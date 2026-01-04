@@ -11,6 +11,7 @@ COPY tsconfig.base.json .
 COPY apps/api ./apps/api
 
 # Install dependencies (including workspace)
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 RUN pnpm install --shamefully-hoist
 

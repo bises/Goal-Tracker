@@ -30,3 +30,5 @@ dist
 apps/api/dist
 apps/web/dist
 .git
+**/.pnpm-store
+apps/api/.pnpm-store

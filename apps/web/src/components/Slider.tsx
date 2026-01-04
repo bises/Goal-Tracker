@@ -6,9 +6,10 @@ interface SliderProps {
     onChange: (val: number) => void;
     onCommit: (val: number) => void;
     label?: string;
+    step?: number;
 }
 
-export const Slider: React.FC<SliderProps> = ({ value, max, onChange, onCommit, label }) => {
+export const Slider: React.FC<SliderProps> = ({ value, max, onChange, onCommit, label, step = 0.1 }) => {
     const [localValue, setLocalValue] = useState(value);
 
     useEffect(() => {
@@ -37,7 +38,7 @@ export const Slider: React.FC<SliderProps> = ({ value, max, onChange, onCommit, 
                     type="range"
                     min="0"
                     max={max}
-                    step="0.1"
+                    step={step}
                     value={localValue}
                     onChange={handleChange}
                     onMouseUp={handleMouseUp}

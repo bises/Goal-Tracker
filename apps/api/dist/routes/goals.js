@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 // Create a new goal
 router.post('/', async (req, res) => {
     try {
-        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate } = req.body;
+        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize } = req.body;
         const goal = await index_1.prisma.goal.create({
             data: {
                 title,
@@ -34,6 +34,7 @@ router.post('/', async (req, res) => {
                 frequencyTarget,
                 frequencyType,
                 endDate: endDate ? new Date(endDate) : null,
+                stepSize: stepSize || 1,
             }
         });
         res.json(goal);

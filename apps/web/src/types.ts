@@ -9,6 +9,9 @@ export interface Goal {
     frequencyType?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
     startDate: string;
     endDate?: string;
+    stepSize?: number;
+    period?: 'YEAR' | 'MONTH' | 'WEEK' | 'CUSTOM';
+    customDataLabel?: string;
     progress: Progress[];
 }
 
@@ -17,4 +20,5 @@ export interface Progress {
     value: number;
     date: string;
     note?: string;
+    customData?: string;
 }

@@ -17,11 +17,20 @@ export const api = {
         return res.json();
     },
 
-    updateProgress: async (goalId: string, value: number, note?: string) => {
+    updateGoal: async (goalId: string, updates: Partial<Goal>): Promise<Goal> => {
+        const res = await fetch(`${API_URL}/goals/${goalId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        return res.json();
+    },
+
+    updateProgress: async (goalId: string, value: number, note?: string, customData?: string) => {
         const res = await fetch(`${API_URL}/goals/${goalId}/progress`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value, note, date: new Date().toISOString() }),
+            body: JSON.stringify({ value, note, date: new Date().toISOString(), customData }),
         });
         return res.json();
     },

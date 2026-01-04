@@ -13,6 +13,13 @@ enum GoalType {
   HABIT
 }
 
+enum GoalPeriod {
+  YEAR
+  MONTH
+  WEEK
+  CUSTOM
+}
+
 enum FrequencyType {
   DAILY
   WEEKLY
@@ -24,10 +31,13 @@ model Goal {
   title       String
   description String?
   type        GoalType
+  period      GoalPeriod @default(CUSTOM)
+  customDataLabel String?
   
   // For TOTAL_TARGET (e.g., Read 12 books)
   targetValue Float?    
   currentValue Float    @default(0)
+  stepSize     Float    @default(1)
   
   // For FREQUENCY (e.g., 2 times per week)
   frequencyTarget Int?
@@ -51,4 +61,5 @@ model Progress {
   date      DateTime @default(now())
   
   note      String?
+  customData String?
 }
