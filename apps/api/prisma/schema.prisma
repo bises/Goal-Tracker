@@ -11,13 +11,16 @@ enum GoalType {
   TOTAL_TARGET
   FREQUENCY
   HABIT
+  COMPLETION
 }
 
-enum GoalPeriod {
-  YEAR
-  MONTH
-  WEEK
-  CUSTOM
+
+enum GoalScope {
+  YEARLY
+  MONTHLY
+  WEEKLY
+  DAILY
+  STANDALONE
 }
 
 enum FrequencyType {
@@ -31,8 +34,18 @@ model Goal {
   title       String
   description String?
   type        GoalType
-  period      GoalPeriod @default(CUSTOM)
   customDataLabel String?
+  
+  // Hierarchy fields
+  parentId    String?
+  parent      Goal?    @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Goal[]   @relation("GoalHierarchy")
+  
+  // Scope and scheduling
+  scope       GoalScope @default(STANDALONE)
+  scheduledDate DateTime?
+  isCompleted   Boolean @default(false)
+  completedAt   DateTime?
   
   // For TOTAL_TARGET (e.g., Read 12 books)
   targetValue Float?    

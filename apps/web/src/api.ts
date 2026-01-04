@@ -39,5 +39,35 @@ export const api = {
         await fetch(`${API_URL}/goals/${goalId}`, {
             method: 'DELETE',
         });
-    }
+    },
+
+    // Hierarchy endpoints
+    getGoalTree: async () => {
+        const res = await fetch(`${API_URL}/goals/tree`);
+        return res.json();
+    },
+
+    getGoalsByScope: async (scope: string) => {
+        const res = await fetch(`${API_URL}/goals/scope/${scope}`);
+        return res.json();
+    },
+
+    getScheduledGoals: async (date: string) => {
+        const res = await fetch(`${API_URL}/goals/scheduled/${date}`);
+        return res.json();
+    },
+
+    bulkCreateTasks: async (parentId: string, tasks: Array<{ title: string; scheduledDate?: string }>) => {
+        const res = await fetch(`${API_URL}/goals/${parentId}/bulk-tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks }),
+        });
+        return res.json();
+    },
+
+    getAvailableTasks: async (scope: string = 'DAILY', scheduled: boolean = false) => {
+        const res = await fetch(`${API_URL}/goals/available-tasks?scope=${scope}&scheduled=${scheduled}`);
+        return res.json();
+    },
 };

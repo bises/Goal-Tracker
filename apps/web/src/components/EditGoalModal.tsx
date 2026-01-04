@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../api';
-import { Goal } from '../types';
+import { Goal, GoalScope } from '../types';
 import { X } from 'lucide-react';
 
 interface EditGoalModalProps {
@@ -11,20 +11,26 @@ interface EditGoalModalProps {
 
 export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onUpdated }) => {
     const [title, setTitle] = useState(goal.title);
+    const [description, setDescription] = useState(goal.description || '');
     const [target, setTarget] = useState(goal.targetValue?.toString() || '');
-    const [period, setPeriod] = useState(goal.period || 'CUSTOM');
     const [customEndDate, setCustomEndDate] = useState(goal.endDate ? new Date(goal.endDate).toISOString().split('T')[0] : '');
     const [customDataLabel, setCustomDataLabel] = useState(goal.customDataLabel || '');
+    const [scope, setScope] = useState<GoalScope>(goal.scope || 'STANDALONE');
+    const [scheduledDate, setScheduledDate] = useState(goal.scheduledDate ? new Date(goal.scheduledDate).toISOString().split('T')[0] : '');
+    const [isCompleted, setIsCompleted] = useState(goal.isCompleted || false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         await api.updateGoal(goal.id, {
             title,
+            description,
             targetValue: parseFloat(target),
-            period: period as any,
-            endDate: period === 'CUSTOM' && customEndDate ? new Date(customEndDate).toISOString() : undefined,
-            customDataLabel
+            endDate: customEndDate ? new Date(customEndDate).toISOString() : undefined,
+            customDataLabel,
+            scope,
+            scheduledDate: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
+            isCompleted
         });
         onUpdated();
         onClose();
@@ -50,28 +56,48 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
                     </div>
 
                     <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Description (Optional)</label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="Add more details about this goal..."
+                            rows={3}
+                            style={{ width: '100%', resize: 'vertical' }}
+                        />
+                    </div>
+
+                    <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Custom Log Label</label>
                         <input value={customDataLabel} onChange={e => setCustomDataLabel(e.target.value)} placeholder="e.g. Book Name" />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Period</label>
-                            <select value={period} onChange={e => setPeriod(e.target.value as any)}>
-                                <option value="YEAR">Yearly</option>
-                                <option value="MONTH">Monthly</option>
-                                <option value="WEEK">Weekly</option>
-                                <option value="CUSTOM">Custom Date</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scope</label>
+                        <select value={scope} onChange={e => setScope(e.target.value as GoalScope)}>
+                            <option value="STANDALONE">Standalone</option>
+                            <option value="YEARLY">Yearly Goal</option>
+                            <option value="MONTHLY">Monthly Goal</option>
+                            <option value="WEEKLY">Weekly Goal</option>
+                            <option value="DAILY">Daily Task</option>
+                        </select>
                     </div>
 
-                    {period === 'CUSTOM' && (
+                    {(scope === 'DAILY' || scope === 'WEEKLY') && (
                         <div>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>End Date</label>
-                            <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scheduled Date</label>
+                            <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
                         </div>
                     )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input type="checkbox" id="isCompleted" checked={isCompleted} onChange={e => setIsCompleted(e.target.checked)} style={{ width: 'auto' }} />
+                        <label htmlFor="isCompleted" style={{ fontSize: '0.9rem' }}>Mark as Completed</label>
+                    </div>
+
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>End Date (Optional)</label>
+                        <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
+                    </div>
 
                     <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Target Value</label>
