@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GoalType {
+  TOTAL_TARGET
+  FREQUENCY
+  HABIT
+}
+
+enum FrequencyType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Goal {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  type        GoalType
+  
+  // For TOTAL_TARGET (e.g., Read 12 books)
+  targetValue Float?    
+  currentValue Float    @default(0)
+  
+  // For FREQUENCY (e.g., 2 times per week)
+  frequencyTarget Int?
+  frequencyType   FrequencyType?
+  
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  progress    Progress[]
+}
+
+model Progress {
+  id        String   @id @default(uuid())
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id])
+  
+  value     Float // Amount added (e.g., 1 book, or 1 gym session)
+  date      DateTime @default(now())
+  
+  note      String?
+}

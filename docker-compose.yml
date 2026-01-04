@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: goal-tracker-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: goaltracker
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - goal-net
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: goal-tracker-api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://user:password@postgres:5432/goaltracker"
+      PORT: 3000
+    depends_on:
+      - postgres
+    networks:
+      - goal-net
+    volumes:
+      - ./apps/api:/app/apps/api
+      - /app/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: goal-tracker-web
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_URL: "http://localhost:3000"
+    depends_on:
+      - api
+    networks:
+      - goal-net
+
+networks:
+  goal-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

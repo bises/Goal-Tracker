@@ -1,0 +1,32 @@
+# Default ignore everything
+*
+
+# Allow these
+!package.json
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps
+!apps/api
+!apps/api/package.json
+!apps/api/tsconfig.json
+!apps/api/src
+!apps/api/prisma
+!apps/api/Dockerfile
+!apps/web
+!apps/web/package.json
+!apps/web/tsconfig.json
+!apps/web/tsconfig.node.json
+!apps/web/vite.config.ts
+!apps/web/index.html
+!apps/web/src
+!apps/web/public
+!apps/web/Dockerfile
+
+# Explicitly ignore these (redundant if * is ignored, but safe)
+node_modules
+apps/api/node_modules
+apps/web/node_modules
+dist
+apps/api/dist
+apps/web/dist
+.git

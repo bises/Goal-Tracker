@@ -1,0 +1,23 @@
+import express from 'express';
+import cors from 'cors';
+import { PrismaClient } from '@prisma/client';
+import goalRoutes from './routes/goals';
+
+const app = express();
+const prisma = new PrismaClient();
+const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/goals', goalRoutes);
+
+app.get('/health', (req, res) => {
+    res.send('OK');
+});
+
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
+
+export { prisma };
