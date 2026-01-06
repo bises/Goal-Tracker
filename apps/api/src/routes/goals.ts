@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../index';
+import { CompletionService } from '../services/completionService';
 
 const router = Router();
+const completionService = new CompletionService(prisma);
 
 const computeGoalView = (goal: any) => {
     const goalTasks = goal.goalTasks || [];
@@ -387,54 +389,13 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 // POST /api/goals/:id/complete - Mark goal as completed and update parent
 router.post('/:id/complete', async (req, res) => {
   try {
-    const goal = await prisma.goal.findUnique({
-      where: { id: req.params.id },
-      select: { 
-        id: true,
-        title: true,
-        parentId: true,
-        progressMode: true,
-      },
-    });
-
-    if (!goal) {
-      return res.status(404).json({ error: 'Goal not found' });
+    const result = await completionService.completeGoal(req.params.id);
+    
+    if (!result.success) {
+      return res.status(404).json({ error: result.message });
     }
-
-    // If goal has a parent, update parent's progress
-    if (goal.parentId) {
-      const parentGoal = await prisma.goal.findUnique({
-        where: { id: goal.parentId },
-        select: { progressMode: true, title: true },
-      });
-
-      if (parentGoal) {
-        // For TASK_BASED or HABIT mode parents, increment the progress
-        if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
-          // Increment parent's progress
-          await prisma.goal.update({
-            where: { id: goal.parentId },
-            data: {
-              currentValue: {
-                increment: 1,
-              },
-            },
-          });
-
-          // Log activity in parent goal
-          await prisma.progress.create({
-            data: {
-              goalId: goal.parentId,
-              value: 1,
-              note: `Subgoal "${goal.title}" marked as completed`,
-              date: new Date(),
-            },
-          });
-        }
-      }
-    }
-
-    res.json({ success: true, message: 'Goal marked as completed' });
+    
+    res.json(result);
   } catch (error) {
     console.error('Error completing goal:', error);
     res.status(500).json({ error: 'Failed to complete goal' });
@@ -443,53 +404,18 @@ router.post('/:id/complete', async (req, res) => {
 
 // POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
 router.post('/:id/uncomplete', async (req, res) => {
-    try {
-        const goal = await prisma.goal.findUnique({
-            where: { id: req.params.id },
-            select: {
-                id: true,
-                title: true,
-                parentId: true,
-                progressMode: true,
-            },
-        });
-
-        if (!goal) {
-            return res.status(404).json({ error: 'Goal not found' });
-        }
-
-        if (goal.parentId) {
-            const parentGoal = await prisma.goal.findUnique({
-                where: { id: goal.parentId },
-                select: { progressMode: true, title: true, currentValue: true },
-            });
-
-            if (parentGoal) {
-                if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
-                    const newValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
-
-                    await prisma.goal.update({
-                        where: { id: goal.parentId },
-                        data: { currentValue: newValue },
-                    });
-
-                    await prisma.progress.create({
-                        data: {
-                            goalId: goal.parentId,
-                            value: -1,
-                            note: `Subgoal "${goal.title}" marked as incomplete`,
-                            date: new Date(),
-                        },
-                    });
-                }
-            }
-        }
-
-        res.json({ success: true, message: 'Goal marked as incomplete' });
-    } catch (error) {
-        console.error('Error marking goal incomplete:', error);
-        res.status(500).json({ error: 'Failed to mark goal incomplete' });
+  try {
+    const result = await completionService.uncompleteGoal(req.params.id);
+    
+    if (!result.success) {
+      return res.status(404).json({ error: result.message });
     }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error marking goal incomplete:', error);
+    res.status(500).json({ error: 'Failed to mark goal incomplete' });
+  }
 });
 
 export default router;

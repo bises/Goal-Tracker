@@ -2,7 +2,58 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const index_1 = require("../index");
+const completionService_1 = require("../services/completionService");
 const router = (0, express_1.Router)();
+const completionService = new completionService_1.CompletionService(index_1.prisma);
+const computeGoalView = (goal) => {
+    const goalTasks = goal.goalTasks || [];
+    const children = goal.children || [];
+    // Calculate direct task progress
+    let totalSize = goalTasks.reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+    let completedSize = goalTasks
+        .filter((gt) => gt.task?.isCompleted)
+        .reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+    let totalCount = goalTasks.length;
+    let completedCount = goalTasks.filter((gt) => gt.task?.isCompleted).length;
+    // If goal has children, include their task progress
+    if (children.length > 0 && goal.progressMode === 'TASK_BASED') {
+        // Recursively calculate child task totals
+        for (const child of children) {
+            const childTasks = child.goalTasks || [];
+            const childTotalSize = childTasks.reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+            const childCompletedSize = childTasks
+                .filter((gt) => gt.task?.isCompleted)
+                .reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+            totalSize += childTotalSize;
+            completedSize += childCompletedSize;
+            totalCount += childTasks.length;
+            completedCount += childTasks.filter((gt) => gt.task?.isCompleted).length;
+        }
+    }
+    const taskProgress = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
+    const manualProgress = goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0;
+    let percentComplete = manualProgress;
+    if (goal.progressMode === 'TASK_BASED') {
+        percentComplete = taskProgress;
+    }
+    return {
+        ...goal,
+        progressSummary: {
+            mode: goal.progressMode,
+            percentComplete,
+            taskTotals: {
+                totalCount,
+                completedCount,
+                totalSize,
+                completedSize,
+            },
+            manualTotals: {
+                currentValue: goal.currentValue,
+                targetValue: goal.targetValue,
+            },
+        },
+    };
+};
 // Get all goals
 router.get('/', async (req, res) => {
     try {
@@ -13,11 +64,19 @@ router.get('/', async (req, res) => {
                     take: 5
                 },
                 children: {
-                    select: {
-                        id: true,
-                        title: true,
-                        scope: true,
-                        isCompleted: true
+                    include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 parent: {
@@ -26,11 +85,23 @@ router.get('/', async (req, res) => {
                         title: true,
                         scope: true
                     }
+                },
+                goalTasks: {
+                    include: {
+                        task: {
+                            select: {
+                                id: true,
+                                title: true,
+                                isCompleted: true,
+                                size: true
+                            }
+                        }
+                    }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.json(goals);
+        res.json(goals.map(computeGoalView));
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch goals' });
@@ -39,26 +110,13 @@ router.get('/', async (req, res) => {
 // Create a new goal
 router.post('/', async (req, res) => {
     try {
-        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize, period, customDataLabel, parentId, scope, scheduledDate } = req.body;
-        let calculatedEndDate = endDate ? new Date(endDate) : null;
-        let startDate = new Date();
-        if (period === 'YEAR') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setFullYear(startDate.getFullYear() + 1);
-        }
-        else if (period === 'MONTH') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setMonth(startDate.getMonth() + 1);
-        }
-        else if (period === 'WEEK') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setDate(startDate.getDate() + 7);
-        }
+        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize, customDataLabel, parentId, scope, progressMode } = req.body;
         const goal = await index_1.prisma.goal.create({
             data: {
                 title,
                 description,
                 type,
+                progressMode: progressMode || 'TASK_BASED',
                 targetValue,
                 frequencyTarget,
                 frequencyType,
@@ -66,8 +124,7 @@ router.post('/', async (req, res) => {
                 stepSize: stepSize || 1,
                 customDataLabel,
                 parentId,
-                scope: scope || 'STANDALONE',
-                scheduledDate: scheduledDate ? new Date(scheduledDate) : null
+                scope: scope || 'STANDALONE'
             }
         });
         res.json(goal);
@@ -81,12 +138,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const { title, description, targetValue, frequencyTarget, frequencyType, endDate, customDataLabel, parentId, scope, scheduledDate, isCompleted } = req.body;
-        // Similar logic for endDate if period is updated, 
-        // but typically edits to period might not shift dates unless requested.
-        // For simplicity, we'll respect passed endDate or period logic if provided.
-        // But usually editing a "Yearly" goal just changes the label or target. 
-        // Let's assume user explicitly provides endDate if they want to change it.
+        const { title, description, targetValue, frequencyTarget, frequencyType, endDate, customDataLabel, parentId, scope, progressMode } = req.body;
         const goal = await index_1.prisma.goal.update({
             where: { id },
             data: {
@@ -99,9 +151,7 @@ router.put('/:id', async (req, res) => {
                 customDataLabel,
                 parentId,
                 scope,
-                scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
-                isCompleted,
-                completedAt: isCompleted ? new Date() : undefined
+                progressMode
             }
         });
         res.json(goal);
@@ -163,9 +213,48 @@ router.get('/tree', async (req, res) => {
             include: {
                 children: {
                     include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        },
                         children: {
                             include: {
-                                children: true // 4 levels deep
+                                goalTasks: {
+                                    include: {
+                                        task: {
+                                            select: {
+                                                id: true,
+                                                title: true,
+                                                isCompleted: true,
+                                                size: true
+                                            }
+                                        }
+                                    }
+                                },
+                                children: {
+                                    include: {
+                                        goalTasks: {
+                                            include: {
+                                                task: {
+                                                    select: {
+                                                        id: true,
+                                                        title: true,
+                                                        isCompleted: true,
+                                                        size: true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -195,10 +284,19 @@ router.get('/scope/:scope', async (req, res) => {
                     take: 5
                 },
                 children: {
-                    select: {
-                        id: true,
-                        title: true,
-                        isCompleted: true
+                    include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 parent: {
@@ -206,51 +304,92 @@ router.get('/scope/:scope', async (req, res) => {
                         id: true,
                         title: true,
                         scope: true
+                    }
+                },
+                goalTasks: {
+                    include: {
+                        task: {
+                            select: {
+                                id: true,
+                                title: true,
+                                isCompleted: true,
+                                size: true
+                            }
+                        }
                     }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.json(goals);
+        res.json(goals.map(computeGoalView));
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch goals by scope' });
     }
 });
-// Get goals scheduled for a specific date
-router.get('/scheduled/:date', async (req, res) => {
-    const { date } = req.params;
+// Bulk create child tasks
+router.post('/:id/bulk-tasks', async (req, res) => {
+    const { id } = req.params;
+    const { tasks } = req.body; // Array of { title, scheduledDate?, size? }
     try {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
-        const goals = await index_1.prisma.goal.findMany({
-            where: {
-                scheduledDate: {
-                    gte: startOfDay,
-                    lte: endOfDay
-                }
-            },
-            include: {
-                progress: {
-                    orderBy: { date: 'desc' },
-                    take: 5
-                },
-                parent: {
-                    select: {
-                        id: true,
-                        title: true,
-                        scope: true
+        const createdTasks = await index_1.prisma.$transaction(tasks.map((task) => index_1.prisma.task.create({
+            data: {
+                title: task.title,
+                scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : null,
+                size: task.size || 1,
+                isCompleted: false,
+                goalTasks: {
+                    create: {
+                        goalId: id
                     }
                 }
             },
-            orderBy: { scheduledDate: 'asc' }
-        });
-        res.json(goals);
+            include: {
+                goalTasks: {
+                    include: {
+                        goal: {
+                            select: {
+                                id: true,
+                                title: true
+                            }
+                        }
+                    }
+                }
+            }
+        })));
+        res.json(createdTasks);
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to fetch scheduled goals' });
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create bulk tasks' });
+    }
+});
+// POST /api/goals/:id/complete - Mark goal as completed and update parent
+router.post('/:id/complete', async (req, res) => {
+    try {
+        const result = await completionService.completeGoal(req.params.id);
+        if (!result.success) {
+            return res.status(404).json({ error: result.message });
+        }
+        res.json(result);
+    }
+    catch (error) {
+        console.error('Error completing goal:', error);
+        res.status(500).json({ error: 'Failed to complete goal' });
+    }
+});
+// POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
+router.post('/:id/uncomplete', async (req, res) => {
+    try {
+        const result = await completionService.uncompleteGoal(req.params.id);
+        if (!result.success) {
+            return res.status(404).json({ error: result.message });
+        }
+        res.json(result);
+    }
+    catch (error) {
+        console.error('Error marking goal incomplete:', error);
+        res.status(500).json({ error: 'Failed to mark goal incomplete' });
     }
 });
 exports.default = router;

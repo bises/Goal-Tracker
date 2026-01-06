@@ -54,6 +54,9 @@ model Goal {
   currentValue Float    @default(0)
   stepSize     Float    @default(1)
   
+  // Completion tracking for parent updates
+  isMarkedComplete Boolean @default(false)
+  
   // For FREQUENCY (e.g., 2 times per week)
   frequencyTarget Int?
   frequencyType   FrequencyType?
