@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Goal } from '@prisma/client';
 
 /**
  * Result type for completion service operations
@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 export interface CompletionResult {
   success: boolean;
   message: string;
-  updatedGoal?: any;
+  updatedGoal?: Partial<Goal>;
 }
 
 /**
