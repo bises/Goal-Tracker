@@ -131,17 +131,85 @@ function App() {
 
             {/* Goals View */}
             {viewMode === 'goals' && (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                    gap: '24px'
-                }}>
-                    {goals.map(goal => (
-                        <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
-                            <GoalCard goal={goal} onUpdate={loadGoals} />
+                <>
+                    {/* Yearly Goals Section */}
+                    {goals.some(g => g.scope === 'YEARLY') && (
+                        <div style={{ marginBottom: '40px' }}>
+                            <h2 style={{ 
+                                fontSize: '1.5rem', 
+                                color: 'var(--color-accent)', 
+                                marginBottom: '16px',
+                                paddingBottom: '8px',
+                                borderBottom: '2px solid var(--color-accent)'
+                            }}>
+                                Yearly Goals
+                            </h2>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                gap: '24px'
+                            }}>
+                                {goals.filter(g => g.scope === 'YEARLY').map(goal => (
+                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    ))}
-                </div>
+                    )}
+
+                    {/* Monthly Goals Section */}
+                    {goals.some(g => g.scope === 'MONTHLY') && (
+                        <div style={{ marginBottom: '40px' }}>
+                            <h2 style={{ 
+                                fontSize: '1.5rem', 
+                                color: 'var(--color-secondary)', 
+                                marginBottom: '16px',
+                                paddingBottom: '8px',
+                                borderBottom: '2px solid var(--color-secondary)'
+                            }}>
+                                Monthly Goals
+                            </h2>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                gap: '24px'
+                            }}>
+                                {goals.filter(g => g.scope === 'MONTHLY').map(goal => (
+                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Standalone Goals Section */}
+                    {goals.some(g => g.scope === 'STANDALONE') && (
+                        <div style={{ marginBottom: '40px' }}>
+                            <h2 style={{ 
+                                fontSize: '1.5rem', 
+                                color: 'var(--color-primary)', 
+                                marginBottom: '16px',
+                                paddingBottom: '8px',
+                                borderBottom: '2px solid var(--color-primary)'
+                            }}>
+                                Standalone Goals
+                            </h2>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                gap: '24px'
+                            }}>
+                                {goals.filter(g => g.scope === 'STANDALONE').map(goal => (
+                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Tasks View */}
