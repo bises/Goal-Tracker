@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import goalRoutes from './routes/goals';
+import taskRoutes from './routes/tasks';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -11,6 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/goals', goalRoutes);
+app.use('/api/tasks', taskRoutes);
 
 app.get('/health', (req, res) => {
     res.send('OK');

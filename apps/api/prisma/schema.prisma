@@ -11,7 +11,12 @@ enum GoalType {
   TOTAL_TARGET
   FREQUENCY
   HABIT
-  COMPLETION
+}
+
+enum ProgressMode {
+  TASK_BASED
+  MANUAL_TOTAL
+  HABIT
 }
 
 
@@ -19,7 +24,6 @@ enum GoalScope {
   YEARLY
   MONTHLY
   WEEKLY
-  DAILY
   STANDALONE
 }
 
@@ -34,6 +38,7 @@ model Goal {
   title       String
   description String?
   type        GoalType
+  progressMode ProgressMode @default(TASK_BASED)
   customDataLabel String?
   
   // Hierarchy fields
@@ -41,14 +46,11 @@ model Goal {
   parent      Goal?    @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children    Goal[]   @relation("GoalHierarchy")
   
-  // Scope and scheduling
+  // Scope
   scope       GoalScope @default(STANDALONE)
-  scheduledDate DateTime?
-  isCompleted   Boolean @default(false)
-  completedAt   DateTime?
   
   // For TOTAL_TARGET (e.g., Read 12 books)
-  targetValue Float?    
+  targetValue Float?
   currentValue Float    @default(0)
   stepSize     Float    @default(1)
   
@@ -63,6 +65,49 @@ model Goal {
   updatedAt   DateTime  @updatedAt
 
   progress    Progress[]
+  goalTasks   GoalTask[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  
+  // Size estimation (in days, default 1)
+  size        Int      @default(1)
+  
+  // Completion tracking
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  
+  // Scheduling
+  scheduledDate DateTime?
+  
+  // Linking to multiple goals (many-to-many)
+  goalTasks   GoalTask[]
+  
+  // Hierarchy (tasks can have subtasks)
+  parentTaskId String?
+  parentTask   Task?    @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subTasks     Task[]   @relation("TaskHierarchy")
+  
+  // Metadata
+  customData  String?  // For logging specific info when completing
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GoalTask {
+  id      String   @id @default(uuid())
+  goalId  String
+  taskId  String
+  goal    Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([goalId, taskId])
 }
 
 model Progress {

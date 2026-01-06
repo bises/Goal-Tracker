@@ -3,6 +3,42 @@ import { prisma } from '../index';
 
 const router = Router();
 
+const computeGoalView = (goal: any) => {
+    const goalTasks = goal.goalTasks || [];
+    const totalSize = goalTasks.reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
+    const completedSize = goalTasks
+        .filter((gt: any) => gt.task?.isCompleted)
+        .reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
+    const totalCount = goalTasks.length;
+    const completedCount = goalTasks.filter((gt: any) => gt.task?.isCompleted).length;
+
+    const taskProgress = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
+    const manualProgress = goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0;
+
+    let percentComplete = manualProgress;
+    if (goal.progressMode === 'TASK_BASED') {
+        percentComplete = taskProgress;
+    }
+
+    return {
+        ...goal,
+        progressSummary: {
+            mode: goal.progressMode,
+            percentComplete,
+            taskTotals: {
+                totalCount,
+                completedCount,
+                totalSize,
+                completedSize,
+            },
+            manualTotals: {
+                currentValue: goal.currentValue,
+                targetValue: goal.targetValue,
+            },
+        },
+    };
+};
+
 // Get all goals
 router.get('/', async (req, res) => {
     try {
@@ -16,8 +52,7 @@ router.get('/', async (req, res) => {
                     select: {
                         id: true,
                         title: true,
-                        scope: true,
-                        isCompleted: true
+                        scope: true
                     }
                 },
                 parent: {
@@ -26,11 +61,23 @@ router.get('/', async (req, res) => {
                         title: true,
                         scope: true
                     }
+                },
+                goalTasks: {
+                    include: {
+                        task: {
+                            select: {
+                                id: true,
+                                title: true,
+                                isCompleted: true,
+                                size: true
+                            }
+                        }
+                    }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.json(goals);
+        res.json(goals.map(computeGoalView));
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch goals' });
     }
@@ -39,27 +86,14 @@ router.get('/', async (req, res) => {
 // Create a new goal
 router.post('/', async (req, res) => {
     try {
-        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize, period, customDataLabel, parentId, scope, scheduledDate } = req.body;
-
-        let calculatedEndDate = endDate ? new Date(endDate) : null;
-        let startDate = new Date();
-
-        if (period === 'YEAR') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setFullYear(startDate.getFullYear() + 1);
-        } else if (period === 'MONTH') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setMonth(startDate.getMonth() + 1);
-        } else if (period === 'WEEK') {
-            calculatedEndDate = new Date(startDate);
-            calculatedEndDate.setDate(startDate.getDate() + 7);
-        }
+        const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize, customDataLabel, parentId, scope, progressMode } = req.body;
 
         const goal = await prisma.goal.create({
             data: {
                 title,
                 description,
                 type,
+                progressMode: progressMode || 'TASK_BASED',
                 targetValue,
                 frequencyTarget,
                 frequencyType,
@@ -67,8 +101,7 @@ router.post('/', async (req, res) => {
                 stepSize: stepSize || 1,
                 customDataLabel,
                 parentId,
-                scope: scope || 'STANDALONE',
-                scheduledDate: scheduledDate ? new Date(scheduledDate) : null
+                scope: scope || 'STANDALONE'
             }
         });
         res.json(goal);
@@ -82,13 +115,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const { title, description, targetValue, frequencyTarget, frequencyType, endDate, customDataLabel, parentId, scope, scheduledDate, isCompleted } = req.body;
-
-        // Similar logic for endDate if period is updated, 
-        // but typically edits to period might not shift dates unless requested.
-        // For simplicity, we'll respect passed endDate or period logic if provided.
-        // But usually editing a "Yearly" goal just changes the label or target. 
-        // Let's assume user explicitly provides endDate if they want to change it.
+        const { title, description, targetValue, frequencyTarget, frequencyType, endDate, customDataLabel, parentId, scope, progressMode } = req.body;
 
         const goal = await prisma.goal.update({
             where: { id },
@@ -102,24 +129,9 @@ router.put('/:id', async (req, res) => {
                 customDataLabel,
                 parentId,
                 scope,
-                scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
-                isCompleted,
-                completedAt: isCompleted ? new Date() : undefined
+                progressMode
             }
         });
-
-        // If task is being marked complete and has a parent, increment parent's progress
-        if (isCompleted && parentId) {
-            const existingGoal = await prisma.goal.findUnique({ where: { id } });
-            if (existingGoal && !existingGoal.isCompleted) {
-                await prisma.goal.update({
-                    where: { id: parentId },
-                    data: {
-                        currentValue: { increment: 1 }
-                    }
-                });
-            }
-        }
 
         res.json(goal);
     } catch (error) {
@@ -218,8 +230,7 @@ router.get('/scope/:scope', async (req, res) => {
                 children: {
                     select: {
                         id: true,
-                        title: true,
-                        isCompleted: true
+                        title: true
                     }
                 },
                 parent: {
@@ -227,72 +238,62 @@ router.get('/scope/:scope', async (req, res) => {
                         id: true,
                         title: true,
                         scope: true
+                    }
+                },
+                goalTasks: {
+                    include: {
+                        task: {
+                            select: {
+                                id: true,
+                                title: true,
+                                isCompleted: true,
+                                size: true
+                            }
+                        }
                     }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.json(goals);
+        res.json(goals.map(computeGoalView));
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch goals by scope' });
     }
 });
 
-// Get goals scheduled for a specific date
-router.get('/scheduled/:date', async (req, res) => {
-    const { date } = req.params;
-    try {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
 
-        const goals = await prisma.goal.findMany({
-            where: {
-                scheduledDate: {
-                    gte: startOfDay,
-                    lte: endOfDay
-                }
-            },
-            include: {
-                progress: {
-                    orderBy: { date: 'desc' },
-                    take: 5
-                },
-                parent: {
-                    select: {
-                        id: true,
-                        title: true,
-                        scope: true
-                    }
-                }
-            },
-            orderBy: { scheduledDate: 'asc' }
-        });
-        res.json(goals);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch scheduled goals' });
-    }
-});
 
 // Bulk create child tasks
 router.post('/:id/bulk-tasks', async (req, res) => {
     const { id } = req.params;
-    const { tasks } = req.body; // Array of { title, scheduledDate? }
+    const { tasks } = req.body; // Array of { title, scheduledDate?, size? }
 
     try {
         const createdTasks = await prisma.$transaction(
             tasks.map((task: any) =>
-                prisma.goal.create({
+                prisma.task.create({
                     data: {
                         title: task.title,
-                        type: 'COMPLETION',
-                        scope: 'DAILY',
-                        parentId: id,
                         scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : null,
+                        size: task.size || 1,
                         isCompleted: false,
-                        currentValue: 0,
-                        stepSize: 1
+                        goalTasks: {
+                            create: {
+                                goalId: id
+                            }
+                        }
+                    },
+                    include: {
+                        goalTasks: {
+                            include: {
+                                goal: {
+                                    select: {
+                                        id: true,
+                                        title: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 })
             )
@@ -302,34 +303,6 @@ router.post('/:id/bulk-tasks', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create bulk tasks' });
-    }
-});
-
-// Get available unscheduled tasks
-router.get('/available-tasks', async (req, res) => {
-    const { scope, scheduled } = req.query;
-
-    try {
-        const goals = await prisma.goal.findMany({
-            where: {
-                scope: scope as any || 'DAILY',
-                scheduledDate: scheduled === 'false' ? null : undefined,
-                isCompleted: false
-            },
-            include: {
-                parent: {
-                    select: {
-                        id: true,
-                        title: true,
-                        scope: true
-                    }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-        res.json(goals);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch available tasks' });
     }
 });
 

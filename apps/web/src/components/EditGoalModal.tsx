@@ -13,11 +13,10 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
     const [title, setTitle] = useState(goal.title);
     const [description, setDescription] = useState(goal.description || '');
     const [target, setTarget] = useState(goal.targetValue?.toString() || '');
+    const [progressMode, setProgressMode] = useState<'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT'>(goal.progressMode || 'TASK_BASED');
     const [customEndDate, setCustomEndDate] = useState(goal.endDate ? new Date(goal.endDate).toISOString().split('T')[0] : '');
     const [customDataLabel, setCustomDataLabel] = useState(goal.customDataLabel || '');
     const [scope, setScope] = useState<GoalScope>(goal.scope || 'STANDALONE');
-    const [scheduledDate, setScheduledDate] = useState(goal.scheduledDate ? new Date(goal.scheduledDate).toISOString().split('T')[0] : '');
-    const [isCompleted, setIsCompleted] = useState(goal.isCompleted || false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,12 +24,11 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
         await api.updateGoal(goal.id, {
             title,
             description,
-            targetValue: parseFloat(target),
+            progressMode,
+            targetValue: target ? parseFloat(target) : undefined,
             endDate: customEndDate ? new Date(customEndDate).toISOString() : undefined,
             customDataLabel,
-            scope,
-            scheduledDate: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
-            isCompleted
+            scope
         });
         onUpdated();
         onClose();
@@ -78,20 +76,7 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
                             <option value="YEARLY">Yearly Goal</option>
                             <option value="MONTHLY">Monthly Goal</option>
                             <option value="WEEKLY">Weekly Goal</option>
-                            <option value="DAILY">Daily Task</option>
                         </select>
-                    </div>
-
-                    {(scope === 'DAILY' || scope === 'WEEKLY') && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scheduled Date</label>
-                            <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
-                        </div>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input type="checkbox" id="isCompleted" checked={isCompleted} onChange={e => setIsCompleted(e.target.checked)} style={{ width: 'auto' }} />
-                        <label htmlFor="isCompleted" style={{ fontSize: '0.9rem' }}>Mark as Completed</label>
                     </div>
 
                     <div>
@@ -100,9 +85,20 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Target Value</label>
-                        <input type="number" value={target} onChange={e => setTarget(e.target.value)} required />
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Progress Mode</label>
+                        <select value={progressMode} onChange={e => setProgressMode(e.target.value as any)}>
+                            <option value="TASK_BASED">Task-based</option>
+                            <option value="MANUAL_TOTAL">Manual total</option>
+                            <option value="HABIT">Habit</option>
+                        </select>
                     </div>
+
+                    {progressMode === 'MANUAL_TOTAL' && (
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Target Value (optional)</label>
+                            <input type="number" value={target} onChange={e => setTarget(e.target.value)} />
+                        </div>
+                    )}
 
                     <button type="submit" className="primary-btn" style={{ marginTop: '16px' }}>Save Changes</button>
                 </form>

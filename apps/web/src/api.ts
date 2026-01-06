@@ -1,6 +1,8 @@
-import { Goal } from './types';
+import { Goal, Task } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+type TaskPayload = Partial<Task> & { goalIds?: string[] };
 
 export const api = {
     fetchGoals: async (): Promise<Goal[]> => {
@@ -52,12 +54,7 @@ export const api = {
         return res.json();
     },
 
-    getScheduledGoals: async (date: string) => {
-        const res = await fetch(`${API_URL}/goals/scheduled/${date}`);
-        return res.json();
-    },
-
-    bulkCreateTasks: async (parentId: string, tasks: Array<{ title: string; scheduledDate?: string }>) => {
+    bulkCreateTasks: async (parentId: string, tasks: Array<{ title: string; scheduledDate?: string; size?: number }>) => {
         const res = await fetch(`${API_URL}/goals/${parentId}/bulk-tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -65,9 +62,53 @@ export const api = {
         });
         return res.json();
     },
+};
 
-    getAvailableTasks: async (scope: string = 'DAILY', scheduled: boolean = false) => {
-        const res = await fetch(`${API_URL}/goals/available-tasks?scope=${scope}&scheduled=${scheduled}`);
+export const taskApi = {
+    fetchTasks: async (): Promise<Task[]> => {
+        const res = await fetch(`${API_URL}/tasks`);
+        return res.json();
+    },
+
+    createTask: async (task: TaskPayload): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(task),
+        });
+        return res.json();
+    },
+
+    updateTask: async (id: string, updates: TaskPayload): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        return res.json();
+    },
+
+    deleteTask: async (id: string) => {
+        await fetch(`${API_URL}/tasks/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
+    toggleComplete: async (id: string): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks/${id}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        return res.json();
+    },
+
+    getScheduledTasks: async (date: string): Promise<Task[]> => {
+        const res = await fetch(`${API_URL}/tasks/scheduled/${date}`);
+        return res.json();
+    },
+
+    getUnscheduledTasks: async (): Promise<Task[]> => {
+        const res = await fetch(`${API_URL}/tasks/unscheduled/list`);
         return res.json();
     },
 };

@@ -1,10 +1,38 @@
-export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'DAILY' | 'STANDALONE';
+export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'STANDALONE';
+export type ProgressMode = 'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT';
+
+export interface Task {
+    id: string;
+    title: string;
+    description?: string;
+    size: number;
+    isCompleted: boolean;
+    completedAt?: string;
+    scheduledDate?: string;
+    goalTasks?: GoalTask[];
+    parentTaskId?: string;
+    parentTask?: Partial<Task>;
+    subTasks?: Partial<Task>[];
+    customData?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface GoalTask {
+    id: string;
+    goalId: string;
+    taskId: string;
+    goal?: Partial<Goal>;
+    task?: Partial<Task>;
+    createdAt: string;
+}
 
 export interface Goal {
     id: string;
     title: string;
     description?: string;
-    type: 'TOTAL_TARGET' | 'FREQUENCY' | 'HABIT' | 'COMPLETION';
+    type: 'TOTAL_TARGET' | 'FREQUENCY' | 'HABIT';
+    progressMode: ProgressMode;
     targetValue?: number;
     currentValue: number;
     frequencyTarget?: number;
@@ -19,13 +47,30 @@ export interface Goal {
     parent?: Partial<Goal>;
     children?: Partial<Goal>[];
 
-    // Scope and scheduling
+    // Linked tasks (many-to-many)
+    goalTasks?: GoalTask[];
+
+    // Scope
     scope: GoalScope;
-    scheduledDate?: string;
-    isCompleted: boolean;
-    completedAt?: string;
 
     progress: Progress[];
+
+    progressSummary?: ProgressSummary;
+}
+
+export interface ProgressSummary {
+    mode: ProgressMode;
+    percentComplete: number;
+    taskTotals: {
+        totalCount: number;
+        completedCount: number;
+        totalSize: number;
+        completedSize: number;
+    };
+    manualTotals: {
+        currentValue: number;
+        targetValue?: number;
+    };
 }
 
 export interface Progress {

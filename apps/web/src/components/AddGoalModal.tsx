@@ -14,13 +14,13 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
     const [description, setDescription] = useState('');
     const [target, setTarget] = useState('');
     const [type, setType] = useState('TOTAL_TARGET');
+    const [progressMode, setProgressMode] = useState<'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT'>('TASK_BASED');
     const [customEndDate, setCustomEndDate] = useState('');
     const [customDataLabel, setCustomDataLabel] = useState('');
 
     // Hierarchy fields
     const [scope, setScope] = useState<GoalScope>(parentGoal ? 'STANDALONE' : 'STANDALONE');
     const [parentId, setParentId] = useState(parentGoal?.id || '');
-    const [scheduledDate, setScheduledDate] = useState('');
     const [availableParents, setAvailableParents] = useState<Goal[]>([]);
 
 
@@ -30,7 +30,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
             if (scope !== 'STANDALONE') {
                 const goals = await api.fetchGoals();
                 // Filter to show only valid parents (one level up)
-                const scopeHierarchy = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
+                const scopeHierarchy = ['YEARLY', 'MONTHLY', 'WEEKLY'];
                 const currentIndex = scopeHierarchy.indexOf(scope);
                 const parentScope = currentIndex > 0 ? scopeHierarchy[currentIndex - 1] : null;
 
@@ -44,13 +44,6 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
         loadParents();
     }, [scope]);
 
-    // Auto-set type to COMPLETION for daily tasks
-    useEffect(() => {
-        if (scope === 'DAILY') {
-            setType('COMPLETION');
-        }
-    }, [scope]);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const allowDecimals = (document.getElementById('allowDecimals') as HTMLInputElement).checked;
@@ -59,15 +52,14 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
             title,
             description,
             type: type as any,
-            targetValue: parseFloat(target),
+            progressMode,
+            targetValue: target ? parseFloat(target) : undefined,
             currentValue: 0,
             stepSize: allowDecimals ? 0.1 : 1,
             endDate: customEndDate || undefined,
             customDataLabel: customDataLabel || undefined,
             scope,
-            parentId: parentId || undefined,
-            scheduledDate: scheduledDate || undefined,
-            isCompleted: false
+            parentId: parentId || undefined
         });
         onAdded();
         onClose();
@@ -106,10 +98,18 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Type</label>
-                            <select value={type} onChange={e => setType(e.target.value)} disabled={scope === 'DAILY'}>
-                                <option value="COMPLETION">Completion</option>
+                            <select value={type} onChange={e => setType(e.target.value)}>
                                 <option value="TOTAL_TARGET">Total Target</option>
                                 <option value="FREQUENCY">Frequency</option>
+                                <option value="HABIT">Habit</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Progress Mode</label>
+                            <select value={progressMode} onChange={e => setProgressMode(e.target.value as any)}>
+                                <option value="TASK_BASED">Task-based</option>
+                                <option value="MANUAL_TOTAL">Manual total</option>
+                                <option value="HABIT">Habit</option>
                             </select>
                         </div>
                     </div>
@@ -130,16 +130,11 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
                         </div>
                     )}
 
-                    {type === 'TOTAL_TARGET' && (
+                    {progressMode === 'MANUAL_TOTAL' && (
                         <div>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Target Value</label>
-                            <input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="12" required />
-                        </div>
-                    )}
-
-                    {type === 'COMPLETION' && (
-                        <div style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                            This is a simple completion task. Mark it as done when finished.
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Target Value (optional)</label>
+                            <input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="e.g., 25000" />
+                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>Leave blank for open-ended totals.</div>
                         </div>
                     )}
 
@@ -150,7 +145,6 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
                             <option value="YEARLY">Yearly Goal</option>
                             <option value="MONTHLY">Monthly Goal</option>
                             <option value="WEEKLY">Weekly Goal</option>
-                            <option value="DAILY">Daily Task</option>
                         </select>
                     </div>
 
@@ -163,13 +157,6 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
                                     <option key={g.id} value={g.id}>{g.title}</option>
                                 ))}
                             </select>
-                        </div>
-                    )}
-
-                    {(scope === 'DAILY' || scope === 'WEEKLY') && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scheduled Date (Optional)</label>
-                            <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
                         </div>
                     )}
 
