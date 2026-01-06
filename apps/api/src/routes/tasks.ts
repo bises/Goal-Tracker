@@ -223,7 +223,16 @@ router.post('/:id/complete', async (req, res) => {
       for (const gt of task.goalTasks) {
         const goal = await tx.goal.findUnique({
           where: { id: gt.goalId },
-          select: { currentValue: true, progressMode: true },
+          select: { 
+            title: true, 
+            currentValue: true, 
+            progressMode: true, 
+            targetValue: true, 
+            parentId: true,
+            goalTasks: {
+              include: { task: true }
+            }
+          },
         });
 
         if (!goal) continue;
@@ -245,6 +254,51 @@ router.post('/:id/complete', async (req, res) => {
             date: new Date(),
           },
         });
+
+        // Check if goal is now completed and has a parent to update
+        if (goal.parentId && toggledCompleted) {
+          // Calculate goal completion percentage
+          const goalTasks = goal.goalTasks || [];
+          const totalSize = goalTasks.reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+          const completedSize = goalTasks
+            .filter((gt) => {
+              // Count as completed if task was already completed or if it's the current task being marked complete
+              return gt.taskId === req.params.id || gt.task?.isCompleted;
+            })
+            .reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
+
+          const percentComplete = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
+
+          // If goal just reached 100% completion, update parent
+          if (percentComplete >= 100) {
+            const parentGoal = await tx.goal.findUnique({
+              where: { id: goal.parentId },
+              select: { progressMode: true, title: true },
+            });
+
+            if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+              // Add 1 progress unit to parent when subgoal completes
+              await tx.goal.update({
+                where: { id: goal.parentId },
+                data: {
+                  currentValue: {
+                    increment: 1,
+                  },
+                },
+              });
+
+              // Log progress in parent goal
+              await tx.progress.create({
+                data: {
+                  goalId: goal.parentId,
+                  value: 1,
+                  note: `Subgoal "${goal.title}" completed (all tasks done)`,
+                  date: new Date(),
+                },
+              });
+            }
+          }
+        }
       }
     });
 

@@ -5,14 +5,18 @@ import { GoalCard } from './components/GoalCard';
 import { AddGoalModal } from './components/AddGoalModal';
 import TaskCard from './components/TaskCard';
 import AddTaskModal from './components/AddTaskModal';
+import { GoalDetailsPage } from './pages/GoalDetailsPage';
 import { Plus } from 'lucide-react';
 
 type ViewMode = 'goals' | 'tasks';
+type PageMode = 'list' | 'details';
 
 function App() {
     const [goals, setGoals] = useState<Goal[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('goals');
+    const [pageMode, setPageMode] = useState<PageMode>('list');
+    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -50,8 +54,26 @@ function App() {
         setEditingTask(null);
     };
 
+    const handleGoalDetailsClick = (goalId: string) => {
+        setSelectedGoalId(goalId);
+        setPageMode('details');
+    };
+
+    const handleBackToList = () => {
+        setPageMode('list');
+        setSelectedGoalId(null);
+    };
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px', width: '100%' }}>
+            {pageMode === 'details' && selectedGoalId ? (
+                <GoalDetailsPage 
+                    goalId={selectedGoalId}
+                    onBack={handleBackToList}
+                    onUpdate={loadGoals}
+                />
+            ) : (
+                <>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                 <div>
                     <h1 style={{ fontSize: '2.5rem', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Goal Tracker</h1>
@@ -115,7 +137,9 @@ function App() {
                     gap: '24px'
                 }}>
                     {goals.map(goal => (
-                        <GoalCard key={goal.id} goal={goal} onUpdate={loadGoals} />
+                        <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
+                            <GoalCard goal={goal} onUpdate={loadGoals} />
+                        </div>
                     ))}
                 </div>
             )}
@@ -162,6 +186,8 @@ function App() {
                     }}
                     editTask={editingTask}
                 />
+            )}
+                </>
             )}
         </div>
     );

@@ -113,7 +113,7 @@ model GoalTask {
 model Progress {
   id        String   @id @default(uuid())
   goalId    String
-  goal      Goal     @relation(fields: [goalId], references: [id])
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
   
   value     Float // Amount added (e.g., 1 book, or 1 gym session)
   date      DateTime @default(now())

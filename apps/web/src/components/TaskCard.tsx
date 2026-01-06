@@ -33,26 +33,24 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
     return (
         <div className={`card ${task.isCompleted ? 'completed' : ''}`}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                <input
-                    type="checkbox"
-                    checked={task.isCompleted}
-                    onChange={handleToggleComplete}
-                    style={{ 
-                        width: '24px', 
-                        height: '24px', 
-                        cursor: 'pointer',
-                        marginTop: '0.25rem'
-                    }}
-                />
-                
                 <div style={{ flex: 1 }}>
-                    <h3 style={{ 
-                        margin: '0 0 0.5rem 0',
-                        textDecoration: task.isCompleted ? 'line-through' : 'none',
-                        opacity: task.isCompleted ? 0.6 : 1
-                    }}>
-                        {task.title}
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <h3 style={{ 
+                            margin: '0',
+                            textDecoration: task.isCompleted ? 'line-through' : 'none',
+                            opacity: task.isCompleted ? 0.6 : 1
+                        }}>
+                            {task.title}
+                        </h3>
+                        {task.isCompleted && (
+                            <span style={{ 
+                                fontSize: '1.25rem',
+                                color: '#4ade80'
+                            }}>
+                                ✓
+                            </span>
+                        )}
+                    </div>
                     
                     {task.description && (
                         <p style={{ 
@@ -117,8 +115,18 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
                     )}
                 </div>
                 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {onEdit && (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={handleToggleComplete}
+                        className={task.isCompleted ? 'btn-secondary' : 'primary-btn'}
+                        style={{ 
+                            padding: '0.5rem 1rem',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {task.isCompleted ? 'Mark Incomplete' : 'Complete Task'}
+                    </button>
+                    {onEdit && !task.isCompleted && (
                         <button
                             onClick={() => onEdit(task)}
                             className="btn-secondary"

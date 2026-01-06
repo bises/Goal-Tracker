@@ -26,7 +26,12 @@ export const BulkTaskModal: React.FC<BulkTaskModalProps> = ({ parentGoal, onClos
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const tasks = preview.map(title => ({ title }));
+        // Generate tasks from pattern if preview hasn't been generated
+        const taskNames = preview.length > 0 ? preview : Array.from({ length: count }, (_, i) => {
+            return pattern.replace(/{n}/g, (i + 1).toString());
+        });
+
+        const tasks = taskNames.map(title => ({ title }));
         await api.bulkCreateTasks(parentGoal.id, tasks);
 
         onCreated();

@@ -62,6 +62,22 @@ export const api = {
         });
         return res.json();
     },
+
+    completeGoal: async (goalId: string) => {
+        const res = await fetch(`${API_URL}/goals/${goalId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        return res.json();
+    },
+
+    uncompleteGoal: async (goalId: string) => {
+        const res = await fetch(`${API_URL}/goals/${goalId}/uncomplete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        return res.json();
+    },
 };
 
 export const taskApi = {

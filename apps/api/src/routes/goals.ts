@@ -5,12 +5,32 @@ const router = Router();
 
 const computeGoalView = (goal: any) => {
     const goalTasks = goal.goalTasks || [];
-    const totalSize = goalTasks.reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
-    const completedSize = goalTasks
+    const children = goal.children || [];
+    
+    // Calculate direct task progress
+    let totalSize = goalTasks.reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
+    let completedSize = goalTasks
         .filter((gt: any) => gt.task?.isCompleted)
         .reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
-    const totalCount = goalTasks.length;
-    const completedCount = goalTasks.filter((gt: any) => gt.task?.isCompleted).length;
+    let totalCount = goalTasks.length;
+    let completedCount = goalTasks.filter((gt: any) => gt.task?.isCompleted).length;
+
+    // If goal has children, include their task progress
+    if (children.length > 0 && goal.progressMode === 'TASK_BASED') {
+        // Recursively calculate child task totals
+        for (const child of children) {
+            const childTasks = child.goalTasks || [];
+            const childTotalSize = childTasks.reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
+            const childCompletedSize = childTasks
+                .filter((gt: any) => gt.task?.isCompleted)
+                .reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
+            
+            totalSize += childTotalSize;
+            completedSize += childCompletedSize;
+            totalCount += childTasks.length;
+            completedCount += childTasks.filter((gt: any) => gt.task?.isCompleted).length;
+        }
+    }
 
     const taskProgress = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
     const manualProgress = goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0;
@@ -49,10 +69,19 @@ router.get('/', async (req, res) => {
                     take: 5
                 },
                 children: {
-                    select: {
-                        id: true,
-                        title: true,
-                        scope: true
+                    include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 parent: {
@@ -196,9 +225,48 @@ router.get('/tree', async (req, res) => {
             include: {
                 children: {
                     include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        },
                         children: {
                             include: {
-                                children: true // 4 levels deep
+                                goalTasks: {
+                                    include: {
+                                        task: {
+                                            select: {
+                                                id: true,
+                                                title: true,
+                                                isCompleted: true,
+                                                size: true
+                                            }
+                                        }
+                                    }
+                                },
+                                children: {
+                                    include: {
+                                        goalTasks: {
+                                            include: {
+                                                task: {
+                                                    select: {
+                                                        id: true,
+                                                        title: true,
+                                                        isCompleted: true,
+                                                        size: true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -228,9 +296,19 @@ router.get('/scope/:scope', async (req, res) => {
                     take: 5
                 },
                 children: {
-                    select: {
-                        id: true,
-                        title: true
+                    include: {
+                        goalTasks: {
+                            include: {
+                                task: {
+                                    select: {
+                                        id: true,
+                                        title: true,
+                                        isCompleted: true,
+                                        size: true
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 parent: {
@@ -303,6 +381,114 @@ router.post('/:id/bulk-tasks', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create bulk tasks' });
+    }
+});
+
+// POST /api/goals/:id/complete - Mark goal as completed and update parent
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const goal = await prisma.goal.findUnique({
+      where: { id: req.params.id },
+      select: { 
+        id: true,
+        title: true,
+        parentId: true,
+        progressMode: true,
+      },
+    });
+
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+
+    // If goal has a parent, update parent's progress
+    if (goal.parentId) {
+      const parentGoal = await prisma.goal.findUnique({
+        where: { id: goal.parentId },
+        select: { progressMode: true, title: true },
+      });
+
+      if (parentGoal) {
+        // For TASK_BASED or HABIT mode parents, increment the progress
+        if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
+          // Increment parent's progress
+          await prisma.goal.update({
+            where: { id: goal.parentId },
+            data: {
+              currentValue: {
+                increment: 1,
+              },
+            },
+          });
+
+          // Log activity in parent goal
+          await prisma.progress.create({
+            data: {
+              goalId: goal.parentId,
+              value: 1,
+              note: `Subgoal "${goal.title}" marked as completed`,
+              date: new Date(),
+            },
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Goal marked as completed' });
+  } catch (error) {
+    console.error('Error completing goal:', error);
+    res.status(500).json({ error: 'Failed to complete goal' });
+  }
+});
+
+// POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
+router.post('/:id/uncomplete', async (req, res) => {
+    try {
+        const goal = await prisma.goal.findUnique({
+            where: { id: req.params.id },
+            select: {
+                id: true,
+                title: true,
+                parentId: true,
+                progressMode: true,
+            },
+        });
+
+        if (!goal) {
+            return res.status(404).json({ error: 'Goal not found' });
+        }
+
+        if (goal.parentId) {
+            const parentGoal = await prisma.goal.findUnique({
+                where: { id: goal.parentId },
+                select: { progressMode: true, title: true, currentValue: true },
+            });
+
+            if (parentGoal) {
+                if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
+                    const newValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
+
+                    await prisma.goal.update({
+                        where: { id: goal.parentId },
+                        data: { currentValue: newValue },
+                    });
+
+                    await prisma.progress.create({
+                        data: {
+                            goalId: goal.parentId,
+                            value: -1,
+                            note: `Subgoal "${goal.title}" marked as incomplete`,
+                            date: new Date(),
+                        },
+                    });
+                }
+            }
+        }
+
+        res.json({ success: true, message: 'Goal marked as incomplete' });
+    } catch (error) {
+        console.error('Error marking goal incomplete:', error);
+        res.status(500).json({ error: 'Failed to mark goal incomplete' });
     }
 });
 
