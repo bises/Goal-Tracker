@@ -3,7 +3,14 @@
 		"chrome-devtools": {
 			"type": "stdio",
 			"command": "npx",
-			"args": ["-y", "chrome-devtools-mcp@latest"]
+			"args": [
+				"-y",
+				"chrome-devtools-mcp@latest"
+			]
+		},
+		"github": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/"
 		}
 	},
 	"inputs": []
