@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -208,7 +209,7 @@ router.post('/:id/complete', async (req, res) => {
     const toggledCompleted = !task.isCompleted;
     const effortDelta = (toggledCompleted ? 1 : -1) * (task.size || 1);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Update task completion state
       await tx.task.update({
         where: { id: req.params.id },

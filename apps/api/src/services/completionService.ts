@@ -1,4 +1,4 @@
-import { PrismaClient, Goal } from '@prisma/client';
+import { PrismaClient, Goal, Prisma } from '@prisma/client';
 
 /**
  * Result type for completion service operations
@@ -19,7 +19,7 @@ export class CompletionService {
    * Mark a goal as completed with idempotency and atomic parent updates
    */
   async completeGoal(goalId: string): Promise<CompletionResult> {
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Fetch the goal with parent info
       const goal = await tx.goal.findUnique({
         where: { id: goalId },
@@ -109,7 +109,7 @@ export class CompletionService {
    * Mark a goal as incomplete with idempotency and atomic parent updates
    */
   async uncompleteGoal(goalId: string): Promise<CompletionResult> {
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Fetch the goal with parent info
       const goal = await tx.goal.findUnique({
         where: { id: goalId },

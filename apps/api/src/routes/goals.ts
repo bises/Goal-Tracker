@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
 
@@ -185,7 +186,7 @@ router.post('/:id/progress', async (req, res) => {
     const { value, note, date, customData } = req.body;
 
     try {
-        const result = await prisma.$transaction(async (tx: any) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Create progress entry
             const progress = await tx.progress.create({
                 data: {
