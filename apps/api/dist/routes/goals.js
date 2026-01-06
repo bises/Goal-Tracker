@@ -4,7 +4,14 @@ const express_1 = require("express");
 const index_1 = require("../index");
 const completionService_1 = require("../services/completionService");
 const router = (0, express_1.Router)();
-const completionService = new completionService_1.CompletionService(index_1.prisma);
+// Lazy-initialize the completion service to avoid circular dependency issues
+let completionService;
+const getCompletionService = () => {
+    if (!completionService) {
+        completionService = new completionService_1.CompletionService(index_1.prisma);
+    }
+    return completionService;
+};
 const computeGoalView = (goal) => {
     const goalTasks = goal.goalTasks || [];
     const children = goal.children || [];
@@ -367,7 +374,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 // POST /api/goals/:id/complete - Mark goal as completed and update parent
 router.post('/:id/complete', async (req, res) => {
     try {
-        const result = await completionService.completeGoal(req.params.id);
+        const result = await getCompletionService().completeGoal(req.params.id);
         if (!result.success) {
             return res.status(404).json({ error: result.message });
         }
@@ -381,7 +388,7 @@ router.post('/:id/complete', async (req, res) => {
 // POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
 router.post('/:id/uncomplete', async (req, res) => {
     try {
-        const result = await completionService.uncompleteGoal(req.params.id);
+        const result = await getCompletionService().uncompleteGoal(req.params.id);
         if (!result.success) {
             return res.status(404).json({ error: result.message });
         }

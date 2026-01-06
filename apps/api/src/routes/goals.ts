@@ -3,7 +3,15 @@ import { prisma } from '../index';
 import { CompletionService } from '../services/completionService';
 
 const router = Router();
-const completionService = new CompletionService(prisma);
+
+// Lazy-initialize the completion service to avoid circular dependency issues
+let completionService: CompletionService;
+const getCompletionService = () => {
+  if (!completionService) {
+    completionService = new CompletionService(prisma);
+  }
+  return completionService;
+};
 
 const computeGoalView = (goal: any) => {
     const goalTasks = goal.goalTasks || [];
@@ -389,7 +397,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 // POST /api/goals/:id/complete - Mark goal as completed and update parent
 router.post('/:id/complete', async (req, res) => {
   try {
-    const result = await completionService.completeGoal(req.params.id);
+    const result = await getCompletionService().completeGoal(req.params.id);
     
     if (!result.success) {
       return res.status(404).json({ error: result.message });
@@ -405,7 +413,7 @@ router.post('/:id/complete', async (req, res) => {
 // POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
 router.post('/:id/uncomplete', async (req, res) => {
   try {
-    const result = await completionService.uncompleteGoal(req.params.id);
+    const result = await getCompletionService().uncompleteGoal(req.params.id);
     
     if (!result.success) {
       return res.status(404).json({ error: result.message });
