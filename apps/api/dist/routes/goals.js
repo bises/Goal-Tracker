@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const index_1 = require("../index");
+const prisma_1 = require("../prisma");
 const completionService_1 = require("../services/completionService");
 const router = (0, express_1.Router)();
 // Lazy-initialize the completion service to avoid circular dependency issues
 let completionService;
 const getCompletionService = () => {
     if (!completionService) {
-        completionService = new completionService_1.CompletionService(index_1.prisma);
+        completionService = new completionService_1.CompletionService(prisma_1.prisma);
     }
     return completionService;
 };
@@ -64,7 +64,7 @@ const computeGoalView = (goal) => {
 // Get all goals
 router.get('/', async (req, res) => {
     try {
-        const goals = await index_1.prisma.goal.findMany({
+        const goals = await prisma_1.prisma.goal.findMany({
             include: {
                 progress: {
                     orderBy: { date: 'desc' },
@@ -118,7 +118,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { title, description, type, targetValue, frequencyTarget, frequencyType, endDate, stepSize, customDataLabel, parentId, scope, progressMode } = req.body;
-        const goal = await index_1.prisma.goal.create({
+        const goal = await prisma_1.prisma.goal.create({
             data: {
                 title,
                 description,
@@ -146,7 +146,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const { title, description, targetValue, frequencyTarget, frequencyType, endDate, customDataLabel, parentId, scope, progressMode } = req.body;
-        const goal = await index_1.prisma.goal.update({
+        const goal = await prisma_1.prisma.goal.update({
             where: { id },
             data: {
                 title,
@@ -173,7 +173,7 @@ router.post('/:id/progress', async (req, res) => {
     const { id } = req.params;
     const { value, note, date, customData } = req.body;
     try {
-        const result = await index_1.prisma.$transaction(async (tx) => {
+        const result = await prisma_1.prisma.$transaction(async (tx) => {
             // Create progress entry
             const progress = await tx.progress.create({
                 data: {
@@ -203,8 +203,8 @@ router.post('/:id/progress', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await index_1.prisma.progress.deleteMany({ where: { goalId: id } });
-        await index_1.prisma.goal.delete({ where: { id } });
+        await prisma_1.prisma.progress.deleteMany({ where: { goalId: id } });
+        await prisma_1.prisma.goal.delete({ where: { id } });
         res.json({ message: 'Goal deleted' });
     }
     catch (error) {
@@ -215,7 +215,7 @@ router.delete('/:id', async (req, res) => {
 // Get hierarchical goal tree (top-level goals with nested children)
 router.get('/tree', async (req, res) => {
     try {
-        const goals = await index_1.prisma.goal.findMany({
+        const goals = await prisma_1.prisma.goal.findMany({
             where: { parentId: null }, // Only top-level goals
             include: {
                 children: {
@@ -283,7 +283,7 @@ router.get('/tree', async (req, res) => {
 router.get('/scope/:scope', async (req, res) => {
     const { scope } = req.params;
     try {
-        const goals = await index_1.prisma.goal.findMany({
+        const goals = await prisma_1.prisma.goal.findMany({
             where: { scope: scope },
             include: {
                 progress: {
@@ -339,7 +339,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
     const { id } = req.params;
     const { tasks } = req.body; // Array of { title, scheduledDate?, size? }
     try {
-        const createdTasks = await index_1.prisma.$transaction(tasks.map((task) => index_1.prisma.task.create({
+        const createdTasks = await prisma_1.prisma.$transaction(tasks.map((task) => prisma_1.prisma.task.create({
             data: {
                 title: task.title,
                 scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : null,
