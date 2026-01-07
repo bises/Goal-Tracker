@@ -643,4 +643,27 @@ router.post('/:id/unlink-goal', async (req, res) => {
   }
 });
 
+// POST /api/tasks/:id/schedule - Schedule or unschedule a task
+router.post('/:id/schedule', async (req, res) => {
+  try {
+    const { scheduledDate } = req.body;
+
+    const task = await prisma.task.update({
+      where: { id: req.params.id },
+      data: {
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null
+      },
+      include: taskWithGoals
+    });
+
+    res.json({
+      success: true,
+      task
+    });
+  } catch (error) {
+    console.error('Error scheduling task:', error);
+    res.status(500).json({ error: 'Failed to schedule task' });
+  }
+});
+
 export default router;

@@ -157,4 +157,42 @@ export const taskApi = {
         });
         return res.json();
     },
+
+    scheduleTask: async (taskId: string, scheduledDate: string | null): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks/${taskId}/schedule`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheduledDate }),
+        });
+        const data = await res.json();
+        return data.task;
+    },
+};
+
+export const calendarApi = {
+    fetchCalendarTasks: async (startDate: string, endDate: string, includeUnscheduled = false, parentGoalId?: string) => {
+        const params = new URLSearchParams({
+            startDate,
+            endDate,
+            includeUnscheduled: includeUnscheduled.toString(),
+        });
+        
+        if (parentGoalId) {
+            params.append('parentGoalId', parentGoalId);
+        }
+
+        const res = await fetch(`${API_URL}/calendar/tasks?${params}`);
+        return res.json();
+    },
+
+    fetchCalendarGoals: async (startDate: string, endDate: string, scope?: string) => {
+        const params = new URLSearchParams({ startDate, endDate });
+        
+        if (scope) {
+            params.append('scope', scope);
+        }
+
+        const res = await fetch(`${API_URL}/calendar/goals?${params}`);
+        return res.json();
+    },
 };

@@ -17,16 +17,22 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
     const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
     const [scheduledDate, setScheduledDate] = useState('');
     const [goals, setGoals] = useState<Goal[]>([]);
+    const [showGoals, setShowGoals] = useState(false);
+    const [goalsLoaded, setGoalsLoaded] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            loadGoals();
             if (editTask) {
                 setTitle(editTask.title);
                 setDescription(editTask.description || '');
                 setSize(editTask.size);
                 setSelectedGoalIds(editTask.goalTasks?.map(gt => gt.goalId) || []);
                 setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
+                // Auto-expand goals if task has linked goals
+                if (editTask.goalTasks && editTask.goalTasks.length > 0) {
+                    setShowGoals(true);
+                    loadGoals();
+                }
             } else {
                 resetForm();
             }
@@ -34,9 +40,11 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
     }, [isOpen, editTask]);
 
     const loadGoals = async () => {
+        if (goalsLoaded) return; // Don't reload if already loaded
         try {
             const fetchedGoals = await api.fetchGoals();
             setGoals(fetchedGoals);
+            setGoalsLoaded(true);
         } catch (error) {
             console.error('Failed to fetch goals:', error);
         }
@@ -48,6 +56,9 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
         setSize(1);
         setSelectedGoalIds([]);
         setScheduledDate('');
+        setShowGoals(false);
+        setGoalsLoaded(false);
+        setGoals([]);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -131,22 +142,101 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Link to Goals (Optional, multi-select)</label>
-                        <select
-                            multiple
-                            value={selectedGoalIds}
-                            onChange={(e) => setSelectedGoalIds(Array.from(e.target.selectedOptions).map(o => o.value))}
-                            style={{ minHeight: '100px' }}
+                        <div 
+                            onClick={() => {
+                                if (!showGoals) {
+                                    setShowGoals(true);
+                                    loadGoals();
+                                } else {
+                                    setShowGoals(false);
+                                }
+                            }}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                background: 'rgba(255,255,255,0.05)',
+                                borderRadius: '6px',
+                                marginBottom: showGoals ? '8px' : '0'
+                            }}
                         >
-                            {goals.map((goal) => (
-                                <option key={goal.id} value={goal.id}>
-                                    {goal.title} ({goal.scope})
-                                </option>
-                            ))}
-                        </select>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                            Hold Ctrl/Cmd to select multiple goals.
+                            <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+                                Link to Goals (Optional)
+                            </label>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                {showGoals ? '▼' : '▶'}
+                            </span>
                         </div>
+                        
+                        {showGoals && (
+                            <div style={{ 
+                                maxHeight: '150px', 
+                                overflowY: 'auto', 
+                                border: '1px solid rgba(255,255,255,0.1)', 
+                                borderRadius: '6px', 
+                                padding: '4px',
+                                background: 'rgba(255,255,255,0.02)'
+                            }}>
+                                {!goalsLoaded ? (
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', padding: '12px' }}>
+                                        Loading goals...
+                                    </div>
+                                ) : goals.length === 0 ? (
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', padding: '12px' }}>
+                                        No goals available
+                                    </div>
+                                ) : (
+                                    goals.map((goal) => (
+                                        <label 
+                                            key={goal.id} 
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: '10px', 
+                                                padding: '8px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.9rem',
+                                                borderRadius: '4px',
+                                                transition: 'background 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedGoalIds.includes(goal.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedGoalIds([...selectedGoalIds, goal.id]);
+                                                    } else {
+                                                        setSelectedGoalIds(selectedGoalIds.filter(id => id !== goal.id));
+                                                    }
+                                                }}
+                                                style={{ 
+                                                    cursor: 'pointer',
+                                                    width: '16px',
+                                                    height: '16px',
+                                                    marginTop: '0',
+                                                    flexShrink: 0
+                                                }}
+                                            />
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flex: 1 }}>
+                                                <span style={{ lineHeight: '1.4' }}>{goal.title}</span>
+                                                <span style={{ 
+                                                    fontSize: '0.75rem', 
+                                                    color: 'var(--color-text-muted)',
+                                                    flexShrink: 0
+                                                }}>
+                                                    ({goal.scope})
+                                                </span>
+                                            </div>
+                                        </label>
+                                    ))
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div>

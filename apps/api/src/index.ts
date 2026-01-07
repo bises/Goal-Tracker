@@ -3,6 +3,7 @@ import cors from 'cors';
 import { prisma } from './prisma';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
+import calendarRoutes from './routes/calendar';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.use(express.json());
 
 app.use('/api/goals', goalRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 app.get('/health', (req, res) => {
     res.send('OK');

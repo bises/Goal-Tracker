@@ -6,15 +6,16 @@ import { AddGoalModal } from './components/AddGoalModal';
 import TaskCard from './components/TaskCard';
 import AddTaskModal from './components/AddTaskModal';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
+import { PlannerPage } from './pages/PlannerPage';
 import { Plus } from 'lucide-react';
 
-type ViewMode = 'goals' | 'tasks';
+type ViewMode = 'goals' | 'tasks' | 'planner';
 type PageMode = 'list' | 'details';
 
 function App() {
     const [goals, setGoals] = useState<Goal[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [viewMode, setViewMode] = useState<ViewMode>('goals');
+    const [viewMode, setViewMode] = useState<ViewMode>('planner');
     const [pageMode, setPageMode] = useState<PageMode>('list');
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -130,6 +131,21 @@ function App() {
                 >
                     Tasks ({tasks.length})
                 </button>
+                <button
+                    onClick={() => setViewMode('planner')}
+                    style={{
+                        background: viewMode === 'planner' ? 'var(--color-primary)' : 'transparent',
+                        border: 'none',
+                        color: 'white',
+                        padding: '8px 24px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: viewMode === 'planner' ? 600 : 400
+                    }}
+                >
+                    Planner
+                </button>
             </div>
 
             {/* Goals View */}
@@ -231,6 +247,11 @@ function App() {
                         />
                     ))}
                 </div>
+            )}
+
+            {/* Planner View */}
+            {viewMode === 'planner' && (
+                <PlannerPage />
             )}
 
             {/* Empty States */}
