@@ -35,7 +35,42 @@ const taskWithGoals = {
 router.get('/', async (req, res) => {
   try {
     const tasks = await prisma.task.findMany({
-      include: taskWithGoals,
+      relationLoadStrategy: 'join',
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        size: true,
+        isCompleted: true,
+        scheduledDate: true,
+        customData: true,
+        createdAt: true,
+        updatedAt: true,
+        parentTaskId: true,
+        parentTask: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        goalTasks: {
+          select: {
+            goal: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        subTasks: {
+          select: {
+            id: true,
+            title: true,
+            isCompleted: true,
+          },
+        },
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -52,7 +87,42 @@ router.get('/:id', async (req, res) => {
   try {
     const task = await prisma.task.findUnique({
       where: { id: req.params.id },
-      include: taskWithGoals,
+      relationLoadStrategy: 'join',
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        size: true,
+        isCompleted: true,
+        scheduledDate: true,
+        customData: true,
+        createdAt: true,
+        updatedAt: true,
+        parentTaskId: true,
+        parentTask: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        goalTasks: {
+          select: {
+            goal: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        subTasks: {
+          select: {
+            id: true,
+            title: true,
+            isCompleted: true,
+          },
+        },
+      },
     });
     
     if (!task) {
@@ -83,25 +153,86 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    const task = await prisma.task.create({
-      data: {
-        title,
-        description,
-        size: parseInt(size),
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-        parentTaskId: parentTaskId || null,
-        customData,
-        goalTasks: {
-          create: goalIds.map((goalId: string) => ({
-            goal: {
-              connect: {
-                id: goalId,
+    const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Create the task
+      const newTask = await tx.task.create({
+        data: {
+          title,
+          description,
+          size: parseInt(size),
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          parentTaskId: parentTaskId || null,
+          customData,
+          goalTasks: {
+            create: goalIds.map((goalId: string) => ({
+              goal: {
+                connect: {
+                  id: goalId,
+                },
+              },
+            })),
+          },
+        },
+      });
+
+      // Update target value for each parent goal (only for TASK_BASED)
+      if (goalIds.length > 0) {
+        for (const goalId of goalIds) {
+          const parentGoal = await tx.goal.findUnique({
+            where: { id: goalId },
+            select: { progressMode: true, targetValue: true },
+          });
+          if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+            await tx.goal.update({
+              where: { id: goalId },
+              data: {
+                targetValue: (parentGoal.targetValue ?? 0) + 1,
+              },
+            });
+          }
+          // TODO: Consider MANUAL_TOTAL & HABIT: should adding a task influence targets?
+        }
+      }
+
+      // Fetch the task with relations
+      return await tx.task.findUnique({
+        where: { id: newTask.id },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          size: true,
+          isCompleted: true,
+          scheduledDate: true,
+          customData: true,
+          createdAt: true,
+          updatedAt: true,
+          parentTaskId: true,
+          parentTask: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          goalTasks: {
+            select: {
+              goal: {
+                select: {
+                  id: true,
+                  title: true,
+                },
               },
             },
-          })),
+          },
+          subTasks: {
+            select: {
+              id: true,
+              title: true,
+              isCompleted: true,
+            },
+          },
         },
-      },
-      include: taskWithGoals,
+      });
     });
 
     res.status(201).json(task);
@@ -111,7 +242,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/tasks/:id - Update task
+// PUT /api/tasks/:id - Update task (no longer handles goal linking)
 router.put('/:id', async (req, res) => {
   try {
     const {
@@ -119,7 +250,6 @@ router.put('/:id', async (req, res) => {
       description,
       size,
       scheduledDate,
-      goalIds,
       parentTaskId,
       customData,
       isCompleted,
@@ -146,32 +276,6 @@ router.put('/:id', async (req, res) => {
       include: taskWithGoals,
     });
 
-    // Handle goalIds separately if provided
-    if (goalIds !== undefined) {
-      // Delete existing goal associations
-      await prisma.goalTask.deleteMany({
-        where: { taskId: req.params.id },
-      });
-
-      // Create new goal associations
-      if (goalIds.length > 0) {
-        await prisma.goalTask.createMany({
-          data: goalIds.map((goalId: string) => ({
-            goalId,
-            taskId: req.params.id,
-          })),
-        });
-      }
-
-      // Refetch task with updated goals
-      const updatedTask = await prisma.task.findUnique({
-        where: { id: req.params.id },
-        include: taskWithGoals,
-      });
-
-      return res.json(updatedTask);
-    }
-
     res.json(task);
   } catch (error) {
     console.error('Error updating task:', error);
@@ -182,9 +286,65 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/tasks/:id - Delete task
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.task.delete({
+    const { goalIds = [] } = req.body;
+
+    // Fetch task state first to know if we need to decrease currentValue
+    const existingTask = await prisma.task.findUnique({
       where: { id: req.params.id },
+      select: { isCompleted: true, size: true },
     });
+
+    if (!existingTask) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const progressDelta = existingTask.isCompleted ? -1 * (existingTask.size || 1) : 0;
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Delete the task
+      await tx.task.delete({
+        where: { id: req.params.id },
+      });
+
+      // Determine effective goalIds (fallback to DB lookup if not provided)
+      let effectiveGoalIds: string[] = goalIds;
+      if (!effectiveGoalIds || effectiveGoalIds.length === 0) {
+        const links = await tx.goalTask.findMany({
+          where: { taskId: req.params.id },
+          select: { goalId: true },
+        });
+        effectiveGoalIds = links.map((l) => l.goalId);
+      }
+
+      // Adjust parent goals (only for TASK_BASED)
+      for (const goalId of effectiveGoalIds) {
+        const parentGoal = await tx.goal.findUnique({
+          where: { id: goalId },
+          select: { progressMode: true, targetValue: true, currentValue: true },
+        });
+        if (!parentGoal) continue;
+
+        if (parentGoal.progressMode === 'TASK_BASED') {
+          const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
+          const newCurrent = progressDelta !== 0
+            ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
+            : parentGoal.currentValue ?? 0;
+
+          await tx.goal.update({
+            where: { id: goalId },
+            data: {
+              targetValue: newTarget,
+              currentValue: newCurrent,
+            },
+          });
+
+          // Optional: log a negative progress entry to reflect deletion
+          // Skipped for now; add if you want audit trail.
+        }
+        // TODO: Consider MANUAL_TOTAL & HABIT: should removing a task influence targets/progress?
+      }
+    });
+
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting task:', error);
@@ -359,6 +519,127 @@ router.get('/unscheduled/list', async (req, res) => {
   } catch (error) {
     console.error('Error fetching unscheduled tasks:', error);
     res.status(500).json({ error: 'Failed to fetch unscheduled tasks' });
+  }
+});
+
+// POST /api/tasks/:id/link-goal - Link task to a goal
+router.post('/:id/link-goal', async (req, res) => {
+  try {
+    const { goalId } = req.body;
+
+    if (!goalId) {
+      return res.status(400).json({ error: 'goalId is required' });
+    }
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Check if link already exists
+      const existing = await tx.goalTask.findFirst({
+        where: { taskId: req.params.id, goalId },
+      });
+
+      if (existing) {
+        throw new Error('Task is already linked to this goal');
+      }
+
+      // Create the link
+      await tx.goalTask.create({
+        data: { goalId, taskId: req.params.id },
+      });
+
+      // Increment goal's targetValue if TASK_BASED
+      const goal = await tx.goal.findUnique({
+        where: { id: goalId },
+        select: { progressMode: true, targetValue: true },
+      });
+
+      if (goal && goal.progressMode === 'TASK_BASED') {
+        await tx.goal.update({
+          where: { id: goalId },
+          data: { targetValue: (goal.targetValue ?? 0) + 1 },
+        });
+      }
+      // TODO: Consider MANUAL_TOTAL & HABIT link effect on targets
+    });
+
+    // Return updated task
+    const task = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: taskWithGoals,
+    });
+
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error linking task to goal:', error);
+    res.status(500).json({ error: error.message || 'Failed to link task to goal' });
+  }
+});
+
+// POST /api/tasks/:id/unlink-goal - Unlink task from a goal
+router.post('/:id/unlink-goal', async (req, res) => {
+  try {
+    const { goalId } = req.body;
+
+    if (!goalId) {
+      return res.status(400).json({ error: 'goalId is required' });
+    }
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Fetch the task to check if it's completed
+      const task = await tx.task.findUnique({
+        where: { id: req.params.id },
+        select: { isCompleted: true, size: true },
+      });
+
+      if (!task) {
+        throw new Error('Task not found');
+      }
+
+      // Delete the link
+      const deleted = await tx.goalTask.deleteMany({
+        where: { taskId: req.params.id, goalId },
+      });
+
+      if (deleted.count === 0) {
+        throw new Error('Task is not linked to this goal');
+      }
+
+      // Update goal's targetValue and currentValue if TASK_BASED
+      const goal = await tx.goal.findUnique({
+        where: { id: goalId },
+        select: { progressMode: true, targetValue: true, currentValue: true },
+      });
+
+      if (goal && goal.progressMode === 'TASK_BASED') {
+        const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
+        
+        // If task was completed, also decrement currentValue
+        let newCurrentValue = goal.currentValue;
+        if (task.isCompleted) {
+          const progressDelta = task.size || 1;
+          newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
+        }
+
+        await tx.goal.update({
+          where: { id: goalId },
+          data: { 
+            targetValue: newTargetValue,
+            currentValue: newCurrentValue,
+          },
+        });
+      }
+      // TODO: Consider MANUAL_TOTAL & HABIT unlink effect on targets
+    });
+
+    // Return updated task
+    const task = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: taskWithGoals,
+    });
+
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error unlinking task from goal:', error);
+    res.status(500).json({ error: error.message || 'Failed to unlink task from goal' });
   }
 });
 

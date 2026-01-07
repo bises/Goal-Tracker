@@ -78,6 +78,16 @@ export const api = {
         });
         return res.json();
     },
+
+    getGoalTasks: async (goalId: string) => {
+        const res = await fetch(`${API_URL}/goals/${goalId}/tasks`);
+        return res.json();
+    },
+
+    getGoalActivities: async (goalId: string) => {
+        const res = await fetch(`${API_URL}/goals/${goalId}/activities`);
+        return res.json();
+    },
 };
 
 export const taskApi = {
@@ -104,9 +114,11 @@ export const taskApi = {
         return res.json();
     },
 
-    deleteTask: async (id: string) => {
+    deleteTask: async (id: string, goalIds: string[] = []) => {
         await fetch(`${API_URL}/tasks/${id}`, {
             method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goalIds }),
         });
     },
 
@@ -125,6 +137,24 @@ export const taskApi = {
 
     getUnscheduledTasks: async (): Promise<Task[]> => {
         const res = await fetch(`${API_URL}/tasks/unscheduled/list`);
+        return res.json();
+    },
+
+    linkGoal: async (taskId: string, goalId: string): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks/${taskId}/link-goal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goalId }),
+        });
+        return res.json();
+    },
+
+    unlinkGoal: async (taskId: string, goalId: string): Promise<Task> => {
+        const res = await fetch(`${API_URL}/tasks/${taskId}/unlink-goal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goalId }),
+        });
         return res.json();
     },
 };

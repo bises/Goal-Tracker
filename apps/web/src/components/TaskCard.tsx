@@ -20,7 +20,10 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
     const handleDelete = async () => {
         if (confirm(`Delete task "${task.title}"?`)) {
             try {
-                await taskApi.deleteTask(task.id);
+                const goalIds = (task.goalTasks || [])
+                    .map(gt => gt.goal?.id)
+                    .filter((id): id is string => Boolean(id));
+                await taskApi.deleteTask(task.id, goalIds);
                 onUpdate();
             } catch (error) {
                 console.error('Failed to delete task:', error);

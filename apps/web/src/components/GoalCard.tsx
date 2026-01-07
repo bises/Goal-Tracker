@@ -10,9 +10,10 @@ import LinkTasksModal from './LinkTasksModal';
 interface GoalCardProps {
     goal: Goal;
     onUpdate: () => void;
+    onViewDetails?: () => void;
 }
 
-export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
+export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate, onViewDetails }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isLogging, setIsLogging] = useState(false);
     const [isCreatingTasks, setIsCreatingTasks] = useState(false);
@@ -25,8 +26,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
         }
     }
 
-    const summary = goal.progressSummary;
-    const percent = summary?.percentComplete ?? (goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0);
+    const percent = goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0;
 
     return (
         <>
@@ -48,14 +48,14 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
                     </div>
                     <div className="flex gap-2 ml-4">
                         <button 
-                            onClick={() => setIsEditing(true)} 
+                            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} 
                             className="p-2 text-slate-400 hover:text-white transition-colors"
                             title="Edit"
                         >
                             <Edit2 size={18} />
                         </button>
                         <button 
-                            onClick={handleDelete} 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(); }} 
                             className="p-2 text-slate-400 hover:text-red-400 transition-colors"
                             title="Delete"
                         >
@@ -66,40 +66,23 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
 
                 {/* Progress Display */}
                 <div className="mb-6">
-                    {summary?.mode === 'TASK_BASED' ? (
-                        <>
-                            <div className="text-sm text-slate-400 mb-2">
-                                {summary.taskTotals.completedCount}/{summary.taskTotals.totalCount} tasks
-                            </div>
-                            <div className="w-full bg-slate-700/30 rounded-full h-2.5">
-                                <div 
-                                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full transition-all" 
-                                    style={{ width: `${summary.percentComplete}%` }}
-                                />
-                            </div>
-                            <div className="text-right text-sm text-slate-300 mt-2">{summary.percentComplete.toFixed(0)}%</div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="text-sm text-slate-400 mb-2">
-                                {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
-                            </div>
-                            <div className="w-full bg-slate-700/30 rounded-full h-2.5">
-                                <div 
-                                    className="bg-gradient-to-r from-green-500 to-emerald-500 h-2.5 rounded-full transition-all" 
-                                    style={{ width: `${percent}%` }}
-                                />
-                            </div>
-                            <div className="text-right text-sm text-slate-300 mt-2">{percent.toFixed(0)}%</div>
-                        </>
-                    )}
+                    <div className="text-sm text-slate-400 mb-2">
+                        {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
+                    </div>
+                    <div className="w-full bg-slate-700/30 rounded-full h-2.5">
+                        <div
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-2.5 rounded-full transition-all"
+                            style={{ width: `${percent}%` }}
+                        />
+                    </div>
+                    <div className="text-right text-sm text-slate-300 mt-2">{percent.toFixed(0)}%</div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 flex-wrap">
                     {(goal.scope === 'MONTHLY' || goal.scope === 'YEARLY') && (
                         <button
-                            onClick={() => setIsCreatingTasks(true)}
+                            onClick={(e) => { e.stopPropagation(); setIsCreatingTasks(true); }}
                             className="px-3 py-1.5 bg-green-500/20 border border-green-500/30 text-white rounded-lg text-sm hover:bg-green-500/30 transition-colors"
                             title="Create Tasks"
                         >
@@ -107,7 +90,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
                         </button>
                     )}
                     <button
-                        onClick={() => setIsLinkingTasks(true)}
+                        onClick={(e) => { e.stopPropagation(); setIsLinkingTasks(true); }}
                         className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-white rounded-lg text-sm hover:bg-blue-500/30 transition-colors flex items-center gap-1"
                         title="Link existing tasks"
                     >
@@ -115,7 +98,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
                         Link
                     </button>
                     <button 
-                        onClick={() => setIsLogging(true)} 
+                        onClick={(e) => { e.stopPropagation(); setIsLogging(true); }} 
                         className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-1"
                         title="Log Progress"
                     >
@@ -123,6 +106,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
                         Log
                     </button>
                     <button 
+                        onClick={(e) => { e.stopPropagation(); onViewDetails?.(); }}
                         className="px-3 py-1.5 bg-slate-700/50 text-slate-300 rounded-lg text-sm hover:bg-slate-700/70 transition-colors flex items-center gap-1"
                         title="View Details"
                     >

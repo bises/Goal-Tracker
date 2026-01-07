@@ -2,42 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { Goal } from '../types';
 import { api } from '../api';
 import { ChevronLeft, Edit2, Trash2, Link, Plus, CheckCircle, Clock } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { EditGoalModal } from '../components/EditGoalModal';
 import { AddProgressModal } from '../components/AddProgressModal';
 import { BulkTaskModal } from '../components/BulkTaskModal';
 import LinkTasksModal from '../components/LinkTasksModal';
+import { TaskListComponent } from '../components/TaskListComponent';
+import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
 
 interface GoalDetailsPageProps {
-    goalId: string;
+    goal: Goal;
     onBack: () => void;
     onUpdate: () => void;
 }
 
-export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack, onUpdate }) => {
-    const [goal, setGoal] = useState<Goal | null>(null);
+export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goal: initialGoal, onBack, onUpdate }) => {
+    const [goal, setGoal] = useState<Goal>(initialGoal);
     const [isEditing, setIsEditing] = useState(false);
     const [isLogging, setIsLogging] = useState(false);
     const [isCreatingTasks, setIsCreatingTasks] = useState(false);
     const [isLinkingTasks, setIsLinkingTasks] = useState(false);
     const [isCompleting, setIsCompleting] = useState(false);
     const [completionMessage, setCompletionMessage] = useState<string | null>(null);
-
-    const loadGoal = async () => {
-        try {
-            const goals = await api.fetchGoals();
-            const found = goals.find(g => g.id === goalId);
-            if (found) {
-                setGoal(found);
-            }
-        } catch (e) {
-            console.error("Failed to load goal", e);
-        }
-    };
-
-    useEffect(() => {
-        loadGoal();
-    }, [goalId]);
 
     if (!goal) {
         return (
@@ -58,9 +43,8 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
     const handleCompleteGoal = async () => {
         try {
             setIsCompleting(true);
-            await api.completeGoal(goal!.id);
+            await api.completeGoal(goal.id);
             setCompletionMessage('✓ Goal marked as completed! Parent goal progress updated.');
-            loadGoal();
             onUpdate();
             // Clear message after 3 seconds
             setTimeout(() => setCompletionMessage(null), 3000);
@@ -78,7 +62,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
             setIsCompleting(true);
             await api.uncompleteGoal(goal!.id);
             setCompletionMessage('↺ Goal marked as incomplete. Parent goal progress updated.');
-            loadGoal();
             onUpdate();
             setTimeout(() => setCompletionMessage(null), 3000);
         } catch (e) {
@@ -88,16 +71,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
         } finally {
             setIsCompleting(false);
         }
-    }
-
-    const chartData = goal.progress.slice().reverse().map(p => ({
-        date: new Date(p.date).toLocaleDateString(),
-        value: p.value,
-        customData: p.customData
-    }));
-
-    if (chartData.length === 0) {
-        chartData.push({ date: 'Start', value: 0, customData: undefined });
     }
 
     const summary = goal.progressSummary;
@@ -282,8 +255,8 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                 </div>
             </div>
 
-            {/* Chart */}
-            {chartData.length > 1 && (
+            {/* Chart 
+            {activitiesLoaded && chartData.length > 1 && (
                 <div className="glass-panel p-6 mb-8">
                     <h2 className="text-xl font-semibold text-white mb-4">Progress History</h2>
                     <div className="w-full h-80">
@@ -312,25 +285,13 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                         </ResponsiveContainer>
                     </div>
                 </div>
-            )}
+            )} */}
 
-            {/* Recent Activity */}
-            {goal.progress && goal.progress.length > 0 && (
-                <div className="glass-panel p-6">
-                    <h2 className="text-xl font-semibold text-white mb-4">Activity Log ({goal.progress.length})</h2>
-                    <div className="space-y-2">
-                        {goal.progress.map(p => (
-                            <div key={p.id} className="flex justify-between items-center bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors">
-                                <div>
-                                    <div className="text-white font-medium">{p.customData || (p.value > 0 ? `+${p.value}` : p.value)}</div>
-                                    {p.note && <p className="text-slate-400 text-sm mt-1">{p.note}</p>}
-                                </div>
-                                <span className="text-slate-400 text-sm">{new Date(p.date).toLocaleDateString()}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {/* Tasks Section */}
+            <TaskListComponent goalId={goal.id} onTasksUpdated={onUpdate} />
+
+            {/* Activities Section */}
+            <ActivitiesListComponent goalId={goal.id} />
 
             {/* Modals */}
             {isEditing && (
@@ -338,7 +299,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                     goal={goal}
                     onClose={() => setIsEditing(false)}
                     onUpdated={() => {
-                        loadGoal();
                         onUpdate();
                     }}
                 />
@@ -349,7 +309,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                     goal={goal}
                     onClose={() => setIsLogging(false)}
                     onUpdated={() => {
-                        loadGoal();
                         onUpdate();
                     }}
                 />
@@ -359,7 +318,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                     parentGoal={goal}
                     onClose={() => setIsCreatingTasks(false)}
                     onCreated={() => {
-                        loadGoal();
                         onUpdate();
                     }}
                 />
@@ -370,7 +328,6 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({ goalId, onBack
                     onClose={() => setIsLinkingTasks(false)}
                     goal={goal}
                     onTasksLinked={() => {
-                        loadGoal();
                         onUpdate();
                     }}
                 />

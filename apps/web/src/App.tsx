@@ -16,7 +16,7 @@ function App() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('goals');
     const [pageMode, setPageMode] = useState<PageMode>('list');
-    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+    const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -55,20 +55,23 @@ function App() {
     };
 
     const handleGoalDetailsClick = (goalId: string) => {
-        setSelectedGoalId(goalId);
-        setPageMode('details');
+        const goal = goals.find(g => g.id === goalId);
+        if (goal) {
+            setSelectedGoal(goal);
+            setPageMode('details');
+        }
     };
 
     const handleBackToList = () => {
         setPageMode('list');
-        setSelectedGoalId(null);
+        setSelectedGoal(null);
     };
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px', width: '100%' }}>
-            {pageMode === 'details' && selectedGoalId ? (
+            {pageMode === 'details' && selectedGoal ? (
                 <GoalDetailsPage 
-                    goalId={selectedGoalId}
+                    goal={selectedGoal}
                     onBack={handleBackToList}
                     onUpdate={loadGoals}
                 />
@@ -150,8 +153,8 @@ function App() {
                                 gap: '24px'
                             }}>
                                 {goals.filter(g => g.scope === 'YEARLY').map(goal => (
-                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    <div key={goal.id}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
@@ -176,8 +179,8 @@ function App() {
                                 gap: '24px'
                             }}>
                                 {goals.filter(g => g.scope === 'MONTHLY').map(goal => (
-                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    <div key={goal.id}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
@@ -202,8 +205,8 @@ function App() {
                                 gap: '24px'
                             }}>
                                 {goals.filter(g => g.scope === 'STANDALONE').map(goal => (
-                                    <div key={goal.id} onClick={() => handleGoalDetailsClick(goal.id)} style={{ cursor: 'pointer' }}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} />
+                                    <div key={goal.id}>
+                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
