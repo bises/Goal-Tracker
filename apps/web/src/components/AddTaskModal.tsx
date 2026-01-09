@@ -1,54 +1,49 @@
 import { useState, useEffect } from 'react';
-import { Task, Goal } from '../types';
-import { taskApi, api } from '../api';
+import { Task } from '../types';
+import { taskApi } from '../api';
 import { Modal } from './Modal';
+import { useGoalContext } from '../contexts/GoalContext';
 
 interface AddTaskModalProps {
     isOpen: boolean;
     onClose: () => void;
     onTaskAdded: () => void;
     editTask?: Task | null;
+    defaultScheduledDate?: string;
 }
 
-export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }: AddTaskModalProps) {
+export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask, defaultScheduledDate }: AddTaskModalProps) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [size, setSize] = useState(1);
     const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
     const [scheduledDate, setScheduledDate] = useState('');
-    const [goals, setGoals] = useState<Goal[]>([]);
     const [showGoals, setShowGoals] = useState(false);
-    const [goalsLoaded, setGoalsLoaded] = useState(false);
+    const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
 
     useEffect(() => {
-        if (isOpen) {
-            if (editTask) {
-                setTitle(editTask.title);
-                setDescription(editTask.description || '');
-                setSize(editTask.size);
-                setSelectedGoalIds(editTask.goalTasks?.map(gt => gt.goalId) || []);
-                setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
-                // Auto-expand goals if task has linked goals
-                if (editTask.goalTasks && editTask.goalTasks.length > 0) {
-                    setShowGoals(true);
-                    loadGoals();
-                }
-            } else {
-                resetForm();
-            }
-        }
-    }, [isOpen, editTask]);
+        if (!isOpen) return;
 
-    const loadGoals = async () => {
-        if (goalsLoaded) return; // Don't reload if already loaded
-        try {
-            const fetchedGoals = await api.fetchGoals();
-            setGoals(fetchedGoals);
-            setGoalsLoaded(true);
-        } catch (error) {
-            console.error('Failed to fetch goals:', error);
+        // Always ensure goals are available when opening the modal
+        fetchGoals();
+
+        if (editTask) {
+            setTitle(editTask.title);
+            setDescription(editTask.description || '');
+            setSize(editTask.size);
+            // Be defensive: some API payloads may include only goal object without goalId
+            const preselectedIds = (editTask.goalTasks || [])
+                .map(gt => gt.goalId || gt.goal?.id)
+                .filter((id): id is string => Boolean(id));
+            setSelectedGoalIds(preselectedIds);
+            setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
+            // Auto-expand goals if task has linked goals
+            setShowGoals((editTask.goalTasks?.length || 0) > 0);
+        } else {
+            resetForm();
+            setScheduledDate(defaultScheduledDate || '');
         }
-    };
+    }, [isOpen, editTask, fetchGoals, defaultScheduledDate]);
 
     const resetForm = () => {
         setTitle('');
@@ -57,8 +52,6 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
         setSelectedGoalIds([]);
         setScheduledDate('');
         setShowGoals(false);
-        setGoalsLoaded(false);
-        setGoals([]);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +135,7 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
                             onClick={() => {
                                 if (!showGoals) {
                                     setShowGoals(true);
-                                    loadGoals();
+                                    fetchGoals();
                                 } else {
                                     setShowGoals(false);
                                 }
@@ -175,7 +168,7 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
                                 padding: '4px',
                                 background: 'rgba(255,255,255,0.02)'
                             }}>
-                                {!goalsLoaded ? (
+                                {goalsLoading ? (
                                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', padding: '12px' }}>
                                         Loading goals...
                                     </div>

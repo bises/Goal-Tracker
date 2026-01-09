@@ -126,6 +126,8 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         }
     };
 
+    
+
     /**
      * Renders a calendar month view with days, tasks, and drag-and-drop functionality.
      * 
@@ -166,31 +168,41 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                         <div
                             key={`day-${day}`}
                             className={`calendar-day ${isToday ? 'today' : ''}`}
-                            onClick={() => onDateClick?.(date)}
                             onDragOver={handleDayDragOver}
                             onDragLeave={handleDayDragLeave}
                             onDrop={(e) => handleDayDrop(date, e)}
+                            onClick={() => onDateClick?.(date)}
                         >
                             <div className="day-header">{currentDay}</div>
-                            <div className="day-tasks">
-                                {dayTasks.slice(0, 3).map(task => (
-                                    <div
-                                        key={task.id}
-                                        className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            e.dataTransfer.setData('taskId', task.id);
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onTaskClick?.(task);
-                                        }}
-                                    >
-                                        {task.title}
+                            {/* Mobile: show total count only */}
+                            {dayTasks.length > 0 && (
+                                <div className="md:hidden mt-1">
+                                    <span className="inline-flex items-center justify-center text-[11px] font-bold bg-cyan-500/90 text-black rounded-full px-1.5 py-0.5 shadow-[0_1px_4px_rgba(6,182,212,0.4)]">
+                                        {dayTasks.length}
+                                    </span>
+                                </div>
+                            )}
+                            {/* Desktop: show first pill + hidden count badge */}
+                            <div className="day-tasks hidden md:flex md:flex-col md:gap-1">
+                                {dayTasks.slice(0, 1).map(task => (
+                                    <div key={task.id} className="task-pill-wrapper">
+                                        <div 
+                                            className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.stopPropagation();
+                                                e.dataTransfer.setData('taskId', task.id);
+                                            }}
+                                        >
+                                            {task.title}
+                                        </div>
+                                        <div className="task-tooltip">{task.title}</div>
                                     </div>
                                 ))}
-                                {dayTasks.length > 3 && (
-                                    <div className="task-pill more">+{dayTasks.length - 3} more</div>
+                                {dayTasks.length > 1 && (
+                                    <div className="hidden-tasks-badge">
+                                        +{dayTasks.length - 1}
+                                    </div>
                                 )}
                             </div>
                         </div>
