@@ -1,8 +1,7 @@
 import React from 'react';
 import { Task } from '../types';
-import { X } from 'lucide-react';
 
-interface UnscheduledTasksSidebarProps {
+interface UnscheduledTasksContainerProps {
     tasks: Task[];
     isVisible: boolean;
     onClose: () => void;
@@ -11,97 +10,46 @@ interface UnscheduledTasksSidebarProps {
     onUnscheduleDrop: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
-export function UnscheduledTasksSidebar({
+export function UnscheduledTasksContainer({
     tasks,
     isVisible,
     onClose,
     onTaskDragStart,
     onTaskClick,
     onUnscheduleDrop
-}: UnscheduledTasksSidebarProps) {
+}: UnscheduledTasksContainerProps) {
     if (!isVisible) return null;
 
     return (
-        <div
-            style={{
-                width: '300px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                borderRadius: '12px',
-                padding: '16px',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                border: '1px dashed rgba(255, 255, 255, 0.1)'
-            }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={onUnscheduleDrop}
-        >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Unscheduled Tasks</h3>
-                <button
-                    className="icon-btn"
-                    onClick={onClose}
-                >
-                    <X size={16} />
-                </button>
-            </div>
-
-            {tasks.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
-                    No unscheduled tasks
-                </div>
-            ) : (
-                tasks.map(task => (
-                    <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => {
-                            e.dataTransfer.setData('taskId', task.id);
-                            onTaskDragStart(task.id);
-                        }}
-                        onClick={() => onTaskClick?.(task)}
-                        style={{
-                            padding: '12px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            borderRadius: '8px',
-                            cursor: 'grab',
-                            transition: 'background 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}
+        <div className="w-full bg-white/5 border-b border-white/10 overflow-hidden">
+            <div className="px-4 py-3">
+                <h3 className="text-sm font-semibold mb-3 text-slate-300">Unscheduled Tasks</h3>
+                {tasks.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-2">No unscheduled tasks</div>
+                ) : (
+                    <div 
+                        className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={onUnscheduleDrop}
                     >
-                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>{task.title}</div>
-                        {task.description && (
+                        {tasks.map(task => (
                             <div
-                                style={{
-                                    fontSize: '12px',
-                                    color: 'var(--color-text-muted)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
+                                key={task.id}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('taskId', task.id);
+                                    onTaskDragStart(task.id);
                                 }}
+                                onClick={() => onTaskClick?.(task)}
+                                className="flex-shrink-0 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 rounded-full cursor-grab active:cursor-grabbing transition whitespace-nowrap text-sm font-medium text-cyan-300 shadow-sm"
+                                title={task.title}
                             >
-                                {task.description}
+                                {task.title}
                             </div>
-                        )}
-                        {task.goalTasks && task.goalTasks.length > 0 && (
-                            <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
-                                {task.goalTasks.map((gt, idx) => (
-                                    <React.Fragment key={gt.id}>
-                                        {gt.goal?.title}
-                                        {idx < task.goalTasks!.length - 1 && ', '}
-                                    </React.Fragment>
-                                ))}
-                            </div>
-                        )}
+                        ))}
                     </div>
-                ))
-            )}
+                )}
+            </div>
         </div>
     );
 }

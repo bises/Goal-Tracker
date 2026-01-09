@@ -3,7 +3,7 @@ import { CalendarView } from '../components/Calendar/CalendarView';
 import { Task } from '../types';
 import { taskApi } from '../api';
 import AddTaskModal from '../components/AddTaskModal';
-import { UnscheduledTasksSidebar } from '../components/UnscheduledTasksSidebar';
+import { UnscheduledTasksContainer } from '../components/UnscheduledTasksSidebar';
 import { Modal } from '../components/Modal';
 import { Toast } from '../components/Toast';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -11,7 +11,7 @@ import { useTaskContext } from '../contexts/TaskContext';
 export function PlannerPage() {
     const { tasks, scheduleTask } = useTaskContext();
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-    const [showSidebar, setShowSidebar] = useState(true);
+    const [showSidebar, setShowSidebar] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [toast, setToast] = useState<{ level: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
@@ -54,6 +54,10 @@ export function PlannerPage() {
         setSelectedTask(null);
     };
 
+    const handleTaskDragStart = (taskId: string) => {
+        // Store taskId for drag operations
+    };
+
     const handleUnscheduleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         const taskId = e.dataTransfer.getData('taskId');
@@ -69,28 +73,18 @@ export function PlannerPage() {
 
     return (
         <>
-        <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 200px)' }}>
-            {/* Left Sidebar - Unscheduled Tasks */}
-            <UnscheduledTasksSidebar
+            {/* Unscheduled Tasks Horizontal Bar - Always visible at top */}
+            <UnscheduledTasksContainer
                 tasks={unscheduledTasks}
-                isVisible={showSidebar}
-                onClose={() => setShowSidebar(false)}
-                onTaskDragStart={() => {}}
+                isVisible={true}
+                onClose={() => {}}
+                onTaskDragStart={handleTaskDragStart}
                 onTaskClick={handleTaskClick}
                 onUnscheduleDrop={handleUnscheduleDrop}
             />
 
-            {/* Main Calendar */}
+            {/* Calendar */}
             <div style={{ flex: 1, overflow: 'auto' }}>
-                {!showSidebar && (
-                    <button
-                        className="secondary-btn"
-                        onClick={() => setShowSidebar(true)}
-                        style={{ marginBottom: '16px' }}
-                    >
-                        Show Unscheduled Tasks
-                    </button>
-                )}
                 <CalendarView
                     onTaskClick={handleTaskClick}
                     onDateClick={handleDateClick}
@@ -99,7 +93,6 @@ export function PlannerPage() {
                     }}
                 />
             </div>
-        </div>
 
         {/* Date Tasks Modal */}
         <Modal

@@ -93,6 +93,20 @@
     position: relative;
 }
 
+@media (max-width: 640px) {
+    .calendar-day {
+        min-height: 64px;
+        padding: 6px;
+    }
+    .day-header {
+        margin-bottom: 2px;
+        font-size: 12px;
+    }
+    .weekday-header {
+        padding: 8px;
+        font-size: 11px;
+    }
+}
 .calendar-day:hover {
     background: rgba(255, 255, 255, 0.05);
 }
@@ -122,6 +136,12 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+@media (max-width: 767px) {
+    .day-tasks {
+        display: none;
+    }
 }
 
 .task-pill-wrapper {
