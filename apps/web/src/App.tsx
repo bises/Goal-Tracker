@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { api, taskApi } from './api';
 import { Goal, Task } from './types';
 import { GoalCard } from './components/GoalCard';
 import { AddGoalModal } from './components/AddGoalModal';
@@ -8,13 +7,15 @@ import AddTaskModal from './components/AddTaskModal';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
 import { PlannerPage } from './pages/PlannerPage';
 import { Plus } from 'lucide-react';
+import { useGoalContext } from './contexts/GoalContext';
+import { useTaskContext } from './contexts/TaskContext';
 
 type ViewMode = 'goals' | 'tasks' | 'planner';
 type PageMode = 'list' | 'details';
 
-function App() {
-    const [goals, setGoals] = useState<Goal[]>([]);
-    const [tasks, setTasks] = useState<Task[]>([]);
+function AppContent() {
+    const { goals, fetchGoals } = useGoalContext();
+    const { tasks, fetchTasks } = useTaskContext();
     const [viewMode, setViewMode] = useState<ViewMode>('planner');
     const [pageMode, setPageMode] = useState<PageMode>('list');
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -22,27 +23,9 @@ function App() {
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-    const loadGoals = async () => {
-        try {
-            const data = await api.fetchGoals();
-            setGoals(data);
-        } catch (e) {
-            console.error("Failed to load goals", e);
-        }
-    };
-
-    const loadTasks = async () => {
-        try {
-            const data = await taskApi.fetchTasks();
-            setTasks(data);
-        } catch (e) {
-            console.error("Failed to load tasks", e);
-        }
-    };
-
     useEffect(() => {
-        loadGoals();
-        loadTasks();
+        fetchGoals();
+        fetchTasks();
     }, []);
 
     const handleEditTask = (task: Task) => {
@@ -74,7 +57,7 @@ function App() {
                 <GoalDetailsPage 
                     goal={selectedGoal}
                     onBack={handleBackToList}
-                    onUpdate={loadGoals}
+                    onUpdate={fetchGoals}
                 />
             ) : (
                 <>
@@ -170,7 +153,7 @@ function App() {
                             }}>
                                 {goals.filter(g => g.scope === 'YEARLY').map(goal => (
                                     <div key={goal.id}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
+                                        <GoalCard goal={goal} onUpdate={fetchGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
@@ -196,7 +179,7 @@ function App() {
                             }}>
                                 {goals.filter(g => g.scope === 'MONTHLY').map(goal => (
                                     <div key={goal.id}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
+                                        <GoalCard goal={goal} onUpdate={fetchGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
@@ -222,7 +205,7 @@ function App() {
                             }}>
                                 {goals.filter(g => g.scope === 'STANDALONE').map(goal => (
                                     <div key={goal.id}>
-                                        <GoalCard goal={goal} onUpdate={loadGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
+                                        <GoalCard goal={goal} onUpdate={fetchGoals} onViewDetails={() => handleGoalDetailsClick(goal.id)} />
                                     </div>
                                 ))}
                             </div>
@@ -242,7 +225,7 @@ function App() {
                         <TaskCard 
                             key={task.id} 
                             task={task} 
-                            onUpdate={loadTasks} 
+                            onUpdate={fetchTasks} 
                             onEdit={handleEditTask}
                         />
                     ))}
@@ -267,14 +250,14 @@ function App() {
                 </div>
             )}
 
-            {isGoalModalOpen && <AddGoalModal onClose={() => setIsGoalModalOpen(false)} onAdded={loadGoals} />}
+            {isGoalModalOpen && <AddGoalModal onClose={() => setIsGoalModalOpen(false)} onAdded={fetchGoals} />}
             {isTaskModalOpen && (
                 <AddTaskModal 
                     isOpen={isTaskModalOpen}
                     onClose={handleCloseTaskModal} 
                     onTaskAdded={() => {
-                        loadTasks();
-                        loadGoals(); // Refresh goals to show updated task counts
+                        fetchTasks();
+                        fetchGoals(); // Refresh goals to show updated task counts
                     }}
                     editTask={editingTask}
                 />
@@ -285,4 +268,4 @@ function App() {
     );
 }
 
-export default App;
+export default AppContent;

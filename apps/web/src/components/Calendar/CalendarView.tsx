@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { calendarApi, taskApi } from '../../api';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Task, Goal } from '../../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './CalendarView.css';
+import { useTaskContext } from '../../contexts/TaskContext';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -14,42 +14,10 @@ interface CalendarViewProps {
 }
 
 export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVersion = 0 }: CalendarViewProps) {
+    const { tasks: allTasks, scheduleTask } = useTaskContext();
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [goals, setGoals] = useState<Goal[]>([]);
-    const [loading, setLoading] = useState(false);
     const [scheduling, setScheduling] = useState(false);
-
-    useEffect(() => {
-        loadCalendarData();
-    }, [currentDate, viewMode, reloadVersion]);
-
-    const loadCalendarData = async () => {
-        setLoading(true);
-        try {
-            const { startDate, endDate } = getDateRange();
-            
-            const [tasksData, goalsData] = await Promise.all([
-                calendarApi.fetchCalendarTasks(
-                    startDate.toISOString(),
-                    endDate.toISOString(),
-                    false
-                ),
-                calendarApi.fetchCalendarGoals(
-                    startDate.toISOString(),
-                    endDate.toISOString()
-                )
-            ]);
-
-            setTasks(tasksData.tasks || []);
-            setGoals(goalsData.goals || []);
-        } catch (error) {
-            console.error('Error loading calendar data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const getDateRange = () => {
         const start = new Date(currentDate);
@@ -72,6 +40,16 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
 
         return { startDate: start, endDate: end };
     };
+
+    // Filter tasks for the current date range
+    const tasks = useMemo(() => {
+        const { startDate, endDate } = getDateRange();
+        return allTasks.filter(task => {
+            if (!task.scheduledDate) return false;
+            const taskDate = new Date(task.scheduledDate);
+            return taskDate >= startDate && taskDate <= endDate;
+        });
+    }, [allTasks, currentDate, viewMode]);
 
     const navigatePrevious = () => {
         const newDate = new Date(currentDate);
@@ -135,13 +113,12 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         if (!taskId) return;
 
         try {
-            // Optimistic: schedule and refresh
+            // Use context to schedule task (with caching)
             if (scheduling) return;
             setScheduling(true);
-            await taskApi.scheduleTask(taskId, date.toISOString());
+            await scheduleTask(taskId, date);
             onScheduled?.(taskId, date);
-            // Reload tasks for updated calendar
-            await loadCalendarData();
+            // Context automatically updates, no need to reload
             setScheduling(false);
         } catch (error) {
             console.error('Failed to schedule task:', error);
@@ -149,6 +126,22 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         }
     };
 
+    /**
+     * Renders a calendar month view with days, tasks, and drag-and-drop functionality.
+     * 
+     * Generates a 6-week grid layout for the current month, displaying:
+     * - Day numbers for each date
+     * - Up to 3 task pills per day with a "+X more" indicator for additional tasks
+     * - Empty cells for days outside the current month
+     * - Visual highlighting for today's date
+     * 
+     * Supports interactive features:
+     * - Click handlers on dates and tasks
+     * - Drag-and-drop task rearrangement between days
+     * - Drag over/leave visual feedback
+     * 
+     * @returns {JSX.Element} A calendar grid displaying the current month with task overlays
+     */
     const renderMonthView = () => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -360,17 +353,9 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                 </div>
             </div>
 
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '64px', color: 'var(--color-text-muted)' }}>
-                    Loading...
-                </div>
-            ) : (
-                <>
-                    {viewMode === 'month' && renderMonthView()}
-                    {viewMode === 'week' && renderWeekView()}
-                    {viewMode === 'day' && renderDayView()}
-                </>
-            )}
+            {viewMode === 'month' && renderMonthView()}
+            {viewMode === 'week' && renderWeekView()}
+            {viewMode === 'day' && renderDayView()}
         </div>
     );
 }

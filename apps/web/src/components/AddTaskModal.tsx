@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Task, Goal } from '../types';
 import { taskApi, api } from '../api';
-import { X } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface AddTaskModalProps {
     isOpen: boolean;
@@ -91,19 +91,15 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
     if (!isOpen) return null;
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-            backdropFilter: 'blur(5px)'
-        }}>
-            <div className="glass-panel" style={{ width: '400px', padding: '32px', position: 'relative' }}>
-                <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
-                    <X size={24} />
-                </button>
-
-                <h2 style={{ marginBottom: '24px' }}>{editTask ? 'Edit Task' : 'New Task'}</h2>
-
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={editTask ? 'Edit Task' : 'New Task'}
+            width="90%"
+            maxWidth="500px"
+            maxHeight="85vh"
+        >
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Task Title</label>
                         <input 
@@ -257,7 +253,6 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask }:
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
-    );
+            </Modal>
+        );
 }
