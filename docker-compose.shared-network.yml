@@ -1,0 +1,32 @@
+# Using Shared PostgreSQL Container (Same Docker Network)
+
+services:
+  api:
+    image: ${DOCKER_USERNAME}/goal-tracker-api:latest
+    container_name: goal-tracker-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Connect to immich_postgres container on immich-net network
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: ${PORT:-3000}
+    networks:
+      - immich-net  # Join the existing network
+    external_links:
+      - immich_postgres:postgres  # Link to existing postgres container
+
+  web:
+    image: ${DOCKER_USERNAME}/goal-tracker-web:latest
+    container_name: goal-tracker-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    depends_on:
+      - api
+
+networks:
+  immich-net:
+    external: true  # Use existing immich network

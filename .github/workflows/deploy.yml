@@ -1,0 +1,131 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches:
+      - main  # Change to your default branch if different
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/goal-tracker-api:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/goal-tracker-api:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/goal-tracker-api:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/goal-tracker-api:buildcache,mode=max
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/goal-tracker-web:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/goal-tracker-web:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/goal-tracker-web:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/goal-tracker-web:buildcache,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/goal-tracker
+            
+            echo "🔑 Logging into Docker Hub..."
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            
+            echo "📥 Pulling latest images..."
+            docker pull ${{ secrets.DOCKER_USERNAME }}/goal-tracker-api:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/goal-tracker-web:latest
+            
+            echo "🛑 Stopping old API and Web containers (keeping DB running)..."
+            docker compose stop api web || true
+            docker compose rm -f api web || true
+            
+            echo "🗄️ Starting/ensuring database is running..."
+            docker compose up -d postgres
+            
+            echo "⏳ Waiting for database to be ready..."
+            sleep 5
+            until docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-user}; do
+              echo "Waiting for database..."
+              sleep 2
+            done
+            
+            echo "🔄 Running database migrations..."
+            docker compose run --rm api sh -c "npx prisma migrate deploy"
+            
+            echo "🚀 Starting all services..."
+            docker compose up -d
+            
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+            
+            echo "✅ Deployment completed successfully!"
+            docker compose ps
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 15
+            
+            cd ~/goal-tracker
+            
+            # Check if containers are running
+            if docker compose ps | grep -q "Up"; then
+              echo "✅ Containers are running"
+              docker compose ps
+            else
+              echo "❌ Some containers failed to start"
+              docker compose logs --tail=50
+              exit 1
+            fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi

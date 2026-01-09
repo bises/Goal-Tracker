@@ -23,6 +23,11 @@ RUN pnpm build
 # Ensure production dependencies are available locally
 RUN npm install --omit=dev
 
+# Copy entrypoint script
+COPY apps/api/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+# Use entrypoint to run migrations before starting
+ENTRYPOINT ["./entrypoint.sh"]

@@ -1,4 +1,7 @@
-FROM node:18-alpine as builder
+FROM node:18-alpine AS builder
+
+# Accept build argument for API URL
+ARG VITE_API_URL=http://localhost:3000
 
 WORKDIR /app
 
@@ -14,8 +17,9 @@ COPY apps/web ./apps/web
 RUN npm install -g pnpm
 RUN pnpm install
 
-# Build
+# Build with environment variable
 WORKDIR /app/apps/web
+ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm build
 
 FROM nginx:alpine
