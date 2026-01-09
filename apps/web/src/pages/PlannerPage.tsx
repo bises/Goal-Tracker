@@ -4,6 +4,7 @@ import { Task } from '../types';
 import { taskApi } from '../api';
 import AddTaskModal from '../components/AddTaskModal';
 import { UnscheduledTasksSidebar } from '../components/UnscheduledTasksSidebar';
+import { Modal } from '../components/Modal';
 import { Toast } from '../components/Toast';
 import { useTaskContext } from '../contexts/TaskContext';
 
@@ -13,6 +14,8 @@ export function PlannerPage() {
     const [showSidebar, setShowSidebar] = useState(true);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [toast, setToast] = useState<{ level: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
+    const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
     // Compute unscheduled tasks from cached tasks
     const unscheduledTasks = useMemo(() => {
@@ -25,9 +28,20 @@ export function PlannerPage() {
     };
 
     const handleDateClick = (date: Date) => {
-        console.log('Date clicked:', date);
-        // Future: could open quick add task modal for this date
+        setSelectedDate(date);
+        setIsDateModalOpen(true);
     };
+
+    const formatDateInput = (date: Date) => {
+        const tzOff = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - tzOff).toISOString().split('T')[0];
+    };
+
+    const tasksForSelectedDate = useMemo(() => {
+        if (!selectedDate) return [] as Task[];
+        const target = selectedDate.toDateString();
+        return tasks.filter(t => t.scheduledDate && new Date(t.scheduledDate).toDateString() === target);
+    }, [tasks, selectedDate]);
 
     const handleTaskUpdate = () => {
         // No need to reload - cache is automatically updated via context
@@ -87,12 +101,53 @@ export function PlannerPage() {
             </div>
         </div>
 
+        {/* Date Tasks Modal */}
+        <Modal
+            isOpen={isDateModalOpen}
+            onClose={() => setIsDateModalOpen(false)}
+            title={selectedDate ? `Tasks for ${selectedDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : 'Tasks'}
+            maxWidth="520px"
+        >
+            <div className="flex flex-col gap-2">
+                {tasksForSelectedDate.length === 0 ? (
+                    <div className="text-slate-400 p-2">No tasks for this date</div>
+                ) : (
+                    tasksForSelectedDate.map(task => (
+                        <div
+                            key={task.id}
+                            onClick={() => { handleTaskClick(task); setIsDateModalOpen(false); }}
+                            className="flex justify-between items-center p-2.5 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition"
+                        >
+                            <div className="flex-1">
+                                <div className={`${task.isCompleted ? 'line-through opacity-70' : ''} font-semibold mb-1`}>{task.title}</div>
+                                {task.description && <div className="text-xs text-slate-400 truncate">{task.description}</div>}
+                            </div>
+                            <div className="text-xs bg-cyan-500 px-2 py-1 rounded font-semibold whitespace-nowrap ml-3">{task.size}d</div>
+                        </div>
+                    ))
+                )}
+                <div className="flex justify-end mt-3">
+                    <button
+                        className="primary-btn"
+                        onClick={() => {
+                            setIsDateModalOpen(false);
+                            setSelectedTask(null);
+                            setIsEditModalOpen(true);
+                        }}
+                    >
+                        Add Task{selectedDate ? ` — ${selectedDate.toLocaleDateString('en-US',{ month:'short', day:'numeric'})}` : ''}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+
         {/* Task Edit Modal */}
         <AddTaskModal
             isOpen={isEditModalOpen}
             onClose={handleCloseModal}
             onTaskAdded={handleTaskUpdate}
             editTask={selectedTask}
+            defaultScheduledDate={selectedDate && !selectedTask ? formatDateInput(selectedDate) : undefined}
         />
 
         {/* Toast Notification */}

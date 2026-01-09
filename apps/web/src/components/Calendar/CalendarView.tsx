@@ -126,6 +126,8 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         }
     };
 
+    
+
     /**
      * Renders a calendar month view with days, tasks, and drag-and-drop functionality.
      * 
@@ -173,24 +175,24 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                         >
                             <div className="day-header">{currentDay}</div>
                             <div className="day-tasks">
-                                {dayTasks.slice(0, 3).map(task => (
-                                    <div
-                                        key={task.id}
-                                        className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            e.dataTransfer.setData('taskId', task.id);
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onTaskClick?.(task);
-                                        }}
-                                    >
-                                        {task.title}
+                                {dayTasks.slice(0, 1).map(task => (
+                                    <div key={task.id} className="task-pill-wrapper">
+                                        <div
+                                            className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('taskId', task.id);
+                                            }}
+                                        >
+                                            {task.title}
+                                        </div>
+                                        <div className="task-tooltip">{task.title}</div>
                                     </div>
                                 ))}
-                                {dayTasks.length > 3 && (
-                                    <div className="task-pill more">+{dayTasks.length - 3} more</div>
+                                {dayTasks.length > 1 && (
+                                    <div className="hidden-tasks-badge">
+                                        +{dayTasks.length - 1}
+                                    </div>
                                 )}
                             </div>
                         </div>
