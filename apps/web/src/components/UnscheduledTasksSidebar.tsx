@@ -19,36 +19,33 @@ export function UnscheduledTasksContainer({
     onUnscheduleDrop
 }: UnscheduledTasksContainerProps) {
     if (!isVisible) return null;
+    // Hide container entirely when there are no unscheduled tasks
+    if (tasks.length === 0) return null;
 
     return (
-        <div className="w-full bg-white/5 border-b border-white/10 overflow-hidden">
-            <div className="px-4 py-3">
-                <h3 className="text-sm font-semibold mb-3 text-slate-300">Unscheduled Tasks</h3>
-                {tasks.length === 0 ? (
-                    <div className="text-xs text-slate-400 py-2">No unscheduled tasks</div>
-                ) : (
-                    <div 
-                        className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={onUnscheduleDrop}
-                    >
-                        {tasks.map(task => (
-                            <div
-                                key={task.id}
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData('taskId', task.id);
-                                    onTaskDragStart(task.id);
-                                }}
-                                onClick={() => onTaskClick?.(task)}
-                                className="flex-shrink-0 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 rounded-full cursor-grab active:cursor-grabbing transition whitespace-nowrap text-sm font-medium text-cyan-300 shadow-sm"
-                                title={task.title}
-                            >
-                                {task.title}
-                            </div>
-                        ))}
-                    </div>
-                )}
+        <div className="w-full overflow-hidden">
+            <div className="px-3 py-2 md:px-4 md:py-3">
+                <div 
+                    className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent sm:gap-1.5 sm:pb-1"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={onUnscheduleDrop}
+                >
+                    {tasks.map(task => (
+                        <div
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('taskId', task.id);
+                                onTaskDragStart(task.id);
+                            }}
+                            onClick={() => onTaskClick?.(task)}
+                            className="flex-shrink-0 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 rounded-full cursor-grab active:cursor-grabbing transition whitespace-nowrap text-sm font-medium text-cyan-300 shadow-sm sm:px-2 sm:py-1 sm:text-xs"
+                            title={task.title}
+                        >
+                            {task.title}
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
