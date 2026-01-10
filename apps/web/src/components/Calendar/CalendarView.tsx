@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Task, Goal } from '../../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './CalendarView.css';
+import { Modal } from '../Modal';
 import { useTaskContext } from '../../contexts/TaskContext';
+import { AddTaskToDateModal } from '../AddTaskToDateModal';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -18,6 +20,32 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [scheduling, setScheduling] = useState(false);
+    const [sheetDate, setSheetDate] = useState<Date | null>(null);
+    const [actionTask, setActionTask] = useState<Task | null>(null);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
+
+    const handleTaskPress = (task: Task) => {
+        console.log('Task pressed:', task);
+        if (isMobile()) {
+            setActionTask(task);
+        } else {
+            onTaskClick?.(task);
+        }
+    };
+
+    const handleUnschedule = async () => {
+        if (!actionTask) return;
+        try {
+            if (scheduling) return;
+            setScheduling(true);
+            await scheduleTask(actionTask.id, null);
+            setActionTask(null);
+        } finally {
+            setScheduling(false);
+        }
+    };
 
     const getDateRange = () => {
         const start = new Date(currentDate);
@@ -73,6 +101,40 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
             newDate.setDate(newDate.getDate() + 1);
         }
         setCurrentDate(newDate);
+    };
+
+    const handleDayPress = (e: React.TouchEvent, date: Date) => {
+        if (!isMobile()) return;
+        
+        // Start 500ms timer for long-press detection
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = setTimeout(() => {
+            console.log('Long-press detected on date:', date);
+            setSheetDate(date);
+            longPressTimerRef.current = null;
+        }, 500);
+    };
+
+    const handleDayRelease = (e: React.TouchEvent, date: Date) => {
+        // Clear timer if touch ends before 500ms (wasn't a long-press)
+        console.log('Touch released, clearing long-press timer');
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+            console.log('Short tap detected on date:', date);
+            onDateClick?.(date);
+        }
+        // Prevent onClick from firing on mobile after touch events
+        e.preventDefault();
+    };
+
+    const handleDayClick = (date: Date) => {
+        // Desktop only: call onDateClick callback
+        // Mobile: skip onDateClick to avoid overlap with sheet
+        console.log('Day clicked:', date);
+        if (!isMobile()) {
+            onDateClick?.(date);
+        }
     };
 
     const getTitle = () => {
@@ -167,7 +229,9 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                             onDragOver={handleDayDragOver}
                             onDragLeave={handleDayDragLeave}
                             onDrop={(e) => handleDayDrop(date, e)}
-                            onClick={() => onDateClick?.(date)}
+                            onClick={() => handleDayClick(date)}
+                            onTouchStart={(e) => handleDayPress(e, date)}
+                            onTouchEnd={(e) => handleDayRelease(e, date)}
                         >
                             <div className="day-header">{currentDay}</div>
                             {/* Mobile: show total count only */}
@@ -245,6 +309,9 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                     onDragOver={handleDayDragOver}
                     onDragLeave={handleDayDragLeave}
                     onDrop={(e) => handleDayDrop(date, e)}
+                    onClick={() => handleDayClick(date)}
+                    onTouchStart={(e) => handleDayPress(e, date)}
+                    onTouchEnd={(e) => handleDayRelease(e, date)}
                 >
                     <div className="day-header">
                         <div className="day-name">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
@@ -258,9 +325,7 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                                 draggable
                                 onDragStart={(e) => {
                                     e.dataTransfer.setData('taskId', task.id);
-                                }}
-                                onClick={() => onTaskClick?.(task)}
-                            >
+                                }}>
                                 <div className="task-title">{task.title}</div>
                                 {task.description && (
                                     <div className="task-description">{task.description}</div>
@@ -299,7 +364,7 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                                 onDragStart={(e) => {
                                     e.dataTransfer.setData('taskId', task.id);
                                 }}
-                                onClick={() => onTaskClick?.(task)}
+                                onClick={() => handleTaskPress(task)}
                             >
                                 <div className="task-title">{task.title}</div>
                                 {task.description && (
@@ -322,6 +387,7 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     };
 
     return (
+        <>
         <div className="calendar-container">
             <div className="calendar-header">
                 <div className="calendar-nav">
@@ -362,5 +428,32 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
             {viewMode === 'week' && renderWeekView()}
             {viewMode === 'day' && renderDayView()}
         </div>
+
+        <AddTaskToDateModal 
+            isOpen={!!sheetDate} 
+            date={sheetDate} 
+            onClose={() => setSheetDate(null)}
+            onCreateNew={(date) => onDateClick?.(date)} 
+        />
+        
+        {actionTask && (
+            <Modal
+                isOpen={true}
+                onClose={() => setActionTask(null)}
+                title={actionTask.title}
+                maxWidth="420px"
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <button className="primary-btn" onClick={() => { onTaskClick?.(actionTask); setActionTask(null); }}>
+                        View / Edit
+                    </button>
+                    <button className="secondary-btn" onClick={handleUnschedule} disabled={scheduling}>
+                        {scheduling ? 'Unscheduling...' : 'Unschedule (make unscheduled)'}
+                    </button>
+                    <button className="icon-btn" onClick={() => setActionTask(null)}>Close</button>
+                </div>
+            </Modal>
+        )}
+        </>
     );
 }

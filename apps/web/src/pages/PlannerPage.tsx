@@ -3,7 +3,7 @@ import { CalendarView } from '../components/Calendar/CalendarView';
 import { Task } from '../types';
 import { taskApi } from '../api';
 import AddTaskModal from '../components/AddTaskModal';
-import { UnscheduledTasksContainer } from '../components/UnscheduledTasksSidebar';
+import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
 import { Modal } from '../components/Modal';
 import { Toast } from '../components/Toast';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -11,7 +11,6 @@ import { useTaskContext } from '../contexts/TaskContext';
 export function PlannerPage() {
     const { tasks, scheduleTask } = useTaskContext();
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-    const [showSidebar, setShowSidebar] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [toast, setToast] = useState<{ level: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
@@ -108,14 +107,25 @@ export function PlannerPage() {
                     tasksForSelectedDate.map(task => (
                         <div
                             key={task.id}
-                            onClick={() => { handleTaskClick(task); setIsDateModalOpen(false); }}
-                            className="flex justify-between items-center p-2.5 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition"
+                            className="flex justify-between items-center p-2.5 bg-white/5 rounded-lg hover:bg-white/10 transition gap-2"
                         >
-                            <div className="flex-1">
+                            <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => { handleTaskClick(task); setIsDateModalOpen(false); }}
+                            >
                                 <div className={`${task.isCompleted ? 'line-through opacity-70' : ''} font-semibold mb-1`}>{task.title}</div>
                                 {task.description && <div className="text-xs text-slate-400 truncate">{task.description}</div>}
                             </div>
-                            <div className="text-xs bg-cyan-500 px-2 py-1 rounded font-semibold whitespace-nowrap ml-3">{task.size}d</div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    scheduleTask(task.id, null);
+                                    setToast({ level: 'success', message: 'Task unscheduled' });
+                                }}
+                                className="text-xs bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 px-2 py-1 rounded font-semibold whitespace-nowrap transition"
+                            >
+                                Unschedule
+                            </button>
                         </div>
                     ))
                 )}
