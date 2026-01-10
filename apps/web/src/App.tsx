@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Goal, Task } from './types';
 import { GoalCard } from './components/GoalCard';
 import { AddGoalModal } from './components/AddGoalModal';
-import TaskCard from './components/TaskCard';
+import { AllTasksList } from './components/AllTasksList';
 import AddTaskModal from './components/AddTaskModal';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
 import { PlannerPage } from './pages/PlannerPage';
@@ -167,16 +167,11 @@ function AppContent() {
 
             {/* Tasks View */}
             {viewMode === 'tasks' && (
-                <div className="flex flex-col gap-3 sm:gap-4">
-                    {tasks.map(task => (
-                        <TaskCard 
-                            key={task.id} 
-                            task={task} 
-                            onUpdate={fetchTasks} 
-                            onEdit={handleEditTask}
-                        />
-                    ))}
-                </div>
+                <AllTasksList 
+                    tasks={tasks}
+                    onUpdate={fetchTasks}
+                    onEdit={handleEditTask}
+                />
             )}
 
             {/* Planner View */}
@@ -191,11 +186,7 @@ function AppContent() {
                 </div>
             )}
 
-            {viewMode === 'tasks' && tasks.length === 0 && (
-                <div className="text-center py-12 sm:py-16 text-gray-400">
-                    <p className="text-sm sm:text-base">No tasks yet. Create one to get started!</p>
-                </div>
-            )}
+
 
             {isGoalModalOpen && <AddGoalModal onClose={() => setIsGoalModalOpen(false)} onAdded={fetchGoals} />}
             {isTaskModalOpen && (
