@@ -2,16 +2,28 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Task } from '../types';
 import { taskApi } from '../api';
 
+// Helper: Convert Date to YYYY-MM-DD string in local time (no timezone conversion)
+const dateToLocalString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 interface TaskContextType {
     tasks: Task[];
     loading: boolean;
     error: string | null;
     fetchTasks: () => Promise<void>;
     updateTask: (task: Task) => Promise<void>;
+    updateTaskFields: (id: string, updates: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
     deleteTask: (taskId: string) => Promise<void>;
     scheduleTask: (taskId: string, date: Date | null) => Promise<void>;
+    upsertTask: (task: Task) => void;
+    createTask: (payload: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
     addTask: (task: Task) => void;
     refreshTasks: () => Promise<void>;
+    toggleComplete: (id: string) => Promise<Task>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -39,22 +51,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         setTasks(prev => [...prev, task]);
     }, []);
 
+    const upsertTask = useCallback((task: Task) => {
+        setTasks(prev => {
+            const idx = prev.findIndex(t => t.id === task.id);
+            if (idx === -1) return [...prev, task];
+            const copy = [...prev];
+            copy[idx] = task;
+            return copy;
+        });
+    }, []);
+
     const updateTask = useCallback(async (updatedTask: Task) => {
-        // Optimistically update local cache
-        setTasks(prev =>
-            prev.map(t => t.id === updatedTask.id ? updatedTask : t)
-        );
-        
-        // Sync with API
+        // Send to API and then upsert returned canonical task
         try {
-            await taskApi.updateTask(updatedTask.id, updatedTask);
+            const saved = await taskApi.updateTask(updatedTask.id, updatedTask);
+            upsertTask(saved);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update task');
-            // Revert cache on error
             await fetchTasks();
             throw err;
         }
-    }, [fetchTasks]);
+    }, [fetchTasks, upsertTask]);
+
+    const updateTaskFields = useCallback(async (id: string, updates: Partial<Task> & { goalIds?: string[] }) => {
+        try {
+            const saved = await taskApi.updateTask(id, updates);
+            upsertTask(saved);
+            return saved;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update task');
+            await fetchTasks();
+            throw err;
+        }
+    }, [fetchTasks, upsertTask]);
 
     const deleteTask = useCallback(async (taskId: string) => {
         // Optimistically remove from cache
@@ -71,29 +100,44 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, [fetchTasks]);
 
     const scheduleTask = useCallback(async (taskId: string, date: Date | null) => {
-        // Optimistically update cache
-        setTasks(prev =>
-            prev.map(t =>
-                t.id === taskId
-                    ? { ...t, scheduledDate: date ? date.toISOString() : null }
-                    : t
-            )
-        );
-
         try {
-            await taskApi.scheduleTask(taskId, date);
+            // Convert to YYYY-MM-DD string in local time
+            const dateStr = date ? dateToLocalString(date) : null;
+            const saved = await taskApi.scheduleTask(taskId, dateStr);
+            upsertTask(saved);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to schedule task');
-            // Revert on error
             await fetchTasks();
             throw err;
         }
-    }, [fetchTasks]);
+    }, [fetchTasks, upsertTask]);
 
     const refreshTasks = useCallback(async () => {
         // Force refresh from API
         await fetchTasks();
     }, [fetchTasks]);
+
+    const createTask = useCallback(async (payload: Partial<Task> & { goalIds?: string[] }) => {
+        try {
+            const created = await taskApi.createTask(payload);
+            addTask(created);
+            return created;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create task');
+            throw err;
+        }
+    }, [addTask]);
+
+    const toggleComplete = useCallback(async (id: string) => {
+        try {
+            const saved = await taskApi.toggleComplete(id);
+            upsertTask(saved);
+            return saved;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to toggle task');
+            throw err;
+        }
+    }, [upsertTask]);
 
     const value: TaskContextType = {
         tasks,
@@ -101,10 +145,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         error,
         fetchTasks,
         updateTask,
+        updateTaskFields,
         deleteTask,
         scheduleTask,
+        upsertTask,
+        createTask,
         addTask,
         refreshTasks,
+        toggleComplete,
     };
 
     return (

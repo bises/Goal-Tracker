@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Task } from '../types';
-import { taskApi } from '../api';
 import { Modal } from './Modal';
 import { useGoalContext } from '../contexts/GoalContext';
+import { useTaskContext } from '../contexts/TaskContext';
 
 interface AddTaskModalProps {
     isOpen: boolean;
@@ -20,6 +20,7 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask, d
     const [scheduledDate, setScheduledDate] = useState('');
     const [showGoals, setShowGoals] = useState(false);
     const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
+    const { createTask, updateTaskFields } = useTaskContext();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -67,9 +68,9 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask, d
             };
 
             if (editTask) {
-                await taskApi.updateTask(editTask.id, taskData);
+                await updateTaskFields(editTask.id, taskData);
             } else {
-                await taskApi.createTask(taskData);
+                await createTask(taskData);
             }
             
             onTaskAdded();
