@@ -438,8 +438,36 @@
     .view-toggle button { padding: 6px 10px; font-size: 12px; border-radius: 4px; }
 
     /* Week view layout */
-    .calendar-week-view { grid-template-columns: 1fr; gap: 12px; }
-    .week-day { min-height: auto; padding: 12px; }
+    .calendar-week-view { 
+        grid-template-columns: 1fr; 
+        gap: 12px; 
+        max-height: 600px; 
+        overflow-y: auto; 
+    }
+    /* Card becomes relatively positioned to allow absolute header */
+    .week-day { 
+        position: relative; 
+        min-height: auto; 
+        padding: 28px 12px 12px; /* extra top space for header */
+        border: 2px solid rgba(255, 255, 255, 0.18); /* more prominent border */
+    }
+
+    /* Compact header: name top-left, number top-right */
+    .week-day .day-header {
+        position: absolute;
+        top: 6px;
+        left: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0;
+        padding: 0;
+        border: none;
+    }
+
+    .week-day .day-name { font-size: 11px; }
+    .week-day .day-number { font-size: 16px; font-weight: 700; }
 
     /* Typography tweaks */
     .day-name { font-size: 11px; }

@@ -75,10 +75,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         setCurrentDate(newDate);
     };
 
-    const goToToday = () => {
-        setCurrentDate(new Date());
-    };
-
     const getTitle = () => {
         const options: Intl.DateTimeFormatOptions = viewMode === 'month' 
             ? { year: 'numeric', month: 'long' }
@@ -339,9 +335,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
                 </div>
                 
                 <div className="calendar-controls">
-                    <button onClick={goToToday} className="secondary-btn">
-                        Today
-                    </button>
                     <div className="view-toggle">
                         <button
                             className={viewMode === 'month' ? 'active' : ''}
