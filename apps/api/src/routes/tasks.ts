@@ -155,12 +155,18 @@ router.post('/', async (req, res) => {
 
     const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create the task
+      // Parse YYYY-MM-DD string as local date (not UTC)
+      let parsedScheduledDate = null;
+      if (scheduledDate) {
+        const [year, month, day] = scheduledDate.split('-').map(Number);
+        parsedScheduledDate = new Date(year, month - 1, day);
+      }
       const newTask = await tx.task.create({
         data: {
           title,
           description,
           size: parseInt(size),
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          scheduledDate: parsedScheduledDate,
           parentTaskId: parentTaskId || null,
           customData,
           goalTasks: {
@@ -261,7 +267,13 @@ router.put('/:id', async (req, res) => {
     if (description !== undefined) updateData.description = description;
     if (size !== undefined) updateData.size = parseInt(size);
     if (scheduledDate !== undefined) {
-      updateData.scheduledDate = scheduledDate ? new Date(scheduledDate) : null;
+      // Parse YYYY-MM-DD string as local date (not UTC)
+      let parsedDate = null;
+      if (scheduledDate) {
+        const [year, month, day] = scheduledDate.split('-').map(Number);
+        parsedDate = new Date(year, month - 1, day);
+      }
+      updateData.scheduledDate = parsedDate;
     }
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId || null;
     if (customData !== undefined) updateData.customData = customData;
@@ -648,10 +660,17 @@ router.post('/:id/schedule', async (req, res) => {
   try {
     const { scheduledDate } = req.body;
 
+    // Parse YYYY-MM-DD string as local date (not UTC)
+    let parsedDate = null;
+    if (scheduledDate) {
+      const [year, month, day] = scheduledDate.split('-').map(Number);
+      parsedDate = new Date(year, month - 1, day);
+    }
+
     const task = await prisma.task.update({
       where: { id: req.params.id },
       data: {
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null
+        scheduledDate: parsedDate
       },
       include: taskWithGoals
     });

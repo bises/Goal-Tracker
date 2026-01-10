@@ -1,5 +1,5 @@
 import { Task } from '../types';
-import { taskApi } from '../api';
+import { useTaskContext } from '../contexts/TaskContext';
 
 interface TaskCardProps {
     task: Task;
@@ -8,9 +8,10 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
+    const { toggleComplete, deleteTask } = useTaskContext();
     const handleToggleComplete = async () => {
         try {
-            await taskApi.toggleComplete(task.id);
+            await toggleComplete(task.id);
             onUpdate();
         } catch (error) {
             console.error('Failed to toggle task completion:', error);
@@ -23,7 +24,7 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
                 const goalIds = (task.goalTasks || [])
                     .map(gt => gt.goal?.id)
                     .filter((id): id is string => Boolean(id));
-                await taskApi.deleteTask(task.id, goalIds);
+                await deleteTask(task.id);
                 onUpdate();
             } catch (error) {
                 console.error('Failed to delete task:', error);

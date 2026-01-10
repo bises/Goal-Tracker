@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Task } from '../types';
-import { taskApi } from '../api';
 import { Modal } from './Modal';
 import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -21,7 +20,7 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask, d
     const [scheduledDate, setScheduledDate] = useState('');
     const [showGoals, setShowGoals] = useState(false);
     const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
-    const { addTask, refreshTasks } = useTaskContext();
+    const { createTask, updateTaskFields } = useTaskContext();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -69,13 +68,9 @@ export default function AddTaskModal({ isOpen, onClose, onTaskAdded, editTask, d
             };
 
             if (editTask) {
-                await taskApi.updateTask(editTask.id, taskData);
-                // Ensure calendar reflects latest server state (including goal links)
-                await refreshTasks();
+                await updateTaskFields(editTask.id, taskData);
             } else {
-                const created = await taskApi.createTask(taskData);
-                // Optimistically add to cache so calendar updates immediately
-                addTask(created);
+                await createTask(taskData);
             }
             
             onTaskAdded();

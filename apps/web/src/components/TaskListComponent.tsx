@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api, taskApi } from '../api';
+import { api } from '../api';
+import { useTaskContext } from '../contexts/TaskContext';
 import { Trash2, CheckCircle2, Circle } from 'lucide-react';
 
 interface TaskListComponentProps {
@@ -42,6 +43,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tasksData, setTasksData] = useState<TasksData | null>(null);
+    const { toggleComplete, updateTaskFields, deleteTask } = useTaskContext();
 
     const loadTasks = async () => {
         if (isExpanded || isLoading) return;
@@ -59,7 +61,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
 
     const handleToggleTask = async (taskId: string) => {
         try {
-            await taskApi.toggleComplete(taskId);
+            await toggleComplete(taskId);
             // Reload tasks to get updated data
             const data = await api.getGoalTasks(goalId);
             setTasksData(data);
@@ -72,7 +74,8 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
     const handleUnlinkTask = async (taskId: string) => {
         if (confirm('Unlink this task from the goal? (Task will not be deleted)')) {
             try {
-                await taskApi.unlinkGoal(taskId, goalId);
+                // Update the task's goalIds via context (server returns canonical state)
+                await updateTaskFields(taskId, { goalIds: [] });
                 
                 // Reload tasks
                 const data = await api.getGoalTasks(goalId);
@@ -87,7 +90,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
     const handleDeleteTask = async (taskId: string) => {
         if (confirm('Delete this task permanently?')) {
             try {
-                await taskApi.deleteTask(taskId, [goalId]);
+                await deleteTask(taskId);
                 // Reload tasks
                 const data = await api.getGoalTasks(goalId);
                 setTasksData(data);

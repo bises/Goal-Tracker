@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Goal, Task } from '../types';
 import { taskApi } from '../api';
+import { useTaskContext } from '../contexts/TaskContext';
 import { X } from 'lucide-react';
 
 interface LinkTasksModalProps {
@@ -14,6 +15,7 @@ export default function LinkTasksModal({ isOpen, onClose, goal, onTasksLinked }:
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);
+    const { updateTaskFields } = useTaskContext();
 
     useEffect(() => {
         if (isOpen) {
@@ -69,7 +71,7 @@ export default function LinkTasksModal({ isOpen, onClose, goal, onTasksLinked }:
                         // Get existing goal IDs and add this one
                         const existingGoalIds = (task.goalTasks || []).map(gt => gt.goalId);
                         const updatedGoalIds = Array.from(new Set([...existingGoalIds, goal.id]));
-                        await taskApi.updateTask(taskId, { goalIds: updatedGoalIds } as any);
+                        await updateTaskFields(taskId, { goalIds: updatedGoalIds } as any);
                     }
                 }
             }
@@ -83,7 +85,7 @@ export default function LinkTasksModal({ isOpen, onClose, goal, onTasksLinked }:
                         const existingGoalIds = (task.goalTasks || [])
                             .map(gt => gt.goalId)
                             .filter(gId => gId !== goal.id);
-                        await taskApi.updateTask(linkedId, { goalIds: existingGoalIds } as any);
+                        await updateTaskFields(linkedId, { goalIds: existingGoalIds } as any);
                     }
                 }
             }

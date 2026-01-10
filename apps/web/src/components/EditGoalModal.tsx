@@ -3,6 +3,14 @@ import { api } from '../api';
 import { Goal, GoalScope } from '../types';
 import { X } from 'lucide-react';
 
+// Helper: Convert Date to YYYY-MM-DD string in local time
+const dateToLocalString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 interface EditGoalModalProps {
     goal: Goal;
     onClose: () => void;
@@ -14,7 +22,7 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
     const [description, setDescription] = useState(goal.description || '');
     const [target, setTarget] = useState(goal.targetValue?.toString() || '');
     const [progressMode, setProgressMode] = useState<'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT'>(goal.progressMode || 'TASK_BASED');
-    const [customEndDate, setCustomEndDate] = useState(goal.endDate ? new Date(goal.endDate).toISOString().split('T')[0] : '');
+    const [customEndDate, setCustomEndDate] = useState(goal.endDate ? new Date(goal.endDate).toLocaleDateString('en-CA') : '');
     const [customDataLabel, setCustomDataLabel] = useState(goal.customDataLabel || '');
     const [scope, setScope] = useState<GoalScope>(goal.scope || 'STANDALONE');
 
@@ -26,7 +34,7 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
             description,
             progressMode,
             targetValue: target ? parseFloat(target) : undefined,
-            endDate: customEndDate ? new Date(customEndDate).toISOString() : undefined,
+            endDate: customEndDate ? new Date(customEndDate + 'T00:00:00').toISOString() : undefined,
             customDataLabel,
             scope
         });
