@@ -1,0 +1,31 @@
+services:
+  api:
+    image: ghcr.io/${GITHUB_REPO_OWNER}/goal-tracker-api:latest
+    container_name: goal-tracker-api
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: ${PORT:-3000}
+      NODE_ENV: production
+    networks:
+      - immich-net
+    external_links:
+      - immich_postgres:postgres
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/${GITHUB_REPO_OWNER}/goal-tracker-web:latest
+    container_name: goal-tracker-web
+    ports:
+      - "5137:80"
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  immich-net:
+    external: true
+
