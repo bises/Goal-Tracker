@@ -67,6 +67,10 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      - name: Debug SSH key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | wc -l
+
       - name: Test SSH connection (verbose)
         uses: appleboy/ssh-action@v1.0.3
         with:
