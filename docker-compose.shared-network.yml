@@ -6,7 +6,7 @@ services:
     container_name: goal-tracker-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       # Connect to immich_postgres container on immich-net network
       DATABASE_URL: ${DATABASE_URL}

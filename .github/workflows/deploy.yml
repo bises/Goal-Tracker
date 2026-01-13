@@ -60,6 +60,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -68,7 +75,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd ~/goal-tracker
+            cd ~/deploy/goal-tracker
 
             echo "🔑 Logging into GitHub Container Registry..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -77,24 +84,12 @@ jobs:
             docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-api:latest
             docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
 
-            echo "🛑 Stopping old API and Web containers (keeping DB running)..."
+            echo "🛑 Stopping old API and Web containers..."
             docker compose stop api web || true
             docker compose rm -f api web || true
 
-            echo "🗄️ Starting/ensuring database is running..."
-            docker compose up -d postgres
 
-            echo "⏳ Waiting for database to be ready..."
-            sleep 5
-            until docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-user}; do
-              echo "Waiting for database..."
-              sleep 2
-            done
-
-            echo "🔄 Running database migrations..."
-            docker compose run --rm api sh -c "npx prisma migrate deploy"
-
-            echo "🚀 Starting all services..."
+            echo "�🚀 Starting all services..."
             docker compose up -d
 
             echo "🧹 Cleaning up old images..."
