@@ -3,7 +3,7 @@ name: Deploy to Ubuntu Server
 on:
   push:
     branches:
-      - "**" # Run on all branches
+      - main # Change to your default branch if different
   workflow_dispatch: # Allows manual triggering
 
 env:
@@ -55,22 +55,81 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
 
-  ssh-debug:
+  deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/deploy/goal-tracker
 
-      - name: Write SSH key to temp file
+            echo "🔑 Logging into GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            echo "📥 Pulling latest images..."
+            docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-api:latest
+            docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
+
+            echo "🛑 Stopping old API and Web containers (keeping DB running)..."
+            docker compose stop api web || true
+            docker compose rm -f api web || true
+
+            echo "🗄️ Starting/ensuring database is running..."
+            docker compose up -d postgres
+
+            echo "⏳ Waiting for database to be ready..."
+            sleep 5
+            until docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-user}; do
+              echo "Waiting for database..."
+              sleep 2
+            done
+
+            echo "🔄 Running database migrations..."
+            docker compose run --rm api sh -c "npx prisma migrate deploy"
+
+            echo "🚀 Starting all services..."
+            docker compose up -d
+
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+
+            echo "✅ Deployment completed successfully!"
+            docker compose ps
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 15
+
+            cd ~/goal-tracker
+
+            # Check if containers are running
+            if docker compose ps | grep -q "Up"; then
+              echo "✅ Containers are running"
+              docker compose ps
+            else
+              echo "❌ Some containers failed to start"
+              docker compose logs --tail=50
+              exit 1
+            fi
+
+      - name: Notify deployment status
+        if: always()
         run: |
-          # Write the secret to a temp file
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
-          chmod 600 /tmp/id_rsa
-
-          # Check the first few lines to verify formatting (GitHub masks secrets)
-          head -n 5 /tmp/id_rsa
-
-      - name: Test SSH connection with verbose logging
-        run: |
-          ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -vvv ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '🔑 SSH works!'"
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi
