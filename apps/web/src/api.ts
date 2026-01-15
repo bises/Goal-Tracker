@@ -7,7 +7,8 @@ type TaskPayload = Partial<Task> & { goalIds?: string[] };
 export const api = {
     fetchGoals: async (): Promise<Goal[]> => {
         const res = await fetch(`${API_URL}/goals`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 
     createGoal: async (goal: Partial<Goal>): Promise<Goal> => {
@@ -46,12 +47,14 @@ export const api = {
     // Hierarchy endpoints
     getGoalTree: async () => {
         const res = await fetch(`${API_URL}/goals/tree`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 
     getGoalsByScope: async (scope: string) => {
         const res = await fetch(`${API_URL}/goals/scope/${scope}`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 
     bulkCreateTasks: async (parentId: string, tasks: Array<{ title: string; scheduledDate?: string; size?: number }>) => {
@@ -81,19 +84,22 @@ export const api = {
 
     getGoalTasks: async (goalId: string) => {
         const res = await fetch(`${API_URL}/goals/${goalId}/tasks`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 
     getGoalActivities: async (goalId: string) => {
         const res = await fetch(`${API_URL}/goals/${goalId}/activities`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 };
 
 export const taskApi = {
     fetchTasks: async (): Promise<Task[]> => {
         const res = await fetch(`${API_URL}/tasks`);
-        return res.json();
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
     },
 
     createTask: async (task: TaskPayload): Promise<Task> => {
@@ -176,7 +182,7 @@ export const calendarApi = {
             endDate,
             includeUnscheduled: includeUnscheduled.toString(),
         });
-        
+
         if (parentGoalId) {
             params.append('parentGoalId', parentGoalId);
         }
@@ -187,7 +193,7 @@ export const calendarApi = {
 
     fetchCalendarGoals: async (startDate: string, endDate: string, scope?: string) => {
         const params = new URLSearchParams({ startDate, endDate });
-        
+
         if (scope) {
             params.append('scope', scope);
         }

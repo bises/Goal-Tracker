@@ -1,12 +1,20 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Task, Goal } from '../../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import './CalendarView.css';
-import { Modal } from '../Modal';
+import React, { useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
+import { Task } from '../../types';
 import { AddTaskToDateModal } from '../AddTaskToDateModal';
+import { Modal } from '../Modal';
+import './CalendarView.css';
 
 type ViewMode = 'month' | 'week' | 'day';
+
+// Helper: Parse YYYY-MM-DD string as local date (not UTC)
+const parseLocalDate = (dateStr: string): Date => {
+    // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss.sssZ' formats
+    const dateOnly = dateStr.split('T')[0]; // Get just the date part
+    const [year, month, day] = dateOnly.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
 
 interface CalendarViewProps {
     onTaskClick?: (task: Task) => void;
@@ -72,11 +80,26 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     // Filter tasks for the current date range
     const tasks = useMemo(() => {
         const { startDate, endDate } = getDateRange();
-        return allTasks.filter(task => {
-            if (!task.scheduledDate) return false;
-            const taskDate = new Date(task.scheduledDate);
-            return taskDate >= startDate && taskDate <= endDate;
+        console.log('[CalendarView] Date range:', { 
+            start: startDate.toDateString(), 
+            end: endDate.toDateString() 
         });
+        const filtered = allTasks.filter(task => {
+            if (!task.scheduledDate) return false;
+            const taskDate = parseLocalDate(task.scheduledDate);
+            const inRange = taskDate >= startDate && taskDate <= endDate;
+            console.log('[CalendarView] Task filter:', { 
+                scheduledDate: task.scheduledDate, 
+                taskDate: taskDate.toDateString(),
+                taskDateTime: taskDate.getTime(),
+                startDateTime: startDate.getTime(),
+                endDateTime: endDate.getTime(),
+                inRange 
+            });
+            return inRange;
+        });
+        console.log('[CalendarView] Filtered tasks:', filtered.length, 'out of', allTasks.length);
+        return filtered;
     }, [allTasks, currentDate, viewMode]);
 
     const navigatePrevious = () => {
@@ -148,11 +171,21 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     };
 
     const getTasksForDate = (date: Date) => {
-        return tasks.filter(task => {
+        const filtered = tasks.filter(task => {
             if (!task.scheduledDate) return false;
-            const taskDate = new Date(task.scheduledDate);
-            return taskDate.toDateString() === date.toDateString();
+            const taskDate = parseLocalDate(task.scheduledDate);
+            const match = taskDate.toDateString() === date.toDateString();
+            if (task.scheduledDate === '2026-01-15' || task.scheduledDate === '2026-01-14') {
+                console.log('[CalendarView] Task date check:', { 
+                    scheduledDate: task.scheduledDate, 
+                    taskDate: taskDate.toDateString(), 
+                    compareDate: date.toDateString(), 
+                    match 
+                });
+            }
+            return match;
         });
+        return filtered;
     };
 
     const handleDayDragOver = (e: React.DragEvent<HTMLDivElement>) => {

@@ -1,9 +1,8 @@
-import express from 'express';
 import cors from 'cors';
-import { prisma } from './prisma';
+import express from 'express';
+import calendarRoutes from './routes/calendar';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
-import calendarRoutes from './routes/calendar';
 
 const app = express();
 const port = process.env.PORT || 3000;

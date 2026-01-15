@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { CheckCircle2, Circle, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
 import { api } from '../api';
 import { useTaskContext } from '../contexts/TaskContext';
-import { Trash2, CheckCircle2, Circle } from 'lucide-react';
+
+// Helper: Parse YYYY-MM-DD string as local date (not UTC)
+const parseLocalDate = (dateStr: string): Date => {
+    // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss.sssZ' formats
+    const dateOnly = dateStr.split('T')[0];
+    const [year, month, day] = dateOnly.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
 
 interface TaskListComponentProps {
     goalId: string;
@@ -49,7 +57,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
         if (isExpanded || isLoading) return;
         try {
             setIsLoading(true);
-            const data = await api.getGoalTasks(goalId);
+            const data = await api.getGoalTasks(goalId) as unknown as TasksData;
             setTasksData(data);
             setIsExpanded(true);
         } catch (e) {
@@ -63,7 +71,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
         try {
             await toggleComplete(taskId);
             // Reload tasks to get updated data
-            const data = await api.getGoalTasks(goalId);
+            const data = await api.getGoalTasks(goalId) as unknown as TasksData;
             setTasksData(data);
             onTasksUpdated();
         } catch (e) {
@@ -78,7 +86,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
                 await updateTaskFields(taskId, { goalIds: [] });
                 
                 // Reload tasks
-                const data = await api.getGoalTasks(goalId);
+                const data = await api.getGoalTasks(goalId) as unknown as TasksData;
                 setTasksData(data);
                 onTasksUpdated();
             } catch (e) {
@@ -92,7 +100,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
             try {
                 await deleteTask(taskId);
                 // Reload tasks
-                const data = await api.getGoalTasks(goalId);
+                const data = await api.getGoalTasks(goalId) as unknown as TasksData;
                 setTasksData(data);
                 onTasksUpdated();
             } catch (e) {
@@ -143,7 +151,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
                     <div className="space-y-3">
                         {goalTasks.map((gt) => {
                             const isOverdue = gt.task.scheduledDate && !gt.task.isCompleted && 
-                                new Date(gt.task.scheduledDate) < new Date();
+                                parseLocalDate(gt.task.scheduledDate) < new Date();
                             const statusColor = gt.task.isCompleted 
                                 ? 'border-green-500' 
                                 : isOverdue 
@@ -198,7 +206,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, on
                                                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                             </svg>
-                                                            {new Date(gt.task.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        {parseLocalDate(gt.task.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                         </span>
                                                     )}
                                                     {gt.task.isCompleted && gt.task.completedAt && (

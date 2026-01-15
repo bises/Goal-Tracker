@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum GoalType {
@@ -84,7 +83,7 @@ model Task {
   isCompleted Boolean  @default(false)
   completedAt DateTime?
   
-  // Scheduling
+  // Scheduling (date only, no time)
   scheduledDate DateTime?
   
   // Linking to multiple goals (many-to-many)
