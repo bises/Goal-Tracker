@@ -43,7 +43,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             setTasks(Array.isArray(data) ? data : []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
-            console.error('Error loading tasks:', err);
         } finally {
             setLoading(false);
         }
@@ -105,9 +104,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         try {
             // Convert to YYYY-MM-DD string in local time
             const dateStr = date ? dateToLocalString(date) : null;
-            console.log('[TaskContext] Scheduling task:', { taskId, date, dateStr });
             const saved = await taskApi.scheduleTask(taskId, dateStr);
-            console.log('[TaskContext] Scheduled task response:', saved);
             upsertTask(saved);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to schedule task');

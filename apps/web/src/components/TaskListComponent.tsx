@@ -2,14 +2,7 @@ import { CheckCircle2, Circle, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { api } from '../api';
 import { useTaskContext } from '../contexts/TaskContext';
-
-// Helper: Parse YYYY-MM-DD string as local date (not UTC)
-const parseLocalDate = (dateStr: string): Date => {
-    // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss.sssZ' formats
-    const dateOnly = dateStr.split('T')[0];
-    const [year, month, day] = dateOnly.split('-').map(Number);
-    return new Date(year, month - 1, day);
-};
+import { parseLocalDate } from '../utils/dateUtils';
 
 interface TaskListComponentProps {
     goalId: string;

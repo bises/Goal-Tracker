@@ -2,19 +2,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
+import { parseLocalDate } from '../../utils/dateUtils';
 import { AddTaskToDateModal } from '../AddTaskToDateModal';
 import { Modal } from '../Modal';
 import './CalendarView.css';
 
 type ViewMode = 'month' | 'week' | 'day';
-
-// Helper: Parse YYYY-MM-DD string as local date (not UTC)
-const parseLocalDate = (dateStr: string): Date => {
-    // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss.sssZ' formats
-    const dateOnly = dateStr.split('T')[0]; // Get just the date part
-    const [year, month, day] = dateOnly.split('-').map(Number);
-    return new Date(year, month - 1, day);
-};
 
 interface CalendarViewProps {
     onTaskClick?: (task: Task) => void;
@@ -35,7 +28,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
 
     const handleTaskPress = (task: Task) => {
-        console.log('Task pressed:', task);
         if (isMobile()) {
             setActionTask(task);
         } else {
@@ -80,25 +72,12 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     // Filter tasks for the current date range
     const tasks = useMemo(() => {
         const { startDate, endDate } = getDateRange();
-        console.log('[CalendarView] Date range:', { 
-            start: startDate.toDateString(), 
-            end: endDate.toDateString() 
-        });
         const filtered = allTasks.filter(task => {
             if (!task.scheduledDate) return false;
             const taskDate = parseLocalDate(task.scheduledDate);
             const inRange = taskDate >= startDate && taskDate <= endDate;
-            console.log('[CalendarView] Task filter:', { 
-                scheduledDate: task.scheduledDate, 
-                taskDate: taskDate.toDateString(),
-                taskDateTime: taskDate.getTime(),
-                startDateTime: startDate.getTime(),
-                endDateTime: endDate.getTime(),
-                inRange 
-            });
             return inRange;
         });
-        console.log('[CalendarView] Filtered tasks:', filtered.length, 'out of', allTasks.length);
         return filtered;
     }, [allTasks, currentDate, viewMode]);
 
@@ -132,7 +111,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         // Start 500ms timer for long-press detection
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = setTimeout(() => {
-            console.log('Long-press detected on date:', date);
             setSheetDate(date);
             longPressTimerRef.current = null;
         }, 500);
@@ -140,11 +118,9 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
 
     const handleDayRelease = (e: React.TouchEvent, date: Date) => {
         // Clear timer if touch ends before 500ms (wasn't a long-press)
-        console.log('Touch released, clearing long-press timer');
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
-            console.log('Short tap detected on date:', date);
             onDateClick?.(date);
         }
         // Prevent onClick from firing on mobile after touch events
@@ -154,7 +130,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     const handleDayClick = (date: Date) => {
         // Desktop only: call onDateClick callback
         // Mobile: skip onDateClick to avoid overlap with sheet
-        console.log('Day clicked:', date);
         if (!isMobile()) {
             onDateClick?.(date);
         }
@@ -175,14 +150,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
             if (!task.scheduledDate) return false;
             const taskDate = parseLocalDate(task.scheduledDate);
             const match = taskDate.toDateString() === date.toDateString();
-            if (task.scheduledDate === '2026-01-15' || task.scheduledDate === '2026-01-14') {
-                console.log('[CalendarView] Task date check:', { 
-                    scheduledDate: task.scheduledDate, 
-                    taskDate: taskDate.toDateString(), 
-                    compareDate: date.toDateString(), 
-                    match 
-                });
-            }
             return match;
         });
         return filtered;
@@ -212,7 +179,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
             // Context automatically updates, no need to reload
             setScheduling(false);
         } catch (error) {
-            console.error('Failed to schedule task:', error);
             setScheduling(false);
         }
     };
