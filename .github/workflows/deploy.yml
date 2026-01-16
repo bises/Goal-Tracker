@@ -3,7 +3,7 @@ name: Deploy to Ubuntu Server
 on:
   push:
     branches:
-      - "**" # Deploy from any branch
+      - "main" # Deploy from any branch
   workflow_dispatch: # Allows manual triggering
 
 env:
