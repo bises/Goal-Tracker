@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarView } from '../components/Calendar/CalendarView';
-import { Task } from '../types';
-import { taskApi } from '../api';
+import React, { useMemo, useState } from 'react';
 import AddTaskModal from '../components/AddTaskModal';
-import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
+import { CalendarView } from '../components/Calendar/CalendarView';
 import { Modal } from '../components/Modal';
 import { Toast } from '../components/Toast';
+import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
 import { useTaskContext } from '../contexts/TaskContext';
+import { Task } from '../types';
+import { parseLocalDate } from '../utils/dateUtils';
 
 export function PlannerPage() {
     const { tasks, scheduleTask } = useTaskContext();
@@ -39,7 +39,7 @@ export function PlannerPage() {
     const tasksForSelectedDate = useMemo(() => {
         if (!selectedDate) return [] as Task[];
         const target = selectedDate.toDateString();
-        return tasks.filter(t => t.scheduledDate && new Date(t.scheduledDate).toDateString() === target);
+        return tasks.filter(t => t.scheduledDate && parseLocalDate(t.scheduledDate).toDateString() === target);
     }, [tasks, selectedDate]);
 
     const handleTaskUpdate = () => {

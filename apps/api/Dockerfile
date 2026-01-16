@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -17,11 +17,16 @@ RUN pnpm install --shamefully-hoist
 
 # Build
 WORKDIR /app/apps/api
+# Set placeholder DATABASE_URL for prisma generate (actual value provided at runtime)
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate
 RUN pnpm build
 
 # Ensure production dependencies are available locally
-RUN npm install --omit=dev
+RUN pnpm prune --prod
+
+# Regenerate Prisma client after pruning
+RUN npx prisma generate
 
 # Copy entrypoint script
 COPY apps/api/entrypoint.sh .

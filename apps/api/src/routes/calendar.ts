@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/calendar/tasks - Fetch tasks for calendar view
 router.get('/tasks', async (req, res) => {

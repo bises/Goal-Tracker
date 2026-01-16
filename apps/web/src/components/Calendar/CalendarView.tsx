@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Task, Goal } from '../../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import './CalendarView.css';
-import { Modal } from '../Modal';
+import React, { useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
+import { Task } from '../../types';
+import { parseLocalDate } from '../../utils/dateUtils';
 import { AddTaskToDateModal } from '../AddTaskToDateModal';
+import { Modal } from '../Modal';
+import './CalendarView.css';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -27,7 +28,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
 
     const handleTaskPress = (task: Task) => {
-        console.log('Task pressed:', task);
         if (isMobile()) {
             setActionTask(task);
         } else {
@@ -72,11 +72,13 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     // Filter tasks for the current date range
     const tasks = useMemo(() => {
         const { startDate, endDate } = getDateRange();
-        return allTasks.filter(task => {
+        const filtered = allTasks.filter(task => {
             if (!task.scheduledDate) return false;
-            const taskDate = new Date(task.scheduledDate);
-            return taskDate >= startDate && taskDate <= endDate;
+            const taskDate = parseLocalDate(task.scheduledDate);
+            const inRange = taskDate >= startDate && taskDate <= endDate;
+            return inRange;
         });
+        return filtered;
     }, [allTasks, currentDate, viewMode]);
 
     const navigatePrevious = () => {
@@ -109,7 +111,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
         // Start 500ms timer for long-press detection
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = setTimeout(() => {
-            console.log('Long-press detected on date:', date);
             setSheetDate(date);
             longPressTimerRef.current = null;
         }, 500);
@@ -117,11 +118,9 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
 
     const handleDayRelease = (e: React.TouchEvent, date: Date) => {
         // Clear timer if touch ends before 500ms (wasn't a long-press)
-        console.log('Touch released, clearing long-press timer');
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
-            console.log('Short tap detected on date:', date);
             onDateClick?.(date);
         }
         // Prevent onClick from firing on mobile after touch events
@@ -131,7 +130,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     const handleDayClick = (date: Date) => {
         // Desktop only: call onDateClick callback
         // Mobile: skip onDateClick to avoid overlap with sheet
-        console.log('Day clicked:', date);
         if (!isMobile()) {
             onDateClick?.(date);
         }
@@ -148,11 +146,13 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
     };
 
     const getTasksForDate = (date: Date) => {
-        return tasks.filter(task => {
+        const filtered = tasks.filter(task => {
             if (!task.scheduledDate) return false;
-            const taskDate = new Date(task.scheduledDate);
-            return taskDate.toDateString() === date.toDateString();
+            const taskDate = parseLocalDate(task.scheduledDate);
+            const match = taskDate.toDateString() === date.toDateString();
+            return match;
         });
+        return filtered;
     };
 
     const handleDayDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -179,7 +179,6 @@ export function CalendarView({ onTaskClick, onDateClick, onScheduled, reloadVers
             // Context automatically updates, no need to reload
             setScheduling(false);
         } catch (error) {
-            console.error('Failed to schedule task:', error);
             setScheduling(false);
         }
     };

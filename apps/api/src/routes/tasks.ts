@@ -1,6 +1,7 @@
-import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import { Router } from 'express';
 import { prisma } from '../prisma';
+import { parseDateOnly } from '../utils/dateUtils';
 
 const router = Router();
 
@@ -124,11 +125,11 @@ router.get('/:id', async (req, res) => {
         },
       },
     });
-    
+
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    
+
     res.json(task);
   } catch (error) {
     console.error('Error fetching task:', error);
@@ -155,11 +156,10 @@ router.post('/', async (req, res) => {
 
     const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create the task
-      // Parse YYYY-MM-DD string as local date (not UTC)
+      // Parse YYYY-MM-DD string for date-only field
       let parsedScheduledDate = null;
       if (scheduledDate) {
-        const [year, month, day] = scheduledDate.split('-').map(Number);
-        parsedScheduledDate = new Date(year, month - 1, day);
+        parsedScheduledDate = parseDateOnly(scheduledDate);
       }
       const newTask = await tx.task.create({
         data: {
@@ -262,16 +262,15 @@ router.put('/:id', async (req, res) => {
     } = req.body;
 
     const updateData: any = {};
-    
+
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (size !== undefined) updateData.size = parseInt(size);
     if (scheduledDate !== undefined) {
-      // Parse YYYY-MM-DD string as local date (not UTC)
+      // Parse YYYY-MM-DD string for date-only field
       let parsedDate = null;
       if (scheduledDate) {
-        const [year, month, day] = scheduledDate.split('-').map(Number);
-        parsedDate = new Date(year, month - 1, day);
+        parsedDate = parseDateOnly(scheduledDate);
       }
       updateData.scheduledDate = parsedDate;
     }
@@ -395,11 +394,11 @@ router.post('/:id/complete', async (req, res) => {
       for (const gt of task.goalTasks) {
         const goal = await tx.goal.findUnique({
           where: { id: gt.goalId },
-          select: { 
-            title: true, 
-            currentValue: true, 
-            progressMode: true, 
-            targetValue: true, 
+          select: {
+            title: true,
+            currentValue: true,
+            progressMode: true,
+            targetValue: true,
             parentId: true,
             goalTasks: {
               include: { task: true }
@@ -623,7 +622,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
 
       if (goal && goal.progressMode === 'TASK_BASED') {
         const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
-        
+
         // If task was completed, also decrement currentValue
         let newCurrentValue = goal.currentValue;
         if (task.isCompleted) {
@@ -633,7 +632,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
 
         await tx.goal.update({
           where: { id: goalId },
-          data: { 
+          data: {
             targetValue: newTargetValue,
             currentValue: newCurrentValue,
           },

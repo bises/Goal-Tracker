@@ -1,12 +1,14 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Task } from '../types';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { taskApi } from '../api';
+import { Task } from '../types';
 
 // Helper: Convert Date to YYYY-MM-DD string in local time (no timezone conversion)
 const dateToLocalString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    // Ensure we're working with a proper Date object
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -38,10 +40,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         setError(null);
         try {
             const data = await taskApi.fetchTasks();
-            setTasks(data);
+            setTasks(Array.isArray(data) ? data : []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
-            console.error('Error loading tasks:', err);
         } finally {
             setLoading(false);
         }

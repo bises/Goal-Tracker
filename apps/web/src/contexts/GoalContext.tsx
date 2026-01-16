@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Goal } from '../types';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { api } from '../api';
+import { Goal } from '../types';
 
 interface GoalContextType {
     goals: Goal[];
@@ -25,7 +25,7 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
         setError(null);
         try {
             const data = await api.fetchGoals();
-            setGoals(data);
+            setGoals(Array.isArray(data) ? data : []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch goals');
             console.error('Error loading goals:', err);

@@ -1,6 +1,7 @@
-import { Task } from '../types';
-import { useTaskContext } from '../contexts/TaskContext';
 import { CheckCircle2, Circle, Edit2, Trash2 } from 'lucide-react';
+import { useTaskContext } from '../contexts/TaskContext';
+import { Task } from '../types';
+import { parseLocalDate } from '../utils/dateUtils';
 
 interface TaskCardProps {
     task: Task;
@@ -37,7 +38,7 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
     
     // Determine status color
     const isOverdue = task.scheduledDate && !task.isCompleted && 
-        new Date(task.scheduledDate) < new Date();
+        parseLocalDate(task.scheduledDate) < new Date();
     const statusColor = task.isCompleted 
         ? 'border-green-500' 
         : isOverdue 
@@ -90,7 +91,7 @@ export default function TaskCard({ task, onUpdate, onEdit }: TaskCardProps) {
                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
-                                    {new Date(task.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    {parseLocalDate(task.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </span>
                             )}
                             {task.completedAt && (
