@@ -23,7 +23,10 @@ RUN npx prisma generate
 RUN pnpm build
 
 # Ensure production dependencies are available locally
-RUN npm install --omit=dev
+RUN pnpm prune --prod
+
+# Regenerate Prisma client after pruning
+RUN npx prisma generate
 
 # Copy entrypoint script
 COPY apps/api/entrypoint.sh .
