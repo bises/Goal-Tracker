@@ -1,11 +1,4 @@
-import {
-    ChevronLeft,
-    Clock,
-    Edit2,
-    Link,
-    Plus,
-    Trash2
-} from "lucide-react";
+import { ChevronLeft, Clock, Edit2, Link, Plus, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { api } from "../api";
 import { ActivitiesListComponent } from "../components/ActivitiesListComponent";

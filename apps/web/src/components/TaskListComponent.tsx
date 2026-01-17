@@ -46,7 +46,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tasksData, setTasksData] = useState<TasksData | null>(null);
-  const { toggleComplete, updateTaskFields, deleteTask } = useTaskContext();
+  const { updateTaskFields } = useTaskContext();
 
   const loadTasks = async () => {
     if (isExpanded || isLoading) return;
@@ -59,18 +59,6 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
       console.error("Failed to load tasks", e);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleToggleTask = async (taskId: string) => {
-    try {
-      await toggleComplete(taskId);
-      // Reload tasks to get updated data
-      const data = await api.getGoalTasks(goalId);
-      setTasksData(data);
-      onTasksUpdated();
-    } catch (e) {
-      console.error("Failed to toggle task", e);
     }
   };
 
@@ -90,17 +78,13 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    if (confirm("Delete this task permanently?")) {
-      try {
-        await deleteTask(taskId);
-        // Reload tasks
-        const data = await api.getGoalTasks(goalId);
-        setTasksData(data);
-        onTasksUpdated();
-      } catch (e) {
-        console.error("Failed to delete task", e);
-      }
+  const refreshTasks = async () => {
+    try {
+      const data = await api.getGoalTasks(goalId);
+      setTasksData(data);
+      onTasksUpdated();
+    } catch (e) {
+      console.error("Failed to refresh tasks", e);
     }
   };
 
@@ -150,11 +134,9 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
               <TaskCard
                 key={gt.task.id}
                 task={gt.task}
-                onUpdate={onTasksUpdated}
-                onToggle={handleToggleTask}
+                onUpdate={refreshTasks}
                 onUnlink={handleUnlinkTask}
-                onDelete={handleDeleteTask}
-                showEdit={false}
+                showEdit={true}
                 showUnlink={true}
                 showDelete={true}
                 showLinkedGoals={false}
