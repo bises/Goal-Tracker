@@ -1,10 +1,10 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AddGoalModal } from './components/AddGoalModal';
 import AddTaskModal from './components/AddTaskModal';
-import { AllTasksList } from './components/AllTasksList';
 import { GoalCard } from './components/GoalCard';
+import { TaskListComponent } from './components/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
@@ -15,7 +15,6 @@ type ViewMode = 'goals' | 'tasks' | 'planner';
 function AppContent() {
   const { goals, fetchGoals } = useGoalContext();
   const { tasks, fetchTasks } = useTaskContext();
-  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('planner');
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -157,7 +156,7 @@ function AppContent() {
 
               {/* Tasks View */}
               {viewMode === 'tasks' && (
-                <AllTasksList
+                <TaskListComponent
                   tasks={tasks}
                   onTaskEvent={(taskId, event) => {
                     // Refetch tasks on any task event

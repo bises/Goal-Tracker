@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Goal, GoalScope } from '../types';
-import { X } from 'lucide-react';
 
 interface AddGoalModalProps {
   onClose: () => void;
@@ -21,7 +21,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
   const [customDataLabel, setCustomDataLabel] = useState('');
 
   // Hierarchy fields
-  const [scope, setScope] = useState<GoalScope>(parentGoal ? 'STANDALONE' : 'STANDALONE');
+  const [scope, setScope] = useState<GoalScope>('STANDALONE');
   const [parentId, setParentId] = useState(parentGoal?.id || '');
   const [availableParents, setAvailableParents] = useState<Goal[]>([]);
 
@@ -170,12 +170,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
                   Per
                 </label>
-                <select
-                  style={{ height: '42px' }}
-                  onChange={(e) => {
-                    /* Simplified */
-                  }}
-                >
+                <select style={{ height: '42px' }}>
                   <option value="WEEKLY">Week</option>
                   <option value="MONTHLY">Month</option>
                 </select>
@@ -242,14 +237,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="allowDecimals"
-              style={{ width: 'auto' }}
-              onChange={(e) => {
-                (e.target as any).checkedValue = e.target.checked;
-              }}
-            />
+            <input type="checkbox" id="allowDecimals" style={{ width: 'auto' }} />
             <label htmlFor="allowDecimals" style={{ fontSize: '0.9rem' }}>
               Allow Decimals
             </label>
