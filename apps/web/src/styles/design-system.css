@@ -1,11 +1,11 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-family: "Outfit", sans-serif;
+  --font-family: 'Outfit', sans-serif;
 
   /* HSL Colors */
   --color-bg-h: 222;
@@ -30,19 +30,14 @@
   --gradient-primary: linear-gradient(
     135deg,
     hsl(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l)),
-    hsl(
-      var(--color-secondary-h),
-      var(--color-secondary-s),
-      var(--color-secondary-l)
-    )
+    hsl(var(--color-secondary-h), var(--color-secondary-s), var(--color-secondary-l))
   );
 
   --radius-lg: 24px;
   --radius-md: 16px;
   --radius-sm: 8px;
 
-  --shadow-lg:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
 
   --radius: 0.625rem;
 
@@ -161,11 +156,7 @@ textarea {
 input:focus,
 select:focus {
   outline: none;
-  border-color: hsl(
-    var(--color-primary-h),
-    var(--color-primary-s),
-    var(--color-primary-l)
-  );
+  border-color: hsl(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l));
 }
 
 button.primary-btn {
