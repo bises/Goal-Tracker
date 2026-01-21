@@ -362,16 +362,12 @@ export const GoalDetailsPage: React.FC = () => {
                       title="Linked Tasks"
                       tasks={tasksData.goalTasks.map((gt) => gt.task as Task)}
                       onTaskEvent={async (taskId: string, event: TaskEvent) => {
-                        const tasks = await api.getGoalTasks(goal.id);
-                        setTasksData(tasks);
                         fetchGoalData();
                       }}
                       onUnlink={async (taskId: string) => {
                         if (confirm('Unlink this task from the goal? (Task will not be deleted)')) {
                           try {
                             await updateTaskFields(taskId, { goalIds: [] });
-                            const tasks = await api.getGoalTasks(goal.id);
-                            setTasksData(tasks);
                             fetchGoalData();
                           } catch (e) {
                             console.error('Failed to unlink task', e);

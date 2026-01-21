@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../api';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from './ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
 interface ActivitiesListComponentProps {
   goalId: string;
@@ -14,7 +9,13 @@ interface ActivitiesListComponentProps {
 interface ProgressEntry {
   id: string;
   date: string;
-  value: activities, setActivities] = useState<ProgressEntry[]>([]);
+  value: number;
+  note?: string;
+  customData?: string;
+}
+
+export const ActivitiesListComponent: React.FC<ActivitiesListComponentProps> = ({ goalId }) => {
+  const [activities, setActivities] = useState<ProgressEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -90,13 +91,7 @@ interface ProgressEntry {
             )}
           </AccordionContent>
         </AccordionItem>
-      </Accordion>        </div>
-              ))}
-          </div>
-        </div>
-      ) : (
-        <p className="text-slate-400 text-center py-4">No activities recorded yet</p>
-      )}
+      </Accordion>
     </div>
   );
 };
