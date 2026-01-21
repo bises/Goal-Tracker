@@ -7,20 +7,24 @@ Your deployment now has **three options** for handling migrations safely:
 ### Option 1: Automatic on API Startup (Recommended) ✅
 
 **How it works:**
+
 - The API container runs migrations automatically on startup
 - Implemented via `entrypoint.sh` in the Dockerfile
 - Zero configuration needed
 
 **Pros:**
+
 - ✅ Simplest approach
 - ✅ Works on first deployment
 - ✅ Self-healing (container restart runs migrations)
 
 **Cons:**
+
 - ⚠️ Slight delay on container startup
 - ⚠️ Multiple API instances might race (use locking)
 
 **Files:**
+
 - [apps/api/entrypoint.sh](apps/api/entrypoint.sh)
 - [apps/api/Dockerfile](apps/api/Dockerfile)
 
@@ -29,15 +33,18 @@ Your deployment now has **three options** for handling migrations safely:
 ### Option 2: During GitHub Actions Deployment ✅
 
 **How it works:**
+
 - GitHub Actions runs migrations before starting services
 - Database starts first, then migrations run, then services start
 
 **Pros:**
+
 - ✅ Explicit control over migration timing
 - ✅ Clear logs in GitHub Actions
 - ✅ Fails deployment if migrations fail
 
 **Cons:**
+
 - ⚠️ Requires database to be accessible during deployment
 - ⚠️ Downtime if migration takes long
 
@@ -63,15 +70,18 @@ docker compose up -d
 ### Option 3: Manual Migrations
 
 **How it works:**
+
 - SSH into server and run migrations manually
 - Full control over timing
 
 **Pros:**
+
 - ✅ Complete control
 - ✅ Can test migrations first
 - ✅ Safest for production
 
 **Cons:**
+
 - ⚠️ Manual step required
 - ⚠️ Easy to forget
 
@@ -95,15 +105,19 @@ docker compose exec api npx prisma migrate deploy
 ## Recommended Approach by Environment
 
 ### Development
+
 ✅ **Option 1** (Automatic) - Fast iteration, self-healing
 
 ### Staging/Testing
+
 ✅ **Option 2** (GitHub Actions) - Automated but visible
 
 ### Production (Small Scale)
+
 ✅ **Option 1** (Automatic) + monitoring
 
 ### Production (Large Scale)
+
 ✅ **Option 3** (Manual) - Maximum control and safety
 
 ---
@@ -116,6 +130,7 @@ Your setup uses **BOTH Option 1 AND Option 2** for safety:
 2. **API container** runs migrations on startup (backup)
 
 This means:
+
 - ✅ Migrations always run when needed
 - ✅ Self-healing if GitHub Actions fails
 - ✅ Zero-downtime possible
@@ -166,7 +181,7 @@ For migrations that take > 30 seconds:
 # In docker-compose.yml, add healthcheck delay
 api:
   healthcheck:
-    start_period: 60s  # Wait 60s before checking health
+    start_period: 60s # Wait 60s before checking health
 ```
 
 ### 5. Handle Failed Migrations
@@ -191,6 +206,7 @@ docker compose exec api npx prisma migrate reset
 **Problem:** GitHub Actions fails at migration step
 
 **Solution:**
+
 ```bash
 # SSH into server
 ssh user@your-server
@@ -217,6 +233,7 @@ docker compose logs api
 **Possible cause:** Migration failing on startup
 
 **Solution:**
+
 ```bash
 # Check logs
 docker compose logs api
@@ -247,7 +264,7 @@ services:
         condition: service_healthy
     networks:
       - goal-net
-  
+
   api:
     # Remove entrypoint.sh, go back to CMD
     # This service only starts after migrate completes
@@ -311,6 +328,7 @@ docker compose exec api npx prisma migrate reset
 ## Summary
 
 Your current setup:
+
 - ✅ Automatic migrations on API startup (safest)
 - ✅ GitHub Actions runs migrations during deployment (visible)
 - ✅ Manual option available for production control

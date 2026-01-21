@@ -5,12 +5,14 @@ This guide explains how to deploy the Goal-Tracker application to your local Ubu
 ## Architecture Overview
 
 This deployment uses a **Docker Hub approach**:
+
 1. 🏗️ GitHub Actions builds Docker images
 2. 📤 Images are pushed to Docker Hub
 3. 📥 Server pulls pre-built images
 4. 🚀 Server runs containers
 
 **Benefits:**
+
 - ✅ No Git needed on server
 - ✅ Faster deployments (pre-built images)
 - ✅ More secure (server only needs Docker)
@@ -88,16 +90,17 @@ Add the following secrets to your GitHub repository:
 3. Click **New repository secret**
 4. Add the following secrets:
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `DOCKER_USERNAME` | Your Docker Hub username | Used to push/pull images |
-| `DOCKER_PASSWORD` | Your Docker Hub password/token | Authentication for Docker Hub |
-| `SSH_PRIVATE_KEY` | Content from `~/.ssh/github_actions` | Private SSH key for server access |
-| `SERVER_HOST` | Your server's IP or hostname | e.g., `192.168.1.100` |
-| `SERVER_USER` | Your Ubuntu username | e.g., `ubuntu` or your username |
-| `DATABASE_URL` | Database connection string | e.g., `postgresql://user:password@postgres:5432/goaltracker` |
+| Secret Name       | Value                                | Description                                                  |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------ |
+| `DOCKER_USERNAME` | Your Docker Hub username             | Used to push/pull images                                     |
+| `DOCKER_PASSWORD` | Your Docker Hub password/token       | Authentication for Docker Hub                                |
+| `SSH_PRIVATE_KEY` | Content from `~/.ssh/github_actions` | Private SSH key for server access                            |
+| `SERVER_HOST`     | Your server's IP or hostname         | e.g., `192.168.1.100`                                        |
+| `SERVER_USER`     | Your Ubuntu username                 | e.g., `ubuntu` or your username                              |
+| `DATABASE_URL`    | Database connection string           | e.g., `postgresql://user:password@postgres:5432/goaltracker` |
 
 **No5. Server:** You can create a Docker Hub access token (recommended) instead of using your password:
+
 - Go to Docker Hub → Account Settings → Security → New Access Token
 
 ### 4. Environment Configuration
@@ -113,18 +116,22 @@ Addocker Hub Configuration
 DOCKER_USERNAME=your_dockerhub_username
 
 # Database Configuration
+
 POSTGRES_USER=user
 POSTGRES_PASSWORD=YOUR_SECURE_PASSWORD
 POSTGRES_DB=goaltracker
 DATABASE_URL=postgresql://user:YOUR_SECURE_PASSWORD@postgres:5432/goaltracker
 
 # API Configuration
+
 PORT=3000
 
 # Web Configuration (Use your server's public IP or domain)
+
 PORT=3000
 
 # We6 Configuration
+
 VITE_API_URL=http://YOUR_SERVER_IP:3000
 The `docker-compose.prod.yml` file is configured to pull images from Docker Hub.
 
@@ -217,6 +224,7 @@ git push origin main
 ```
 
 GitHub Actions will:
+
 1. ✅ Connect to your server via SSH
 2. ✅ Pull the latest code
 3. ✅ Stop existing containers
@@ -230,22 +238,22 @@ docker compose pull
 docker compose up -d
 
 # View images
+
 docker images | grep goal-tracker
 
 # Run migrations manually
+
 docker run --rm --network goal-tracker_goal-net \
-  -e DATABASE_URL="postgresql://user:password@postgres:5432/goaltracker" \
-  YOUR_DOCKERHUB_USERNAME/goal-tracker-api:latest \
-  sh -c "npx prisma migrate deploy"
-3. Select **Deploy to Ubuntu Server** workflow
-4. Click **Run workflow**
-5. Select the branch and click **Run workflow**
+ -e DATABASE_URL="postgresql://user:password@postgres:5432/goaltracker" \
+ YOUR_DOCKERHUB_USERNAME/goal-tracker-api:latest \
+ sh -c "npx prisma migrate deploy" 3. Select **Deploy to Ubuntu Server** workflow 4. Click **Run workflow** 5. Select the branch and click **Run workflow**
 
 ## Monitoring and Maintenance
 
 ### View Deployment Logs
 
 Check the GitHub Actions logs:
+
 1. Go to **Actions** tab in your repository
 2. Click on the latest workflow run
 3. Expand the job steps to see detailed logs
@@ -402,6 +410,7 @@ server {
 ## Support
 
 If you encounter issues:
+
 1. Check the GitHub Actions logs
 2. Review server-side logs: `docker compose logs`
 3. Verify all secrets are correctly configured

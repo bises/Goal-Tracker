@@ -1,5 +1,12 @@
-export type GoalScope = "YEARLY" | "MONTHLY" | "WEEKLY" | "STANDALONE";
-export type ProgressMode = "TASK_BASED" | "MANUAL_TOTAL" | "HABIT";
+export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'STANDALONE';
+export type ProgressMode = 'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT';
+
+export type TaskEvent =
+  | 'TaskCompleted'
+  | 'TaskUncompleted'
+  | 'TaskDeleted'
+  | 'TaskUnlinked'
+  | 'TaskEdited';
 
 export interface Task {
   id: string;
@@ -31,12 +38,12 @@ export interface Goal {
   id: string;
   title: string;
   description?: string;
-  type: "TOTAL_TARGET" | "FREQUENCY" | "HABIT";
+  type: 'TOTAL_TARGET' | 'FREQUENCY' | 'HABIT';
   progressMode: ProgressMode;
   targetValue?: number;
   currentValue: number;
   frequencyTarget?: number;
-  frequencyType?: "DAILY" | "WEEKLY" | "MONTHLY";
+  frequencyType?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   startDate: string;
   endDate?: string;
   stepSize?: number;

@@ -1,22 +1,17 @@
-import React from "react";
-import { Task } from "../types";
-import TaskCard from "./Tasks/TaskCard";
+import React from 'react';
+import { Task, TaskEvent } from '../types';
+import TaskCard from './Tasks/TaskCard';
 
 interface AllTasksListProps {
   tasks: Task[];
-  onUpdate: () => void;
+  onTaskEvent?: (taskId: string, event: TaskEvent) => void;
 }
 
-export const AllTasksList: React.FC<AllTasksListProps> = ({
-  tasks,
-  onUpdate,
-}) => {
+export const AllTasksList: React.FC<AllTasksListProps> = ({ tasks, onTaskEvent }) => {
   if (tasks.length === 0) {
     return (
       <div className="text-center py-12 sm:py-16 text-gray-400">
-        <p className="text-sm sm:text-base">
-          No tasks yet. Create one to get started!
-        </p>
+        <p className="text-sm sm:text-base">No tasks yet. Create one to get started!</p>
       </div>
     );
   }
@@ -27,7 +22,7 @@ export const AllTasksList: React.FC<AllTasksListProps> = ({
         <TaskCard
           key={task.id}
           task={task}
-          onUpdate={onUpdate}
+          onTaskEvent={onTaskEvent}
           showEdit={true}
           showUnlink={false}
           showDelete={true}

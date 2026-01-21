@@ -3,3 +3,7 @@ apps/web/dist/*
 apps/api/dist/*
 
 apps/api/.env
+
+# Keep VS Code workspace settings
+!.vscode/settings.json
+!.vscode/extensions.json

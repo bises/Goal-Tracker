@@ -1,11 +1,12 @@
-import React, { useState } from "react";
-import { api } from "../api";
-import { useTaskContext } from "../contexts/TaskContext";
-import TaskCard from "./Tasks/TaskCard";
+import React, { useState } from 'react';
+import { api } from '../api';
+import { useTaskContext } from '../contexts/TaskContext';
+import { TaskEvent } from '../types';
+import TaskCard from './Tasks/TaskCard';
 
 interface TaskListComponentProps {
   goalId: string;
-  onTasksUpdated: () => void;
+  onTaskEvent?: (taskId: string, event: TaskEvent) => void;
 }
 
 interface TaskItem {
@@ -39,10 +40,7 @@ interface TasksData {
   children: Child[];
 }
 
-export const TaskListComponent: React.FC<TaskListComponentProps> = ({
-  goalId,
-  onTasksUpdated,
-}) => {
+export const TaskListComponent: React.FC<TaskListComponentProps> = ({ goalId, onTaskEvent }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tasksData, setTasksData] = useState<TasksData | null>(null);
@@ -56,14 +54,14 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
       setTasksData(data);
       setIsExpanded(true);
     } catch (e) {
-      console.error("Failed to load tasks", e);
+      console.error('Failed to load tasks', e);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUnlinkTask = async (taskId: string) => {
-    if (confirm("Unlink this task from the goal? (Task will not be deleted)")) {
+    if (confirm('Unlink this task from the goal? (Task will not be deleted)')) {
       try {
         // Update the task's goalIds via context (server returns canonical state)
         await updateTaskFields(taskId, { goalIds: [] });
@@ -71,21 +69,22 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
         // Reload tasks
         const data = await api.getGoalTasks(goalId);
         setTasksData(data);
-        onTasksUpdated();
+
+        // Notify parent
+        onTaskEvent?.(taskId, 'TaskUnlinked');
       } catch (e) {
-        console.error("Failed to unlink task", e);
+        console.error('Failed to unlink task', e);
       }
     }
   };
 
-  const refreshTasks = async () => {
-    try {
-      const data = await api.getGoalTasks(goalId);
-      setTasksData(data);
-      onTasksUpdated();
-    } catch (e) {
-      console.error("Failed to refresh tasks", e);
-    }
+  const handleTaskEvent = async (taskId: string, event: TaskEvent) => {
+    // Refresh local task list
+    const data = await api.getGoalTasks(goalId);
+    setTasksData(data);
+
+    // Notify parent
+    onTaskEvent?.(taskId, event);
   };
 
   if (!isExpanded) {
@@ -96,7 +95,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
           disabled={isLoading}
           className="text-white font-medium text-lg hover:text-blue-400 transition-colors"
         >
-          {isLoading ? "↻ Loading tasks..." : "⊕ Load Tasks"}
+          {isLoading ? '↻ Loading tasks...' : '⊕ Load Tasks'}
         </button>
       </div>
     );
@@ -134,7 +133,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
               <TaskCard
                 key={gt.task.id}
                 task={gt.task}
-                onUpdate={refreshTasks}
+                onTaskEvent={handleTaskEvent}
                 onUnlink={handleUnlinkTask}
                 showEdit={true}
                 showUnlink={true}
@@ -167,9 +166,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-white mb-1">
-                        {child.title}
-                      </h4>
+                      <h4 className="font-semibold text-white mb-1">{child.title}</h4>
                       {child.description && (
                         <p className="text-xs text-slate-400 mb-2 leading-relaxed">
                           {child.description}
@@ -180,7 +177,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
                           {child.scope}
                         </span>
                         <span className="inline-flex items-center px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-full font-medium border border-purple-500/40">
-                          {child.progressMode.replace(/_/g, " ")}
+                          {child.progressMode.replace(/_/g, ' ')}
                         </span>
                         <span className="inline-flex items-center px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-full font-medium border border-emerald-500/40">
                           {progress}% ({child.currentValue}/{child.targetValue})
@@ -206,9 +203,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
       )}
 
       {!hasLinkedTasks && !hasSubgoals && (
-        <p className="text-slate-400 text-center py-4">
-          No tasks or subgoals yet
-        </p>
+        <p className="text-slate-400 text-center py-4">No tasks or subgoals yet</p>
       )}
     </div>
   );

@@ -83,7 +83,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5434:5432"
+      - '5434:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -94,7 +94,7 @@ services:
     container_name: goal-tracker-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PORT: ${PORT}
@@ -108,7 +108,7 @@ services:
     container_name: goal-tracker-web
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - '5173:80'
     environment:
       VITE_API_URL: ${VITE_API_URL}
     depends_on:
@@ -132,14 +132,14 @@ Go to your GitHub repo → **Settings** → **Secrets and variables** → **Acti
 
 Add these 6 secrets:
 
-| Secret Name | Value |
-|-------------|-------|
-| `DOCKER_USERNAME` | Your Docker Hub username |
-| `DOCKER_PASSWORD` | Your Docker Hub password or token |
-| `SSH_PRIVATE_KEY` | Output from `cat ~/.ssh/github_actions` |
-| `SERVER_HOST` | Your server IP (e.g., `192.168.1.100`) |
-| `SERVER_USER` | Your username on Ubuntu (e.g., `ubuntu`) |
-| `DATABASE_URL` | `postgresql://user:password@postgres:5432/goaltracker` |
+| Secret Name       | Value                                                  |
+| ----------------- | ------------------------------------------------------ |
+| `DOCKER_USERNAME` | Your Docker Hub username                               |
+| `DOCKER_PASSWORD` | Your Docker Hub password or token                      |
+| `SSH_PRIVATE_KEY` | Output from `cat ~/.ssh/github_actions`                |
+| `SERVER_HOST`     | Your server IP (e.g., `192.168.1.100`)                 |
+| `SERVER_USER`     | Your username on Ubuntu (e.g., `ubuntu`)               |
+| `DATABASE_URL`    | `postgresql://user:password@postgres:5432/goaltracker` |
 
 ---
 
@@ -201,12 +201,14 @@ docker compose pull && docker compose up -d
 ## Troubleshooting
 
 ### Can't connect to Docker Hub?
+
 ```bash
 # Login manually
 docker login
 ```
 
 ### Containers not starting?
+
 ```bash
 # Check logs
 docker compose logs
@@ -216,6 +218,7 @@ cat .env
 ```
 
 ### SSH issues?
+
 ```bash
 # Test SSH from GitHub
 ssh -i ~/.ssh/github_actions user@server-ip

@@ -5,7 +5,7 @@
  * @returns A Date object representing the local date
  */
 export const parseLocalDate = (dateStr: string): Date => {
-    const dateOnly = dateStr.split('T')[0];
-    const [year, month, day] = dateOnly.split('-').map(Number);
-    return new Date(year, month - 1, day);
+  const dateOnly = dateStr.split('T')[0];
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  return new Date(year, month - 1, day);
 };

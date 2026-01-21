@@ -251,15 +251,8 @@ router.post('/', async (req, res) => {
 // PUT /api/tasks/:id - Update task (no longer handles goal linking)
 router.put('/:id', async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      size,
-      scheduledDate,
-      parentTaskId,
-      customData,
-      isCompleted,
-    } = req.body;
+    const { title, description, size, scheduledDate, parentTaskId, customData, isCompleted } =
+      req.body;
 
     const updateData: any = {};
 
@@ -337,9 +330,10 @@ router.delete('/:id', async (req, res) => {
 
         if (parentGoal.progressMode === 'TASK_BASED') {
           const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
-          const newCurrent = progressDelta !== 0
-            ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
-            : parentGoal.currentValue ?? 0;
+          const newCurrent =
+            progressDelta !== 0
+              ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
+              : (parentGoal.currentValue ?? 0);
 
           await tx.goal.update({
             where: { id: goalId },
@@ -401,8 +395,8 @@ router.post('/:id/complete', async (req, res) => {
             targetValue: true,
             parentId: true,
             goalTasks: {
-              include: { task: true }
-            }
+              include: { task: true },
+            },
           },
         });
 
@@ -669,14 +663,14 @@ router.post('/:id/schedule', async (req, res) => {
     const task = await prisma.task.update({
       where: { id: req.params.id },
       data: {
-        scheduledDate: parsedDate
+        scheduledDate: parsedDate,
       },
-      include: taskWithGoals
+      include: taskWithGoals,
     });
 
     res.json({
       success: true,
-      task
+      task,
     });
   } catch (error) {
     console.error('Error scheduling task:', error);

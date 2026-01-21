@@ -1,17 +1,17 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
-import { Calendar, Edit2, Hash, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { useTaskContext } from "../../contexts/TaskContext";
-import { Task } from "../../types";
-import { parseLocalDate } from "../../utils/dateUtils";
-import AddTaskModal from "../AddTaskModal";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+import { Calendar, Edit2, Hash, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { useTaskContext } from '../../contexts/TaskContext';
+import { Task, TaskEvent } from '../../types';
+import { parseLocalDate } from '../../utils/dateUtils';
+import AddTaskModal from '../AddTaskModal';
 interface TaskCardProps {
-  task: Partial<Task> & Pick<Task, "id" | "title" | "size" | "isCompleted">;
-  onUpdate: () => void;
+  task: Partial<Task> & Pick<Task, 'id' | 'title' | 'size' | 'isCompleted'>;
+  onTaskEvent?: (taskId: string, event: TaskEvent) => void;
   onUnlink?: (taskId: string) => void; // Optional - goal-specific operation
   showEdit?: boolean;
   showUnlink?: boolean;
@@ -22,7 +22,7 @@ interface TaskCardProps {
 
 export default function TaskCard({
   task,
-  onUpdate,
+  onTaskEvent,
   onUnlink,
   showEdit = true,
   showUnlink = false,
@@ -34,10 +34,11 @@ export default function TaskCard({
   const { toggleComplete, deleteTask } = useTaskContext();
   const handleToggleComplete = async () => {
     try {
+      const wasCompleted = task.isCompleted;
       await toggleComplete(task.id);
-      onUpdate();
+      onTaskEvent?.(task.id, wasCompleted ? 'TaskUncompleted' : 'TaskCompleted');
     } catch (error) {
-      console.error("Failed to toggle task completion:", error);
+      console.error('Failed to toggle task completion:', error);
     }
   };
 
@@ -45,9 +46,9 @@ export default function TaskCard({
     if (confirm(`Delete task "${task.title}"?`)) {
       try {
         await deleteTask(task.id);
-        onUpdate();
+        onTaskEvent?.(task.id, 'TaskDeleted');
       } catch (error) {
-        console.error("Failed to delete task:", error);
+        console.error('Failed to delete task:', error);
       }
     }
   };
@@ -56,8 +57,9 @@ export default function TaskCard({
     setEditingTask(task as Task);
   };
 
-  const handleCloseModal = () => {
+  const handleTaskEdited = () => {
     setEditingTask(null);
+    onTaskEvent?.(task.id, 'TaskEdited');
   };
 
   const handleUnlink = async () => {
@@ -70,24 +72,22 @@ export default function TaskCard({
 
   // Determine status color
   const isOverdue =
-    task.scheduledDate &&
-    !task.isCompleted &&
-    parseLocalDate(task.scheduledDate) < new Date();
+    task.scheduledDate && !task.isCompleted && parseLocalDate(task.scheduledDate) < new Date();
   const statusColor = task.isCompleted
-    ? "border-green-500"
+    ? 'border-green-500'
     : isOverdue
-      ? "border-red-500"
+      ? 'border-red-500'
       : task.scheduledDate
-        ? "border-cyan-500"
-        : "border-slate-600";
+        ? 'border-cyan-500'
+        : 'border-slate-600';
 
   return (
     <>
       <Card
         className={cn(
-          "group relative overflow-hidden backdrop-blur-sm bg-gradient-to-br from-white/[0.07] to-white/[0.02] border-l-4 shadow-lg hover:shadow-xl hover:shadow-cyan-500/10 transition-all duration-300 hover:-translate-y-0.5",
+          'group relative overflow-hidden backdrop-blur-sm bg-gradient-to-br from-white/[0.07] to-white/[0.02] border-l-4 shadow-lg hover:shadow-xl hover:shadow-cyan-500/10 transition-all duration-300 hover:-translate-y-0.5',
           statusColor,
-          task.isCompleted && "opacity-75",
+          task.isCompleted && 'opacity-75'
         )}
       >
         <CardContent className="p-4 sm:p-5">
@@ -103,17 +103,15 @@ export default function TaskCard({
             <div className="flex-1 min-w-0">
               <h3
                 className={cn(
-                  "font-semibold text-lg text-white mb-1",
-                  task.isCompleted && "line-through",
+                  'font-semibold text-lg text-white mb-1',
+                  task.isCompleted && 'line-through'
                 )}
               >
                 {task.title}
               </h3>
 
               {task.description && (
-                <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                  {task.description}
-                </p>
+                <p className="text-sm text-slate-400 mb-3 leading-relaxed">{task.description}</p>
               )}
 
               {/* Badges */}
@@ -128,17 +126,17 @@ export default function TaskCard({
                 {task.scheduledDate && (
                   <Badge
                     className={cn(
-                      "border",
+                      'border',
                       isOverdue
-                        ? "bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30"
-                        : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30",
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
+                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
                     )}
                   >
                     <Calendar className="w-3 h-3 mr-1" />
-                    {parseLocalDate(task.scheduledDate).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric" },
-                    )}
+                    {parseLocalDate(task.scheduledDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
                   </Badge>
                 )}
                 {showCompletedBadge && task.isCompleted && task.completedAt && (
@@ -156,9 +154,9 @@ export default function TaskCard({
                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    {new Date(task.completedAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
+                    {new Date(task.completedAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
                     })}
                   </Badge>
                 )}
@@ -172,7 +170,7 @@ export default function TaskCard({
                       key={goalTask.id}
                       className="bg-blue-500/20 text-blue-300 border-blue-500/40 hover:bg-blue-500/30"
                     >
-                      🎯 {goalTask.goal?.title || "Unknown Goal"}
+                      🎯 {goalTask.goal?.title || 'Unknown Goal'}
                     </Badge>
                   ))}
                 </div>
@@ -243,8 +241,8 @@ export default function TaskCard({
       {editingTask && (
         <AddTaskModal
           isOpen={true}
-          onClose={handleCloseModal}
-          onTaskAdded={onUpdate}
+          onClose={() => setEditingTask(null)}
+          onTaskAdded={handleTaskEdited}
           editTask={editingTask}
         />
       )}
