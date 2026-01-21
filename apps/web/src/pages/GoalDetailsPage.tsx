@@ -1,5 +1,5 @@
 import { ChevronLeft, Clock, Edit2, Link, Plus, Trash2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
@@ -8,41 +8,102 @@ import { BulkTaskModal } from '../components/BulkTaskModal';
 import { EditGoalModal } from '../components/EditGoalModal';
 import LinkTasksModal from '../components/LinkTasksModal';
 import { TaskListComponent } from '../components/TaskListComponent';
-import { Goal } from '../types';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../components/ui/accordion';
+import { Skeleton } from '../components/ui/skeleton';
+import { useTaskContext } from '../contexts/TaskContext';
+import { Goal, GoalTasksResponse, Task, TaskEvent } from '../types';
 
 export const GoalDetailsPage: React.FC = () => {
   const { goalId } = useParams<{ goalId: string }>();
   const navigate = useNavigate();
+  const { updateTaskFields } = useTaskContext();
   const [goal, setGoal] = useState<Goal | null>(null);
+  const [tasksData, setTasksData] = useState<GoalTasksResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [accordionValue, setAccordionValue] = useState<string>('tasks');
   const [isLogging, setIsLogging] = useState(false);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [isLinkingTasks, setIsLinkingTasks] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
 
-  const fetchGoal = async () => {
+  const fetchGoalData = useCallback(async () => {
     if (!goalId) return;
     try {
       setIsLoading(true);
-      const data = await api.getGoal(goalId);
-      setGoal(data);
+      const [goalData, tasks] = await Promise.all([api.getGoal(goalId), api.getGoalTasks(goalId)]);
+      setGoal(goalData);
+      setTasksData(tasks);
     } catch (error) {
       console.error('Failed to fetch goal:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [goalId]);
 
   useEffect(() => {
-    fetchGoal();
-  }, [goalId]);
+    fetchGoalData();
+  }, [fetchGoalData]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-slate-400">Loading goal...</p>
+      <div>
+        {/* Header Skeleton */}
+        <div className="flex items-center gap-4 mb-8">
+          <Skeleton className="h-10 w-10 rounded" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-10 rounded" />
+            <Skeleton className="h-10 w-10 rounded" />
+          </div>
+        </div>
+
+        {/* Tags Skeleton */}
+        <div className="flex gap-2 flex-wrap mb-8">
+          <Skeleton className="h-7 w-24 rounded-md" />
+          <Skeleton className="h-7 w-32 rounded-md" />
+          <Skeleton className="h-7 w-28 rounded-md" />
+        </div>
+
+        {/* Progress Section Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2 glass-panel p-6">
+            <Skeleton className="h-6 w-24 mb-4" />
+            <div className="space-y-4">
+              <div>
+                <Skeleton className="h-4 w-48 mb-2" />
+                <Skeleton className="h-3 w-full rounded-full" />
+              </div>
+              <Skeleton className="h-12 w-24" />
+            </div>
+          </div>
+          <div className="glass-panel p-6">
+            <Skeleton className="h-6 w-20 mb-4" />
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tasks Section Skeleton */}
+        <div className="glass-panel p-6 mb-8">
+          <Skeleton className="h-6 w-32 mb-4" />
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -67,7 +128,7 @@ export const GoalDetailsPage: React.FC = () => {
       setIsCompleting(true);
       await api.completeGoal(goal.id);
       setCompletionMessage('✓ Goal marked as completed! Parent goal progress updated.');
-      await fetchGoal(); // Refresh goal data
+      await fetchGoalData(); // Refresh goal data
       // Clear message after 3 seconds
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
@@ -84,7 +145,7 @@ export const GoalDetailsPage: React.FC = () => {
       setIsCompleting(true);
       await api.uncompleteGoal(goal!.id);
       setCompletionMessage('↺ Goal marked as incomplete. Parent goal progress updated.');
-      await fetchGoal(); // Refresh goal data
+      await fetchGoalData(); // Refresh goal data
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
       console.error('Failed to mark goal incomplete', e);
@@ -279,46 +340,108 @@ export const GoalDetailsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Chart 
-            {activitiesLoaded && chartData.length > 1 && (
-                <div className="glass-panel p-6 mb-8">
-                    <h2 className="text-xl font-semibold text-white mb-4">Progress History</h2>
-                    <div className="w-full h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id={`gradient-detail-${goal.id}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <Area 
-                                    type="monotone" 
-                                    dataKey="value" 
-                                    stroke="#8884d8" 
-                                    fillOpacity={1} 
-                                    fill={`url(#gradient-detail-${goal.id})`}
-                                    strokeWidth={2} 
-                                />
-                                <Tooltip 
-                                    contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px' }} 
-                                    itemStyle={{ color: 'white' }} 
-                                    formatter={(val: any, name: any, props: any) => [val, props.payload.customData || 'Value']} 
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )} */}
-
       {/* Tasks Section */}
-      <TaskListComponent
-        goalId={goal.id}
-        onTaskEvent={(taskId, event) => {
-          // Refetch goal data on task events to update progress
-          fetchGoal();
-        }}
-      />
+      {tasksData && (
+        <div className="glass-panel mb-8">
+          <Accordion
+            type="single"
+            collapsible
+            className="w-full"
+            value={accordionValue}
+            onValueChange={setAccordionValue}
+          >
+            <AccordionItem value="tasks" className="border-none">
+              <AccordionTrigger className="px-6 py-4 text-xl font-semibold text-white hover:no-underline hover:text-blue-400">
+                Tasks {tasksData.goalTasks.length > 0 ? `(${tasksData.goalTasks.length})` : ''}
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
+                {/* Linked Tasks */}
+                {tasksData.goalTasks.length > 0 && (
+                  <div className="mb-6">
+                    <TaskListComponent
+                      title="Linked Tasks"
+                      tasks={tasksData.goalTasks.map((gt) => gt.task as Task)}
+                      onTaskEvent={async (taskId: string, event: TaskEvent) => {
+                        fetchGoalData();
+                      }}
+                      onUnlink={async (taskId: string) => {
+                        if (confirm('Unlink this task from the goal? (Task will not be deleted)')) {
+                          try {
+                            await updateTaskFields(taskId, { goalIds: [] });
+                            fetchGoalData();
+                          } catch (e) {
+                            console.error('Failed to unlink task', e);
+                          }
+                        }
+                      }}
+                      showUnlink={true}
+                      showLinkedGoals={false}
+                      emptyMessage="No linked tasks"
+                    />
+                  </div>
+                )}
+
+                {/* Subgoals */}
+                {tasksData.children.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wide">
+                      Subgoals
+                    </h3>
+                    <div className="space-y-2.5">
+                      {tasksData.children.map((child) => {
+                        const progress =
+                          child.targetValue > 0
+                            ? Math.round((child.currentValue / child.targetValue) * 100)
+                            : 0;
+
+                        return (
+                          <div
+                            key={child.id}
+                            className="group relative rounded-xl overflow-hidden backdrop-blur-sm bg-gradient-to-br from-white/[0.06] to-white/[0.02] border-l-4 border-purple-500 p-4 shadow-md hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 hover:-translate-y-0.5"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-white mb-1">{child.title}</h4>
+                                {child.description && (
+                                  <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+                                    {child.description}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  <span className="inline-flex items-center px-2.5 py-1 bg-blue-500/20 text-blue-300 rounded-full font-medium border border-blue-500/40">
+                                    {child.scope}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-full font-medium border border-purple-500/40">
+                                    {child.progressMode.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-full font-medium border border-emerald-500/40">
+                                    {progress}% ({child.currentValue}/{child.targetValue})
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-3 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                                style={{ width: `${progress}%` }}
+                              ></div>
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {tasksData.goalTasks.length === 0 && tasksData.children.length === 0 && (
+                  <p className="text-slate-400 text-center py-4">No tasks or subgoals yet</p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      )}
 
       {/* Activities Section */}
       <ActivitiesListComponent goalId={goal.id} />
@@ -329,7 +452,7 @@ export const GoalDetailsPage: React.FC = () => {
           goal={goal}
           onClose={() => setIsEditing(false)}
           onUpdated={() => {
-            fetchGoal();
+            fetchGoalData();
           }}
         />
       )}
@@ -339,7 +462,7 @@ export const GoalDetailsPage: React.FC = () => {
           goal={goal}
           onClose={() => setIsLogging(false)}
           onUpdated={() => {
-            fetchGoal();
+            fetchGoalData();
           }}
         />
       )}
@@ -348,7 +471,7 @@ export const GoalDetailsPage: React.FC = () => {
           parentGoal={goal}
           onClose={() => setIsCreatingTasks(false)}
           onCreated={() => {
-            fetchGoal();
+            fetchGoalData();
           }}
         />
       )}
@@ -358,7 +481,7 @@ export const GoalDetailsPage: React.FC = () => {
           onClose={() => setIsLinkingTasks(false)}
           goal={goal}
           onTasksLinked={() => {
-            fetchGoal();
+            fetchGoalData();
           }}
         />
       )}
