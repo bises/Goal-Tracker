@@ -1,55 +1,64 @@
-import {
-    ChevronLeft,
-    Clock,
-    Edit2,
-    Link,
-    Plus,
-    Trash2
-} from "lucide-react";
-import React, { useState } from "react";
-import { api } from "../api";
-import { ActivitiesListComponent } from "../components/ActivitiesListComponent";
-import { AddProgressModal } from "../components/AddProgressModal";
-import { BulkTaskModal } from "../components/BulkTaskModal";
-import { EditGoalModal } from "../components/EditGoalModal";
-import LinkTasksModal from "../components/LinkTasksModal";
-import { TaskListComponent } from "../components/TaskListComponent";
-import { Goal } from "../types";
+import { ChevronLeft, Clock, Edit2, Link, Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { api } from '../api';
+import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
+import { AddProgressModal } from '../components/AddProgressModal';
+import { BulkTaskModal } from '../components/BulkTaskModal';
+import { EditGoalModal } from '../components/EditGoalModal';
+import LinkTasksModal from '../components/LinkTasksModal';
+import { TaskListComponent } from '../components/TaskListComponent';
+import { Goal } from '../types';
 
-interface GoalDetailsPageProps {
-  goal: Goal;
-  onBack: () => void;
-  onUpdate: () => void;
-}
-
-export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
-  goal: initialGoal,
-  onBack,
-  onUpdate,
-}) => {
-  const [goal, setGoal] = useState<Goal>(initialGoal);
+export const GoalDetailsPage: React.FC = () => {
+  const { goalId } = useParams<{ goalId: string }>();
+  const navigate = useNavigate();
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [isLinkingTasks, setIsLinkingTasks] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
-  const [completionMessage, setCompletionMessage] = useState<string | null>(
-    null,
-  );
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+
+  const fetchGoal = async () => {
+    if (!goalId) return;
+    try {
+      setIsLoading(true);
+      const data = await api.getGoal(goalId);
+      setGoal(data);
+    } catch (error) {
+      console.error('Failed to fetch goal:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGoal();
+  }, [goalId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-slate-400">Loading goal...</p>
+      </div>
+    );
+  }
 
   if (!goal) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-slate-400">Loading...</p>
+        <p className="text-slate-400">Goal not found</p>
       </div>
     );
   }
 
   const handleDelete = async () => {
-    if (confirm("Delete this goal?")) {
+    if (confirm('Delete this goal?')) {
       await api.deleteGoal(goal.id);
-      onUpdate();
-      onBack();
+      navigate('/');
     }
   };
 
@@ -57,15 +66,13 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
     try {
       setIsCompleting(true);
       await api.completeGoal(goal.id);
-      setCompletionMessage(
-        "✓ Goal marked as completed! Parent goal progress updated.",
-      );
-      onUpdate();
+      setCompletionMessage('✓ Goal marked as completed! Parent goal progress updated.');
+      await fetchGoal(); // Refresh goal data
       // Clear message after 3 seconds
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
-      console.error("Failed to complete goal", e);
-      setCompletionMessage("✗ Failed to mark goal as completed");
+      console.error('Failed to complete goal', e);
+      setCompletionMessage('✗ Failed to mark goal as completed');
       setTimeout(() => setCompletionMessage(null), 3000);
     } finally {
       setIsCompleting(false);
@@ -76,14 +83,12 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
     try {
       setIsCompleting(true);
       await api.uncompleteGoal(goal!.id);
-      setCompletionMessage(
-        "↺ Goal marked as incomplete. Parent goal progress updated.",
-      );
-      onUpdate();
+      setCompletionMessage('↺ Goal marked as incomplete. Parent goal progress updated.');
+      await fetchGoal(); // Refresh goal data
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
-      console.error("Failed to mark goal incomplete", e);
-      setCompletionMessage("✗ Failed to mark goal as incomplete");
+      console.error('Failed to mark goal incomplete', e);
+      setCompletionMessage('✗ Failed to mark goal as incomplete');
       setTimeout(() => setCompletionMessage(null), 3000);
     } finally {
       setIsCompleting(false);
@@ -93,9 +98,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
   const summary = goal.progressSummary;
   const percent =
     summary?.percentComplete ??
-    (goal.targetValue
-      ? Math.min((goal.currentValue / goal.targetValue) * 100, 100)
-      : 0);
+    (goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0);
 
   // Check if goal is 100% complete
   const isGoalComplete = summary?.percentComplete === 100;
@@ -105,7 +108,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={onBack}
+          onClick={() => navigate('/')}
           className="p-2 text-slate-400 hover:text-white transition-colors"
           title="Back"
         >
@@ -113,9 +116,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
         </button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold text-white">{goal.title}</h1>
-          {goal.description && (
-            <p className="text-slate-400 mt-2">{goal.description}</p>
-          )}
+          {goal.description && <p className="text-slate-400 mt-2">{goal.description}</p>}
         </div>
         <div className="flex gap-2">
           <button
@@ -142,7 +143,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
         </span>
         {goal.progressSummary?.mode && (
           <span className="inline-flex items-center px-3 py-1.5 bg-purple-500/20 text-purple-300 text-sm rounded-md border border-purple-500/30">
-            {goal.progressSummary.mode.replace(/_/g, " ")}
+            {goal.progressSummary.mode.replace(/_/g, ' ')}
           </span>
         )}
         {goal.customDataLabel && (
@@ -175,13 +176,9 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
       {/* Completion Banner */}
       {isGoalComplete && (
         <div className="mb-8 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-          <p className="text-green-300 mb-3">
-            ✓ This goal is marked as completed.
-          </p>
+          <p className="text-green-300 mb-3">✓ This goal is marked as completed.</p>
           {completionMessage && (
-            <div className="mb-3 text-green-200 text-sm font-medium">
-              {completionMessage}
-            </div>
+            <div className="mb-3 text-green-200 text-sm font-medium">{completionMessage}</div>
           )}
           <div className="flex gap-2">
             <button
@@ -209,17 +206,15 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
         {/* Progress Display */}
         <div className="lg:col-span-2 glass-panel p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Progress</h2>
-          {summary?.mode === "TASK_BASED" ? (
+          {summary?.mode === 'TASK_BASED' ? (
             <>
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-slate-400 mb-2">
                   <span>
-                    Tasks: {summary.taskTotals.completedCount}/
-                    {summary.taskTotals.totalCount}
+                    Tasks: {summary.taskTotals.completedCount}/{summary.taskTotals.totalCount}
                   </span>
                   <span>
-                    Effort: {summary.taskTotals.completedSize}/
-                    {summary.taskTotals.totalSize}
+                    Effort: {summary.taskTotals.completedSize}/{summary.taskTotals.totalSize}
                   </span>
                 </div>
                 <div className="w-full bg-slate-700/30 rounded-full h-3">
@@ -237,8 +232,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
             <>
               <div className="mb-4">
                 <div className="text-sm text-slate-400 mb-2">
-                  {goal.currentValue}{" "}
-                  {goal.targetValue ? `/ ${goal.targetValue}` : "tracked"}
+                  {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : 'tracked'}
                 </div>
                 <div className="w-full bg-slate-700/30 rounded-full h-3">
                   <div
@@ -247,9 +241,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
                   />
                 </div>
               </div>
-              <div className="text-4xl font-bold text-white">
-                {percent.toFixed(0)}%
-              </div>
+              <div className="text-4xl font-bold text-white">{percent.toFixed(0)}%</div>
             </>
           )}
         </div>
@@ -258,7 +250,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
         <div className="glass-panel p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Actions</h2>
           <div className="space-y-2">
-            {(goal.scope === "MONTHLY" || goal.scope === "YEARLY") && (
+            {(goal.scope === 'MONTHLY' || goal.scope === 'YEARLY') && (
               <button
                 onClick={() => setIsCreatingTasks(true)}
                 className="w-full px-4 py-2.5 bg-green-500/20 border border-green-500/30 text-white rounded-lg text-sm hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
@@ -320,7 +312,13 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
             )} */}
 
       {/* Tasks Section */}
-      <TaskListComponent goalId={goal.id} onTasksUpdated={onUpdate} />
+      <TaskListComponent
+        goalId={goal.id}
+        onTaskEvent={(taskId, event) => {
+          // Refetch goal data on task events to update progress
+          fetchGoal();
+        }}
+      />
 
       {/* Activities Section */}
       <ActivitiesListComponent goalId={goal.id} />
@@ -331,7 +329,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
           goal={goal}
           onClose={() => setIsEditing(false)}
           onUpdated={() => {
-            onUpdate();
+            fetchGoal();
           }}
         />
       )}
@@ -341,7 +339,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
           goal={goal}
           onClose={() => setIsLogging(false)}
           onUpdated={() => {
-            onUpdate();
+            fetchGoal();
           }}
         />
       )}
@@ -350,7 +348,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
           parentGoal={goal}
           onClose={() => setIsCreatingTasks(false)}
           onCreated={() => {
-            onUpdate();
+            fetchGoal();
           }}
         />
       )}
@@ -360,7 +358,7 @@ export const GoalDetailsPage: React.FC<GoalDetailsPageProps> = ({
           onClose={() => setIsLinkingTasks(false)}
           goal={goal}
           onTasksLinked={() => {
-            onUpdate();
+            fetchGoal();
           }}
         />
       )}

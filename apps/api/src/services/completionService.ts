@@ -70,10 +70,7 @@ export class CompletionService {
 
         if (parentGoal) {
           // For TASK_BASED or HABIT mode parents, increment the progress
-          if (
-            parentGoal.progressMode === 'TASK_BASED' ||
-            parentGoal.progressMode === 'HABIT'
-          ) {
+          if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
             // Increment parent's currentValue
             await tx.goal.update({
               where: { id: goal.parentId },
@@ -160,10 +157,7 @@ export class CompletionService {
 
         if (parentGoal) {
           // For TASK_BASED or HABIT mode parents, decrement the progress
-          if (
-            parentGoal.progressMode === 'TASK_BASED' ||
-            parentGoal.progressMode === 'HABIT'
-          ) {
+          if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
             // Decrement parent's currentValue, but never go negative
             const newParentValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
 

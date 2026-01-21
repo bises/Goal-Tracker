@@ -15,9 +15,9 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/calendar', calendarRoutes);
 
 app.get('/health', (req, res) => {
-    res.send('OK');
+  res.send('OK');
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
