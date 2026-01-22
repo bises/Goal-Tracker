@@ -26,9 +26,10 @@ export default function AddTaskModal({
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [showGoals, setShowGoals] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
-  const { createTask, updateTaskFields } = useTaskContext();
+  const { createTask, updateTaskFields, toggleComplete } = useTaskContext();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,6 +47,7 @@ export default function AddTaskModal({
         .filter((id): id is string => Boolean(id));
       setSelectedGoalIds(preselectedIds);
       setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
+      setIsCompleted(editTask.isCompleted || false);
       // Auto-expand goals if task has linked goals
       setShowGoals((editTask.goalTasks?.length || 0) > 0);
     } else {
@@ -61,6 +63,7 @@ export default function AddTaskModal({
     setSelectedGoalIds([]);
     setScheduledDate('');
     setShowGoals(false);
+    setIsCompleted(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,6 +80,10 @@ export default function AddTaskModal({
 
       if (editTask) {
         await updateTaskFields(editTask.id, taskData);
+        // If completion state changed, toggle it
+        if (isCompleted !== editTask.isCompleted) {
+          await toggleComplete(editTask.id);
+        }
       } else {
         await createTask(taskData);
       }
@@ -281,6 +288,38 @@ export default function AddTaskModal({
               onChange={(e) => setScheduledDate(e.target.value)}
             />
           </div>
+
+          {editTask && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px',
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+              onClick={() => setIsCompleted(!isCompleted)}
+            >
+              <input
+                type="checkbox"
+                checked={isCompleted}
+                onChange={(e) => setIsCompleted(e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  cursor: 'pointer',
+                  width: '18px',
+                  height: '18px',
+                  marginTop: '0',
+                  flexShrink: 0,
+                }}
+              />
+              <label style={{ fontSize: '0.9rem', cursor: 'pointer', flex: 1 }}>
+                Mark as {isCompleted ? 'Incomplete' : 'Complete'}
+              </label>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
             <button

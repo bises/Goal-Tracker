@@ -7,6 +7,10 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@goal-tracker/shared": ["./packages/shared/dist/index"]
+    }
   }
 }

@@ -86,6 +86,19 @@ export function CalendarView({
     return filtered;
   }, [allTasks, currentDate, viewMode]);
 
+  // Memoize incomplete tasks by date for performance
+  const incompleteTasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      if (task.scheduledDate && !task.isCompleted) {
+        const dateKey = parseLocalDate(task.scheduledDate).toDateString();
+        const existing = map.get(dateKey) || [];
+        map.set(dateKey, [...existing, task]);
+      }
+    });
+    return map;
+  }, [tasks]);
+
   const navigatePrevious = () => {
     const newDate = new Date(currentDate);
     if (viewMode === 'month') {
@@ -223,6 +236,7 @@ export function CalendarView({
           const currentDay = day;
           const date = new Date(year, month, currentDay);
           const dayTasks = getTasksForDate(date);
+          const incompleteTasks = incompleteTasksByDate.get(date.toDateString()) || [];
           const isToday = date.toDateString() === new Date().toDateString();
 
           days.push(
@@ -237,17 +251,17 @@ export function CalendarView({
               onTouchEnd={(e) => handleDayRelease(e, date)}
             >
               <div className="day-header">{currentDay}</div>
-              {/* Mobile: show total count only */}
-              {dayTasks.length > 0 && (
+              {/* Mobile: show incomplete count only */}
+              {incompleteTasks.length > 0 && (
                 <div className="md:hidden mt-1">
                   <span className="inline-flex items-center justify-center text-[11px] font-bold bg-cyan-500/90 text-black rounded-full px-1.5 py-0.5 shadow-[0_1px_4px_rgba(6,182,212,0.4)]">
-                    {dayTasks.length}
+                    {incompleteTasks.length}
                   </span>
                 </div>
               )}
-              {/* Desktop: show first pill + hidden count badge */}
+              {/* Desktop: show first incomplete pill + hidden count badge */}
               <div className="day-tasks hidden md:flex md:flex-col md:gap-1">
-                {dayTasks.slice(0, 1).map((task) => (
+                {incompleteTasks.slice(0, 1).map((task) => (
                   <div key={task.id} className="task-pill-wrapper">
                     <div
                       className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
@@ -262,8 +276,8 @@ export function CalendarView({
                     <div className="task-tooltip">{task.title}</div>
                   </div>
                 ))}
-                {dayTasks.length > 1 && (
-                  <div className="hidden-tasks-badge">+{dayTasks.length - 1}</div>
+                {incompleteTasks.length > 1 && (
+                  <div className="hidden-tasks-badge">+{incompleteTasks.length - 1}</div>
                 )}
               </div>
             </div>

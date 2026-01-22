@@ -1,16 +1,7 @@
+import { formatLocalDate } from '@goal-tracker/shared';
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { taskApi } from '../api';
 import { Task } from '../types';
-
-// Helper: Convert Date to YYYY-MM-DD string in local time (no timezone conversion)
-const dateToLocalString = (date: Date): string => {
-  // Ensure we're working with a proper Date object
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 interface TaskContextType {
   tasks: Task[];
@@ -113,7 +104,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     async (taskId: string, date: Date | null) => {
       try {
         // Convert to YYYY-MM-DD string in local time
-        const dateStr = date ? dateToLocalString(date) : null;
+        const dateStr = date ? formatLocalDate(date) : null;
         const saved = await taskApi.scheduleTask(taskId, dateStr);
         upsertTask(saved);
       } catch (err) {

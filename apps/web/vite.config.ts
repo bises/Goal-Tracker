@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@goal-tracker/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
     },
   },
   server: {

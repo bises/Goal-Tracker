@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api';
 import { Goal } from '../types';
-import { X } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface BulkTaskModalProps {
   parentGoal: Goal;
@@ -42,139 +42,105 @@ export const BulkTaskModal: React.FC<BulkTaskModalProps> = ({ parentGoal, onClos
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-        backdropFilter: 'blur(5px)',
-      }}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`Create Tasks for "${parentGoal.title}"`}
+      maxWidth="600px"
+      maxHeight="80vh"
     >
-      <div
-        className="glass-panel"
-        style={{
-          width: '600px',
-          maxHeight: '80vh',
-          padding: '32px',
-          position: 'relative',
-          overflow: 'auto',
-        }}
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
+        Use {'{n}'} as a placeholder for numbers
+      </p>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
       >
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Task Name Pattern
+          </label>
+          <input
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            placeholder="e.g., Read chapter {n} of Atomic Habits"
+            required
+          />
+          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+            Example: "Read chapter {'{n}'} of Atomic Habits" → "Read chapter 1 of Atomic Habits"
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Number of Tasks
+          </label>
+          <input
+            type="number"
+            value={count}
+            onChange={(e) => setCount(parseInt(e.target.value))}
+            min="1"
+            max="100"
+            required
+          />
+        </div>
+
         <button
-          onClick={onClose}
+          type="button"
+          onClick={generatePreview}
           style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'none',
-            border: 'none',
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
             color: 'white',
+            padding: '8px 16px',
+            borderRadius: '8px',
             cursor: 'pointer',
           }}
         >
-          <X size={24} />
+          Preview Tasks
         </button>
 
-        <h2 style={{ marginBottom: '8px' }}>Create Tasks for "{parentGoal.title}"</h2>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-          Use {'{n}'} as a placeholder for numbers
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-        >
+        {preview.length > 0 && (
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Task Name Pattern
+              Preview ({preview.length} tasks)
             </label>
-            <input
-              value={pattern}
-              onChange={(e) => setPattern(e.target.value)}
-              placeholder="e.g., Read chapter {n} of Atomic Habits"
-              required
-            />
             <div
-              style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}
+              style={{
+                maxHeight: '200px',
+                overflow: 'auto',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+              }}
             >
-              Example: "Read chapter {'{n}'} of Atomic Habits" → "Read chapter 1 of Atomic Habits"
+              {preview.map((task, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '4px 0',
+                    borderBottom:
+                      idx < preview.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                  }}
+                >
+                  {idx + 1}. {task}
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Number of Tasks
-            </label>
-            <input
-              type="number"
-              value={count}
-              onChange={(e) => setCount(parseInt(e.target.value))}
-              min="1"
-              max="100"
-              required
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={generatePreview}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-            }}
-          >
-            Preview Tasks
-          </button>
-
-          {preview.length > 0 && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Preview ({preview.length} tasks)
-              </label>
-              <div
-                style={{
-                  maxHeight: '200px',
-                  overflow: 'auto',
-                  background: 'rgba(0,0,0,0.3)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                }}
-              >
-                {preview.map((task, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '4px 0',
-                      borderBottom:
-                        idx < preview.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                    }}
-                  >
-                    {idx + 1}. {task}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="primary-btn"
-            style={{ marginTop: '16px' }}
-            disabled={preview.length === 0}
-          >
-            Create {preview.length} Tasks
-          </button>
-        </form>
-      </div>
-    </div>
+        <button
+          type="submit"
+          className="primary-btn"
+          style={{ marginTop: '16px' }}
+          disabled={preview.length === 0}
+        >
+          Create {preview.length > 0 ? preview.length : count} Tasks
+        </button>
+      </form>
+    </Modal>
   );
 };

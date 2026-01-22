@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api';
 import { Goal, GoalScope } from '../types';
-import { X } from 'lucide-react';
-
-// Helper: Convert Date to YYYY-MM-DD string in local time
-const dateToLocalString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { Modal } from './Modal';
 
 interface EditGoalModalProps {
   goal: Goal;
@@ -47,122 +39,87 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-        backdropFilter: 'blur(5px)',
-      }}
-    >
-      <div
-        className="glass-panel"
-        style={{ width: '400px', padding: '32px', position: 'relative' }}
+    <Modal isOpen={true} onClose={onClose} title="Edit Goal" maxWidth="400px">
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
       >
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'none',
-            border: 'none',
-            color: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          <X size={24} />
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Goal Title
+          </label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Description (Optional)
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add more details about this goal..."
+            rows={3}
+            style={{ width: '100%', resize: 'vertical' }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Custom Log Label
+          </label>
+          <input
+            value={customDataLabel}
+            onChange={(e) => setCustomDataLabel(e.target.value)}
+            placeholder="e.g. Book Name"
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scope</label>
+          <select value={scope} onChange={(e) => setScope(e.target.value as GoalScope)}>
+            <option value="STANDALONE">Standalone</option>
+            <option value="YEARLY">Yearly Goal</option>
+            <option value="MONTHLY">Monthly Goal</option>
+            <option value="WEEKLY">Weekly Goal</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            End Date (Optional)
+          </label>
+          <input
+            type="date"
+            value={customEndDate}
+            onChange={(e) => setCustomEndDate(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Progress Mode
+          </label>
+          <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
+            <option value="TASK_BASED">Task-based</option>
+            <option value="MANUAL_TOTAL">Manual total</option>
+            <option value="HABIT">Habit</option>
+          </select>
+        </div>
+
+        {progressMode === 'MANUAL_TOTAL' && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Target Value (optional)
+            </label>
+            <input type="number" value={target} onChange={(e) => setTarget(e.target.value)} />
+          </div>
+        )}
+
+        <button type="submit" className="primary-btn" style={{ marginTop: '16px' }}>
+          Save Changes
         </button>
-
-        <h2 style={{ marginBottom: '24px' }}>Edit Goal</h2>
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-        >
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Goal Title
-            </label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Description (Optional)
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add more details about this goal..."
-              rows={3}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Custom Log Label
-            </label>
-            <input
-              value={customDataLabel}
-              onChange={(e) => setCustomDataLabel(e.target.value)}
-              placeholder="e.g. Book Name"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Scope
-            </label>
-            <select value={scope} onChange={(e) => setScope(e.target.value as GoalScope)}>
-              <option value="STANDALONE">Standalone</option>
-              <option value="YEARLY">Yearly Goal</option>
-              <option value="MONTHLY">Monthly Goal</option>
-              <option value="WEEKLY">Weekly Goal</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              End Date (Optional)
-            </label>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Progress Mode
-            </label>
-            <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
-              <option value="TASK_BASED">Task-based</option>
-              <option value="MANUAL_TOTAL">Manual total</option>
-              <option value="HABIT">Habit</option>
-            </select>
-          </div>
-
-          {progressMode === 'MANUAL_TOTAL' && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Target Value (optional)
-              </label>
-              <input type="number" value={target} onChange={(e) => setTarget(e.target.value)} />
-            </div>
-          )}
-
-          <button type="submit" className="primary-btn" style={{ marginTop: '16px' }}>
-            Save Changes
-          </button>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 };

@@ -20,6 +20,7 @@ interface TaskCardProps {
   showDelete?: boolean;
   showLinkedGoals?: boolean;
   showCompletedBadge?: boolean;
+  showBadges?: boolean; // Show size, date, and (when enabled) completed badges
 }
 
 export default function TaskCard({
@@ -31,6 +32,7 @@ export default function TaskCard({
   showDelete = true,
   showLinkedGoals = true,
   showCompletedBadge = true,
+  showBadges = true,
 }: TaskCardProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -105,64 +107,72 @@ export default function TaskCard({
             <div className="flex-1 min-w-0">
               <h3
                 className={cn(
-                  'font-semibold text-lg text-white mb-1',
+                  'font-semibold text-lg text-white mb-1 break-words',
                   task.isCompleted && 'line-through'
                 )}
+                title={task.title}
               >
                 {task.title}
               </h3>
 
               {task.description && (
-                <p className="text-sm text-slate-400 mb-3 leading-relaxed">{task.description}</p>
+                <p
+                  className="text-sm text-slate-400 mb-3 leading-relaxed line-clamp-3 break-words"
+                  title={task.description}
+                >
+                  {task.description}
+                </p>
               )}
 
               {/* Badges */}
-              <div className="flex flex-wrap gap-2 text-xs mb-3">
-                <Badge
-                  variant="secondary"
-                  className="bg-slate-700/60 text-slate-200 border-slate-600/50"
-                >
-                  <Hash className="w-3 h-3 mr-1" />
-                  {task.size}d
-                </Badge>
-                {task.scheduledDate && (
+              {showBadges && (
+                <div className="flex flex-wrap gap-2 text-xs mb-3">
                   <Badge
-                    className={cn(
-                      'border',
-                      isOverdue
-                        ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
-                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
-                    )}
+                    variant="secondary"
+                    className="bg-slate-700/60 text-slate-200 border-slate-600/50"
                   >
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {parseLocalDate(task.scheduledDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                    <Hash className="w-3 h-3 mr-1" />
+                    {task.size}d
                   </Badge>
-                )}
-                {showCompletedBadge && task.isCompleted && task.completedAt && (
-                  <Badge className="bg-green-500/20 text-green-300 border-green-500/40 hover:bg-green-500/30">
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  {task.scheduledDate && (
+                    <Badge
+                      className={cn(
+                        'border',
+                        isOverdue
+                          ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30'
+                          : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
+                      )}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    {new Date(task.completedAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </Badge>
-                )}
-              </div>
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {parseLocalDate(task.scheduledDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Badge>
+                  )}
+                  {showCompletedBadge && task.isCompleted && task.completedAt && (
+                    <Badge className="bg-green-500/20 text-green-300 border-green-500/40 hover:bg-green-500/30">
+                      <svg
+                        className="w-3 h-3 mr-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {new Date(task.completedAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Badge>
+                  )}
+                </div>
+              )}
 
               {/* Linked Goals */}
               {showLinkedGoals && linkedGoals.length > 0 && (
