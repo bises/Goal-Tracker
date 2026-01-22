@@ -33,20 +33,17 @@ export default function AddTaskModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Always ensure goals are available when opening the modal
     fetchGoals();
 
     if (editTask) {
       setTitle(editTask.title);
       setDescription(editTask.description || '');
       setSize(editTask.size);
-      // Be defensive: some API payloads may include only goal object without goalId
       const preselectedIds = (editTask.goalTasks || [])
         .map((gt) => gt.goalId || gt.goal?.id)
         .filter((id): id is string => Boolean(id));
       setSelectedGoalIds(preselectedIds);
       setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
-      // Auto-expand goals if task has linked goals
       setShowGoals((editTask.goalTasks?.length || 0) > 0);
     } else {
       resetForm();
@@ -65,7 +62,6 @@ export default function AddTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const taskData: Partial<Task> & { goalIds?: string[] } = {
         title,
@@ -74,13 +70,11 @@ export default function AddTaskModal({
         goalIds: selectedGoalIds,
         scheduledDate: scheduledDate || undefined,
       };
-
       if (editTask) {
         await updateTaskFields(editTask.id, taskData);
       } else {
         await createTask(taskData);
       }
-
       onTaskAdded();
       onClose();
       resetForm();
@@ -106,40 +100,32 @@ export default function AddTaskModal({
         maxWidth="500px"
         maxHeight="85vh"
       >
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-        >
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Task Title
-            </label>
+            <label className="form-label">Task Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
               placeholder="e.g., Read chapter 1 of Atomic Habits"
+              className="form-input"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Description (Optional)
-            </label>
+            <label className="form-label">Description (Optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add more details about this task..."
               rows={3}
-              style={{ width: '100%', resize: 'vertical' }}
+              className="form-textarea"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Size (in days)
-            </label>
+            <label className="form-label">Size (in days)</label>
             <input
               type="number"
               min="1"
@@ -147,122 +133,51 @@ export default function AddTaskModal({
               value={size}
               onChange={(e) => setSize(parseInt(e.target.value))}
               required
+              className="form-input"
             />
-            <div
-              style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}
-            >
+            <p className="text-xs text-slate-400 mt-1">
               Estimated days to complete this task
-            </div>
+            </p>
           </div>
 
           <div>
             <div
               onClick={() => {
-                if (!showGoals) {
-                  setShowGoals(true);
-                  fetchGoals();
-                } else {
-                  setShowGoals(false);
-                }
+                setShowGoals(!showGoals);
+                if (!showGoals) fetchGoals();
               }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                padding: '8px',
-                background: 'rgba(255,255,255,0.05)',
-                borderRadius: '6px',
-                marginBottom: showGoals ? '8px' : '0',
-              }}
+              className="flex items-center justify-between cursor-pointer p-2 bg-white/5 rounded-md mb-2"
             >
-              <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
-                Link to Goals (Optional)
-              </label>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {showGoals ? '▼' : '▶'}
-              </span>
+              <label className="text-sm cursor-pointer">Link to Goals (Optional)</label>
+              <span className="text-xs text-slate-400">{showGoals ? '▼' : '▶'}</span>
             </div>
 
             {showGoals && (
-              <div
-                style={{
-                  maxHeight: '150px',
-                  overflowY: 'auto',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '6px',
-                  padding: '4px',
-                  background: 'rgba(255,255,255,0.02)',
-                }}
-              >
+              <div className="max-h-36 overflow-y-auto border border-white/10 rounded-md p-1 bg-white/[0.02]">
                 {goalsLoading ? (
-                  <div
-                    style={{
-                      fontSize: '0.85rem',
-                      color: 'var(--color-text-muted)',
-                      padding: '12px',
-                    }}
-                  >
-                    Loading goals...
-                  </div>
+                  <p className="text-sm text-slate-400 p-3">Loading goals...</p>
                 ) : goals.length === 0 ? (
-                  <div
-                    style={{
-                      fontSize: '0.85rem',
-                      color: 'var(--color-text-muted)',
-                      padding: '12px',
-                    }}
-                  >
-                    No goals available
-                  </div>
+                  <p className="text-sm text-slate-400 p-3">No goals available</p>
                 ) : (
                   goals.map((goal) => (
                     <label
                       key={goal.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        borderRadius: '4px',
-                        transition: 'background 0.2s',
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')
-                      }
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      className="flex items-center gap-2.5 p-2 cursor-pointer text-sm rounded-sm hover:bg-white/5"
                     >
                       <input
                         type="checkbox"
                         checked={selectedGoalIds.includes(goal.id)}
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedGoalIds([...selectedGoalIds, goal.id]);
-                          } else {
-                            setSelectedGoalIds(selectedGoalIds.filter((id) => id !== goal.id));
-                          }
+                          const { checked } = e.target;
+                          setSelectedGoalIds((prev) =>
+                            checked ? [...prev, goal.id] : prev.filter((id) => id !== goal.id)
+                          );
                         }}
-                        style={{
-                          cursor: 'pointer',
-                          width: '16px',
-                          height: '16px',
-                          marginTop: '0',
-                          flexShrink: 0,
-                        }}
+                        className="cursor-pointer w-4 h-4 mt-0 shrink-0"
                       />
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flex: 1 }}>
-                        <span style={{ lineHeight: '1.4' }}>{goal.title}</span>
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--color-text-muted)',
-                            flexShrink: 0,
-                          }}
-                        >
-                          ({goal.scope})
-                        </span>
+                      <div className="flex items-baseline gap-1.5 flex-1">
+                        <span>{goal.title}</span>
+                        <span className="text-xs text-slate-400 shrink-0">({goal.scope})</span>
                       </div>
                     </label>
                   ))
@@ -272,33 +187,20 @@ export default function AddTaskModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Scheduled Date (Optional)
-            </label>
+            <label className="form-label">Scheduled Date (Optional)</label>
             <input
               type="date"
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
+              className="form-input"
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: 'white',
-                padding: '10px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            >
+          <div className="flex gap-2 mt-4">
+            <button type="button" onClick={onClose} className="secondary-btn flex-1">
               Cancel
             </button>
-            <button type="submit" className="primary-btn" style={{ flex: 1 }}>
+            <button type="submit" className="primary-btn flex-1">
               {editTask ? 'Update Task' : 'Create Task'}
             </button>
           </div>
