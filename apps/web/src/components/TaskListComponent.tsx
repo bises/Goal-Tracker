@@ -8,6 +8,10 @@ interface TaskListComponentProps {
   onUnlink?: (taskId: string) => void;
   showUnlink?: boolean;
   showLinkedGoals?: boolean;
+  /**
+   * Whether to display task badges such as size and date badges.
+   */
+  showBadges?: boolean;
   emptyMessage?: string;
   title?: string;
 }
@@ -18,6 +22,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
   onUnlink,
   showUnlink = false,
   showLinkedGoals = true,
+  showBadges = true,
   emptyMessage = 'No tasks yet. Create one to get started!',
   title,
 }) => {
@@ -48,6 +53,7 @@ export const TaskListComponent: React.FC<TaskListComponentProps> = ({
             showDelete={true}
             showLinkedGoals={showLinkedGoals}
             showCompletedBadge={true}
+            showBadges={showBadges}
           />
         ))}
       </div>

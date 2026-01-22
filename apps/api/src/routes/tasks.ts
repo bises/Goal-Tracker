@@ -1,7 +1,7 @@
+import { parseDateOnly } from '@goal-tracker/shared';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { parseDateOnly } from '../utils/dateUtils';
 
 const router = Router();
 

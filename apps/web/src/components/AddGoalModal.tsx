@@ -1,7 +1,7 @@
-import { X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Goal, GoalScope } from '../types';
+import { Modal } from './Modal';
 
 interface AddGoalModalProps {
   onClose: () => void;
@@ -67,187 +67,150 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-        backdropFilter: 'blur(5px)',
-      }}
-    >
-      <div
-        className="glass-panel"
-        style={{ width: '400px', padding: '32px', position: 'relative' }}
+    <Modal isOpen={true} onClose={onClose} title="New Goal" maxWidth="400px">
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
       >
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'none',
-            border: 'none',
-            color: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          <X size={24} />
-        </button>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Goal Title
+          </label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Read 12 Books"
+            required
+          />
+        </div>
 
-        <h2 style={{ marginBottom: '24px' }}>New Goal</h2>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Description (Optional)
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add more details about this goal..."
+            rows={3}
+            style={{ width: '100%', resize: 'vertical' }}
+          />
+        </div>
 
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-        >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Goal Title
+              Type
             </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Read 12 Books"
-              required
-            />
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="TOTAL_TARGET">Total Target</option>
+              <option value="FREQUENCY">Frequency</option>
+              <option value="HABIT">Habit</option>
+            </select>
           </div>
-
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Description (Optional)
+              Progress Mode
             </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add more details about this goal..."
-              rows={3}
-              style={{ width: '100%', resize: 'vertical' }}
-            />
+            <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
+              <option value="TASK_BASED">Task-based</option>
+              <option value="MANUAL_TOTAL">Manual total</option>
+              <option value="HABIT">Habit</option>
+            </select>
           </div>
+        </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
+        {type === 'FREQUENCY' && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Type
-              </label>
-              <select value={type} onChange={(e) => setType(e.target.value)}>
-                <option value="TOTAL_TARGET">Total Target</option>
-                <option value="FREQUENCY">Frequency</option>
-                <option value="HABIT">Habit</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Progress Mode
-              </label>
-              <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
-                <option value="TASK_BASED">Task-based</option>
-                <option value="MANUAL_TOTAL">Manual total</option>
-                <option value="HABIT">Habit</option>
-              </select>
-            </div>
-          </div>
-
-          {type === 'FREQUENCY' && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                  Times
-                </label>
-                <input
-                  type="number"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  placeholder="2"
-                  required
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                  Per
-                </label>
-                <select style={{ height: '42px' }}>
-                  <option value="WEEKLY">Week</option>
-                  <option value="MONTHLY">Month</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {progressMode === 'MANUAL_TOTAL' && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Target Value (optional)
+                Times
               </label>
               <input
                 type="number"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                placeholder="e.g., 25000"
+                placeholder="2"
+                required
               />
-              <div
-                style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '4px' }}
-              >
-                Leave blank for open-ended totals.
-              </div>
             </div>
-          )}
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Scope
-            </label>
-            <select value={scope} onChange={(e) => setScope(e.target.value as GoalScope)}>
-              <option value="STANDALONE">Standalone</option>
-              <option value="YEARLY">Yearly Goal</option>
-              <option value="MONTHLY">Monthly Goal</option>
-              <option value="WEEKLY">Weekly Goal</option>
-            </select>
-          </div>
-
-          {scope !== 'STANDALONE' && scope !== 'YEARLY' && availableParents.length > 0 && (
-            <div>
+            <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Parent Goal (Optional)
+                Per
               </label>
-              <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                <option value="">None</option>
-                {availableParents.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.title}
-                  </option>
-                ))}
+              <select style={{ height: '42px' }}>
+                <option value="WEEKLY">Week</option>
+                <option value="MONTHLY">Month</option>
               </select>
             </div>
-          )}
+          </div>
+        )}
 
+        {progressMode === 'MANUAL_TOTAL' && (
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Custom Log Label (Optional)
+              Target Value (optional)
             </label>
             <input
-              value={customDataLabel}
-              onChange={(e) => setCustomDataLabel(e.target.value)}
-              placeholder="e.g. Book Name, Location"
+              type="number"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="e.g., 25000"
             />
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+              Leave blank for open-ended totals.
+            </div>
           </div>
+        )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" id="allowDecimals" style={{ width: 'auto' }} />
-            <label htmlFor="allowDecimals" style={{ fontSize: '0.9rem' }}>
-              Allow Decimals
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Scope</label>
+          <select value={scope} onChange={(e) => setScope(e.target.value as GoalScope)}>
+            <option value="STANDALONE">Standalone</option>
+            <option value="YEARLY">Yearly Goal</option>
+            <option value="MONTHLY">Monthly Goal</option>
+            <option value="WEEKLY">Weekly Goal</option>
+          </select>
+        </div>
+
+        {scope !== 'STANDALONE' && scope !== 'YEARLY' && availableParents.length > 0 && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Parent Goal (Optional)
             </label>
+            <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
+              <option value="">None</option>
+              {availableParents.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </select>
           </div>
+        )}
 
-          <button type="submit" className="primary-btn" style={{ marginTop: '16px' }}>
-            Create Goal
-          </button>
-        </form>
-      </div>
-    </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Custom Log Label (Optional)
+          </label>
+          <input
+            value={customDataLabel}
+            onChange={(e) => setCustomDataLabel(e.target.value)}
+            placeholder="e.g. Book Name, Location"
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input type="checkbox" id="allowDecimals" style={{ width: 'auto' }} />
+          <label htmlFor="allowDecimals" style={{ fontSize: '0.9rem' }}>
+            Allow Decimals
+          </label>
+        </div>
+
+        <button type="submit" className="primary-btn" style={{ marginTop: '16px' }}>
+          Create Goal
+        </button>
+      </form>
+    </Modal>
   );
 };

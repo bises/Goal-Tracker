@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import AddTaskModal from '../components/AddTaskModal';
 import { CalendarView } from '../components/Calendar/CalendarView';
 import { Modal } from '../components/Modal';
+import { TaskListComponent } from '../components/TaskListComponent';
 import { Toast } from '../components/Toast';
 import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
 import { useTaskContext } from '../contexts/TaskContext';
-import { Task } from '../types';
+import { Task, TaskEvent } from '../types';
 import { parseLocalDate } from '../utils/dateUtils';
 
 export function PlannerPage() {
@@ -109,59 +110,37 @@ export function PlannerPage() {
         }
         maxWidth="520px"
       >
-        <div className="flex flex-col gap-2">
-          {tasksForSelectedDate.length === 0 ? (
-            <div className="text-slate-400 p-2">No tasks for this date</div>
-          ) : (
-            tasksForSelectedDate.map((task) => (
-              <div
-                key={task.id}
-                className="flex justify-between items-center p-2.5 bg-white/5 rounded-lg hover:bg-white/10 transition gap-2"
-              >
-                <div
-                  className="flex-1 cursor-pointer"
-                  onClick={() => {
-                    handleTaskClick(task);
-                    setIsDateModalOpen(false);
-                  }}
-                >
-                  <div
-                    className={`${task.isCompleted ? 'line-through opacity-70' : ''} font-semibold mb-1`}
-                  >
-                    {task.title}
-                  </div>
-                  {task.description && (
-                    <div className="text-xs text-slate-400 truncate">{task.description}</div>
-                  )}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    scheduleTask(task.id, null);
-                    setToast({ level: 'success', message: 'Task unscheduled' });
-                  }}
-                  className="text-xs bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 px-2 py-1 rounded font-semibold whitespace-nowrap transition"
-                >
-                  Unschedule
-                </button>
-              </div>
-            ))
-          )}
-          <div className="flex justify-end mt-3">
-            <button
-              className="primary-btn"
-              onClick={() => {
+        <TaskListComponent
+          tasks={tasksForSelectedDate}
+          onTaskEvent={(taskId: string, event: TaskEvent) => {
+            if (event === 'TaskEdited') {
+              const task = tasksForSelectedDate.find((t) => t.id === taskId);
+              if (task) {
+                handleTaskClick(task);
                 setIsDateModalOpen(false);
-                setSelectedTask(null);
-                setIsEditModalOpen(true);
-              }}
-            >
-              Add Task
-              {selectedDate
-                ? ` — ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                : ''}
-            </button>
-          </div>
+              }
+            } else if (event === 'TaskDeleted') {
+              setToast({ level: 'success', message: 'Task deleted' });
+            }
+          }}
+          emptyMessage="No tasks for this date"
+          showLinkedGoals={false}
+          showBadges={false}
+        />
+        <div className="flex justify-end mt-3">
+          <button
+            className="primary-btn"
+            onClick={() => {
+              setIsDateModalOpen(false);
+              setSelectedTask(null);
+              setIsEditModalOpen(true);
+            }}
+          >
+            Add Task
+            {selectedDate
+              ? ` — ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              : ''}
+          </button>
         </div>
       </Modal>
 
