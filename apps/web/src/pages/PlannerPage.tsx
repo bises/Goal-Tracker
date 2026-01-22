@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import AddTaskModal from '../components/AddTaskModal';
 import { CalendarView } from '../components/Calendar/CalendarView';
 import { Modal } from '../components/Modal';
+import { ScheduleTaskModal } from '../components/ScheduleTaskModal';
 import { Toast } from '../components/Toast';
 import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -11,6 +12,7 @@ import { parseLocalDate } from '../utils/dateUtils';
 export function PlannerPage() {
   const { tasks, scheduleTask } = useTaskContext();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskToSchedule, setTaskToSchedule] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [toast, setToast] = useState<{
     level: 'success' | 'error' | 'info' | 'warning';
@@ -27,6 +29,10 @@ export function PlannerPage() {
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsEditModalOpen(true);
+  };
+
+  const handleScheduleClick = (task: Task) => {
+    setTaskToSchedule(task);
   };
 
   const handleDateClick = (date: Date) => {
@@ -75,6 +81,16 @@ export function PlannerPage() {
     }
   };
 
+  const handleScheduleTask = async (taskId: string, date: Date) => {
+    try {
+      await scheduleTask(taskId, date);
+      setToast({ level: 'success', message: 'Task scheduled' });
+    } catch (error) {
+      console.error('Failed to schedule task:', error);
+      setToast({ level: 'error', message: 'Failed to schedule task' });
+    }
+  };
+
   return (
     <>
       {/* Unscheduled Tasks Horizontal Bar - Always visible at top */}
@@ -84,6 +100,7 @@ export function PlannerPage() {
         onClose={() => {}}
         onTaskDragStart={handleTaskDragStart}
         onTaskClick={handleTaskClick}
+        onScheduleClick={handleScheduleClick}
         onUnscheduleDrop={handleUnscheduleDrop}
       />
 
@@ -174,6 +191,14 @@ export function PlannerPage() {
         defaultScheduledDate={
           selectedDate && !selectedTask ? formatDateInput(selectedDate) : undefined
         }
+      />
+
+      {/* Schedule Task Modal */}
+      <ScheduleTaskModal
+        task={taskToSchedule}
+        isOpen={!!taskToSchedule}
+        onClose={() => setTaskToSchedule(null)}
+        onSchedule={handleScheduleTask}
       />
 
       {/* Toast Notification */}

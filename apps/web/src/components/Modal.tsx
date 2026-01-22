@@ -25,12 +25,7 @@ export function Modal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-[90vw] max-h-[85vh] overflow-y-auto"
-        style={{
-          width: width,
-          maxWidth: maxWidth,
-          maxHeight: maxHeight,
-        }}
+        className="fixed bottom-0 left-0 right-0 max-h-[90vh] overflow-y-auto md:relative md:bottom-auto md:left-auto md:right-auto md:max-h-[85vh] md:w-[90%] md:max-w-[600px] rounded-t-lg md:rounded-lg"
         onInteractOutside={(e) => {
           if (!closeOnBackdropClick) {
             e.preventDefault();
