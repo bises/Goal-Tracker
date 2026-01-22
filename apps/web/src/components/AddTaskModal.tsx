@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Task } from '../types';
-import { Modal } from './Modal';
+import { useEffect, useState } from 'react';
 import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
+import { Task } from '../types';
+import { Modal } from './Modal';
+import { Toast } from './Toast';
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export default function AddTaskModal({
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [showGoals, setShowGoals] = useState(false);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
   const { createTask, updateTaskFields } = useTaskContext();
 
@@ -84,208 +86,224 @@ export default function AddTaskModal({
       resetForm();
     } catch (error) {
       console.error('Failed to save task:', error);
-      alert('Failed to save task');
+      setErrorToast('Failed to save task');
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={editTask ? 'Edit Task' : 'New Task'}
-      width="90%"
-      maxWidth="500px"
-      maxHeight="85vh"
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+    <>
+      {errorToast && (
+        <Toast message={errorToast} level="error" onClose={() => setErrorToast(null)} />
+      )}
+
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={editTask ? 'Edit Task' : 'New Task'}
+        width="90%"
+        maxWidth="500px"
+        maxHeight="85vh"
       >
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Task Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            placeholder="e.g., Read chapter 1 of Atomic Habits"
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Description (Optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add more details about this task..."
-            rows={3}
-            style={{ width: '100%', resize: 'vertical' }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Size (in days)
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="30"
-            value={size}
-            onChange={(e) => setSize(parseInt(e.target.value))}
-            required
-          />
-          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Estimated days to complete this task
-          </div>
-        </div>
-
-        <div>
-          <div
-            onClick={() => {
-              if (!showGoals) {
-                setShowGoals(true);
-                fetchGoals();
-              } else {
-                setShowGoals(false);
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              padding: '8px',
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: '6px',
-              marginBottom: showGoals ? '8px' : '0',
-            }}
-          >
-            <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
-              Link to Goals (Optional)
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+        >
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Task Title
             </label>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              {showGoals ? '▼' : '▶'}
-            </span>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              placeholder="e.g., Read chapter 1 of Atomic Habits"
+            />
           </div>
 
-          {showGoals && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Description (Optional)
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add more details about this task..."
+              rows={3}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Size (in days)
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={size}
+              onChange={(e) => setSize(parseInt(e.target.value))}
+              required
+            />
             <div
+              style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}
+            >
+              Estimated days to complete this task
+            </div>
+          </div>
+
+          <div>
+            <div
+              onClick={() => {
+                if (!showGoals) {
+                  setShowGoals(true);
+                  fetchGoals();
+                } else {
+                  setShowGoals(false);
+                }
+              }}
               style={{
-                maxHeight: '150px',
-                overflowY: 'auto',
-                border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                padding: '8px',
+                background: 'rgba(255,255,255,0.05)',
                 borderRadius: '6px',
-                padding: '4px',
-                background: 'rgba(255,255,255,0.02)',
+                marginBottom: showGoals ? '8px' : '0',
               }}
             >
-              {goalsLoading ? (
-                <div
-                  style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', padding: '12px' }}
-                >
-                  Loading goals...
-                </div>
-              ) : goals.length === 0 ? (
-                <div
-                  style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', padding: '12px' }}
-                >
-                  No goals available
-                </div>
-              ) : (
-                goals.map((goal) => (
-                  <label
-                    key={goal.id}
+              <label style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+                Link to Goals (Optional)
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                {showGoals ? '▼' : '▶'}
+              </span>
+            </div>
+
+            {showGoals && (
+              <div
+                style={{
+                  maxHeight: '150px',
+                  overflowY: 'auto',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  padding: '4px',
+                  background: 'rgba(255,255,255,0.02)',
+                }}
+              >
+                {goalsLoading ? (
+                  <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      borderRadius: '4px',
-                      transition: 'background 0.2s',
+                      fontSize: '0.85rem',
+                      color: 'var(--color-text-muted)',
+                      padding: '12px',
                     }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')
-                    }
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedGoalIds.includes(goal.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedGoalIds([...selectedGoalIds, goal.id]);
-                        } else {
-                          setSelectedGoalIds(selectedGoalIds.filter((id) => id !== goal.id));
-                        }
-                      }}
+                    Loading goals...
+                  </div>
+                ) : goals.length === 0 ? (
+                  <div
+                    style={{
+                      fontSize: '0.85rem',
+                      color: 'var(--color-text-muted)',
+                      padding: '12px',
+                    }}
+                  >
+                    No goals available
+                  </div>
+                ) : (
+                  goals.map((goal) => (
+                    <label
+                      key={goal.id}
                       style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px',
                         cursor: 'pointer',
-                        width: '16px',
-                        height: '16px',
-                        marginTop: '0',
-                        flexShrink: 0,
+                        fontSize: '0.9rem',
+                        borderRadius: '4px',
+                        transition: 'background 0.2s',
                       }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flex: 1 }}>
-                      <span style={{ lineHeight: '1.4' }}>{goal.title}</span>
-                      <span
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')
+                      }
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedGoalIds.includes(goal.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedGoalIds([...selectedGoalIds, goal.id]);
+                          } else {
+                            setSelectedGoalIds(selectedGoalIds.filter((id) => id !== goal.id));
+                          }
+                        }}
                         style={{
-                          fontSize: '0.75rem',
-                          color: 'var(--color-text-muted)',
+                          cursor: 'pointer',
+                          width: '16px',
+                          height: '16px',
+                          marginTop: '0',
                           flexShrink: 0,
                         }}
-                      >
-                        ({goal.scope})
-                      </span>
-                    </div>
-                  </label>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+                      />
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flex: 1 }}>
+                        <span style={{ lineHeight: '1.4' }}>{goal.title}</span>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--color-text-muted)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          ({goal.scope})
+                        </span>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Scheduled Date (Optional)
-          </label>
-          <input
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-          />
-        </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+              Scheduled Date (Optional)
+            </label>
+            <input
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+            />
+          </div>
 
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              flex: 1,
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              padding: '10px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="primary-btn" style={{ flex: 1 }}>
-            {editTask ? 'Update Task' : 'Create Task'}
-          </button>
-        </div>
-      </form>
-    </Modal>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: 'white',
+                padding: '10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="primary-btn" style={{ flex: 1 }}>
+              {editTask ? 'Update Task' : 'Create Task'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

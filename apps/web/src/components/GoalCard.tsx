@@ -5,6 +5,7 @@ import { api } from '../api';
 import { Goal } from '../types';
 import { AddProgressModal } from './AddProgressModal';
 import { BulkTaskModal } from './BulkTaskModal';
+import { ConfirmDialog } from './ConfirmDialog';
 import { EditGoalModal } from './EditGoalModal';
 import LinkTasksModal from './LinkTasksModal';
 
@@ -19,12 +20,11 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
   const [isLogging, setIsLogging] = useState(false);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [isLinkingTasks, setIsLinkingTasks] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDelete = async () => {
-    if (confirm('Delete this goal?')) {
-      await api.deleteGoal(goal.id);
-      onUpdate();
-    }
+    await api.deleteGoal(goal.id);
+    onUpdate();
   };
 
   const percent = goal.targetValue
@@ -63,7 +63,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete();
+                setShowDeleteConfirm(true);
               }}
               className="p-2 text-slate-400 hover:text-red-400 transition-colors"
               title="Delete"
@@ -159,6 +159,17 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onUpdate }) => {
           onTasksLinked={onUpdate}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Goal"
+        description="Are you sure you want to delete this goal? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface ModalProps {
   isOpen: boolean;
@@ -22,69 +22,26 @@ export function Modal({
   maxHeight = '80vh',
   closeOnBackdropClick = true,
 }: ModalProps) {
-  if (!isOpen) return null;
-
-  const handleBackdropClick = () => {
-    if (closeOnBackdropClick) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
-      }}
-      onClick={handleBackdropClick}
-    >
-      <div
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-w-[90vw] max-h-[85vh] overflow-y-auto"
         style={{
-          background: 'var(--color-background)',
-          borderRadius: '12px',
-          padding: '24px',
           width: width,
           maxWidth: maxWidth,
           maxHeight: maxHeight,
-          overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
-        onClick={(e) => e.stopPropagation()}
+        onInteractOutside={(e) => {
+          if (!closeOnBackdropClick) {
+            e.preventDefault();
+          }
+        }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px',
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{title}</h2>
-          <button
-            className="icon-btn"
-            onClick={onClose}
-            style={{
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <X size={24} />
-          </button>
-        </div>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
