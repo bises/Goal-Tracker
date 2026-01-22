@@ -5,6 +5,7 @@ import { api } from '../api';
 import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
 import { AddProgressModal } from '../components/AddProgressModal';
 import { BulkTaskModal } from '../components/BulkTaskModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EditGoalModal } from '../components/EditGoalModal';
 import LinkTasksModal from '../components/LinkTasksModal';
 import { TaskListComponent } from '../components/TaskListComponent';
@@ -28,6 +29,9 @@ export const GoalDetailsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('tasks');
   const [isLogging, setIsLogging] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [taskToUnlink, setTaskToUnlink] = useState<string | null>(null);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [isLinkingTasks, setIsLinkingTasks] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -117,9 +121,19 @@ export const GoalDetailsPage: React.FC = () => {
   }
 
   const handleDelete = async () => {
-    if (confirm('Delete this goal?')) {
-      await api.deleteGoal(goal.id);
-      navigate('/');
+    await api.deleteGoal(goal.id);
+    navigate('/');
+  };
+
+  const handleUnlinkTask = async () => {
+    if (taskToUnlink) {
+      try {
+        await updateTaskFields(taskToUnlink, { goalIds: [] });
+        fetchGoalData();
+      } catch (e) {
+        console.error('Failed to unlink task', e);
+      }
+      setTaskToUnlink(null);
     }
   };
 
@@ -188,7 +202,7 @@ export const GoalDetailsPage: React.FC = () => {
             <Edit2 size={20} />
           </button>
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             className="p-2 text-slate-400 hover:text-red-400 transition-colors"
             title="Delete"
           >
@@ -365,14 +379,8 @@ export const GoalDetailsPage: React.FC = () => {
                         fetchGoalData();
                       }}
                       onUnlink={async (taskId: string) => {
-                        if (confirm('Unlink this task from the goal? (Task will not be deleted)')) {
-                          try {
-                            await updateTaskFields(taskId, { goalIds: [] });
-                            fetchGoalData();
-                          } catch (e) {
-                            console.error('Failed to unlink task', e);
-                          }
-                        }
+                        setTaskToUnlink(taskId);
+                        setShowUnlinkConfirm(true);
                       }}
                       showUnlink={true}
                       showLinkedGoals={false}
@@ -485,6 +493,31 @@ export const GoalDetailsPage: React.FC = () => {
           }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Goal"
+        description="Are you sure you want to delete this goal? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        isOpen={showUnlinkConfirm}
+        onClose={() => {
+          setShowUnlinkConfirm(false);
+          setTaskToUnlink(null);
+        }}
+        onConfirm={handleUnlinkTask}
+        title="Unlink Task"
+        description="Unlink this task from the goal? The task will not be deleted."
+        confirmText="Unlink"
+        cancelText="Cancel"
+        variant="default"
+      />
     </div>
   );
 };

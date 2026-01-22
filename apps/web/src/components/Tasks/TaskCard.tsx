@@ -9,6 +9,8 @@ import { useTaskContext } from '../../contexts/TaskContext';
 import { Task, TaskEvent } from '../../types';
 import { parseLocalDate } from '../../utils/dateUtils';
 import AddTaskModal from '../AddTaskModal';
+import { ConfirmDialog } from '../ConfirmDialog';
+
 interface TaskCardProps {
   task: Partial<Task> & Pick<Task, 'id' | 'title' | 'size' | 'isCompleted'>;
   onTaskEvent?: (taskId: string, event: TaskEvent) => void;
@@ -31,7 +33,9 @@ export default function TaskCard({
   showCompletedBadge = true,
 }: TaskCardProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { toggleComplete, deleteTask } = useTaskContext();
+
   const handleToggleComplete = async () => {
     try {
       const wasCompleted = task.isCompleted;
@@ -43,13 +47,11 @@ export default function TaskCard({
   };
 
   const handleDelete = async () => {
-    if (confirm(`Delete task "${task.title}"?`)) {
-      try {
-        await deleteTask(task.id);
-        onTaskEvent?.(task.id, 'TaskDeleted');
-      } catch (error) {
-        console.error('Failed to delete task:', error);
-      }
+    try {
+      await deleteTask(task.id);
+      onTaskEvent?.(task.id, 'TaskDeleted');
+    } catch (error) {
+      console.error('Failed to delete task:', error);
     }
   };
 
@@ -222,7 +224,7 @@ export default function TaskCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   className="h-8 w-8 text-slate-400 hover:text-red-300 hover:bg-red-500/10"
                   title="Delete task permanently"
                 >
@@ -246,6 +248,17 @@ export default function TaskCard({
           editTask={editingTask}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Task"
+        description={`Are you sure you want to delete "${task.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </>
   );
 }
