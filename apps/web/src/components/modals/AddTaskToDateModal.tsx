@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useTaskContext } from '../contexts/TaskContext';
-import { Task } from '../types';
+import { useTaskContext } from '../../contexts/TaskContext';
+import { Task } from '../../types';
 import { Modal } from './Modal';
 
 interface AddTaskToDateModalProps {
@@ -54,7 +54,7 @@ export const AddTaskToDateModal: React.FC<AddTaskToDateModalProps> = ({
     >
       <div className="flex flex-col" style={{ height: 'calc(70vh - 120px)', maxHeight: '500px' }}>
         {/* Search for unscheduled tasks - Fixed at top */}
-        <div className="flex-shrink-0 mb-3">
+        <div className="flex-shrink-0 mb-3 mt-2">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -77,7 +77,9 @@ export const AddTaskToDateModal: React.FC<AddTaskToDateModalProps> = ({
                       {t.title}
                     </span>
                     {t.description && (
-                      <span className="text-xs text-slate-400 truncate">{t.description}</span>
+                      <span className="text-xs text-slate-400 truncate" title={t.description}>
+                        {t.description}
+                      </span>
                     )}
                   </div>
                   <button

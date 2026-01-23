@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { taskApi } from '../api';
-import { useTaskContext } from '../contexts/TaskContext';
-import { Goal, Task } from '../types';
+import { taskApi } from '../../api';
+import { useTaskContext } from '../../contexts/TaskContext';
+import { Goal, Task } from '../../types';
+import { Toast } from '../shared/Toast';
 import { Modal } from './Modal';
-import { Toast } from './Toast';
 
 interface LinkTasksModalProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { api } from '../api';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { api } from '../../api';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
 interface ActivitiesListComponentProps {
   goalId: string;

@@ -3,8 +3,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
 import { parseLocalDate } from '../../utils/dateUtils';
-import { AddTaskToDateModal } from '../AddTaskToDateModal';
-import { Modal } from '../Modal';
+import { AddTaskToDateModal } from '../modals/AddTaskToDateModal';
+import { Modal } from '../modals/Modal';
 import './CalendarView.css';
 
 type ViewMode = 'month' | 'week' | 'day';
