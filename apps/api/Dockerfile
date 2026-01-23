@@ -31,6 +31,9 @@ RUN pnpm prune --prod
 # Regenerate Prisma client after pruning
 RUN npx prisma generate
 
+# Rebuild after pruning to ensure dist directory exists
+# RUN pnpm build
+
 # Copy entrypoint script
 COPY apps/api/entrypoint.sh .
 RUN chmod +x entrypoint.sh
