@@ -345,7 +345,6 @@ export function CalendarView({
                 }}
               >
                 <div className="task-title">{task.title}</div>
-                {task.description && <div className="task-description">{task.description}</div>}
               </div>
             ))}
           </div>
