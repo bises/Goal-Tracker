@@ -25,10 +25,8 @@ export function Modal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-[90vw] max-h-[85vh] overflow-y-auto"
+        className="w-[calc(100vw-2rem)] sm:w-full sm:max-w-[600px] max-h-[85vh] sm:max-h-[90vh] overflow-y-auto"
         style={{
-          width: width,
-          maxWidth: maxWidth,
           maxHeight: maxHeight,
         }}
         onInteractOutside={(e) => {
