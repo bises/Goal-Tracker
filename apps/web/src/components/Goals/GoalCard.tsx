@@ -1,13 +1,13 @@
 import { Edit2, Eye, Link, Plus, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
-import { Goal } from '../types';
-import { AddProgressModal } from './AddProgressModal';
-import { BulkTaskModal } from './BulkTaskModal';
-import { ConfirmDialog } from './ConfirmDialog';
-import { EditGoalModal } from './EditGoalModal';
-import LinkTasksModal from './LinkTasksModal';
+import { api } from '../../api';
+import { Goal } from '../../types';
+import { AddProgressModal } from '../modals/AddProgressModal';
+import { BulkTaskModal } from '../modals/BulkTaskModal';
+import { ConfirmDialog } from '../modals/ConfirmDialog';
+import { EditGoalModal } from '../modals/EditGoalModal';
+import LinkTasksModal from '../modals/LinkTasksModal';
 
 interface GoalCardProps {
   goal: Goal;

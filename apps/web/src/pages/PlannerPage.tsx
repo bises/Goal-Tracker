@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import AddTaskModal from '../components/AddTaskModal';
 import { CalendarView } from '../components/Calendar/CalendarView';
-import { Modal } from '../components/Modal';
-import { TaskListComponent } from '../components/TaskListComponent';
-import { Toast } from '../components/Toast';
-import { UnscheduledTasksContainer } from '../components/UnscheduledTasksContainer';
+import AddTaskModal from '../components/modals/AddTaskModal';
+import { Modal } from '../components/modals/Modal';
+import { Toast } from '../components/shared/Toast';
+import { TaskListComponent } from '../components/Tasks/TaskListComponent';
+import { UnscheduledTasksContainer } from '../components/Tasks/UnscheduledTasksContainer';
 import { useTaskContext } from '../contexts/TaskContext';
 import { Task, TaskEvent } from '../types';
 import { parseLocalDate } from '../utils/dateUtils';

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { api } from '../api';
-import { Goal, GoalScope } from '../types';
+import { api } from '../../api';
+import { Goal, GoalScope } from '../../types';
 import { Modal } from './Modal';
 
 interface EditGoalModalProps {

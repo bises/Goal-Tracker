@@ -2,13 +2,13 @@ import { ChevronLeft, Clock, Edit2, Link, Plus, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
-import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
-import { AddProgressModal } from '../components/AddProgressModal';
-import { BulkTaskModal } from '../components/BulkTaskModal';
-import { ConfirmDialog } from '../components/ConfirmDialog';
-import { EditGoalModal } from '../components/EditGoalModal';
-import LinkTasksModal from '../components/LinkTasksModal';
-import { TaskListComponent } from '../components/TaskListComponent';
+import { ActivitiesListComponent } from '../components/Goals/ActivitiesListComponent';
+import { AddProgressModal } from '../components/modals/AddProgressModal';
+import { BulkTaskModal } from '../components/modals/BulkTaskModal';
+import { ConfirmDialog } from '../components/modals/ConfirmDialog';
+import { EditGoalModal } from '../components/modals/EditGoalModal';
+import LinkTasksModal from '../components/modals/LinkTasksModal';
+import { TaskListComponent } from '../components/Tasks/TaskListComponent';
 import {
   Accordion,
   AccordionContent,

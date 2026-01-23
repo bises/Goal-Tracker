@@ -8,8 +8,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from './ui/alert-dialog';
-import { Spinner } from './ui/spinner';
+} from '../ui/alert-dialog';
+import { Spinner } from '../ui/spinner';
 
 interface ConfirmDialogProps {
   isOpen: boolean;

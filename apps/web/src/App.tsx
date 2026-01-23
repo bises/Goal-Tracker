@@ -1,10 +1,10 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { AddGoalModal } from './components/AddGoalModal';
-import AddTaskModal from './components/AddTaskModal';
-import { GoalCard } from './components/GoalCard';
-import { TaskListComponent } from './components/TaskListComponent';
+import { GoalCard } from './components/Goals/GoalCard';
+import { AddGoalModal } from './components/modals/AddGoalModal';
+import AddTaskModal from './components/modals/AddTaskModal';
+import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';

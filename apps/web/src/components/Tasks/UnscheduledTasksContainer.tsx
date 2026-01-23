@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task } from '../types';
+import { Task } from '../../types';
 
 interface UnscheduledTasksContainerProps {
   tasks: Task[];
@@ -19,8 +19,6 @@ export function UnscheduledTasksContainer({
   onUnscheduleDrop,
 }: UnscheduledTasksContainerProps) {
   if (!isVisible) return null;
-  // Hide container entirely when there are no unscheduled tasks
-  if (tasks.length === 0) return null;
 
   return (
     <div className="w-full overflow-hidden">
@@ -39,7 +37,7 @@ export function UnscheduledTasksContainer({
                 onTaskDragStart(task.id);
               }}
               onClick={() => onTaskClick?.(task)}
-              className="flex-shrink-0 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 rounded-full cursor-grab active:cursor-grabbing transition whitespace-nowrap text-sm font-medium text-cyan-300 shadow-sm sm:px-2 sm:py-1 sm:text-xs"
+              className="flex-shrink-0 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 rounded-full cursor-grab active:cursor-grabbing transition text-sm font-medium text-cyan-300 shadow-sm sm:px-2 sm:py-1 sm:text-xs max-w-[200px] truncate"
               title={task.title}
             >
               {task.title}

@@ -8,8 +8,8 @@ import { useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task, TaskEvent } from '../../types';
 import { parseLocalDate } from '../../utils/dateUtils';
-import AddTaskModal from '../AddTaskModal';
-import { ConfirmDialog } from '../ConfirmDialog';
+import AddTaskModal from '../modals/AddTaskModal';
+import { ConfirmDialog } from '../modals/ConfirmDialog';
 
 interface TaskCardProps {
   task: Partial<Task> & Pick<Task, 'id' | 'title' | 'size' | 'isCompleted'>;
