@@ -18,7 +18,11 @@ RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 RUN pnpm install --shamefully-hoist
 
-# Build
+# Build shared packages first
+WORKDIR /app/packages/shared
+RUN pnpm build
+
+# Build API
 WORKDIR /app/apps/api
 # Set placeholder DATABASE_URL for prisma generate (actual value provided at runtime)
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
