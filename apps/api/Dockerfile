@@ -7,6 +7,9 @@ COPY package.json .
 COPY pnpm-workspace.yaml .
 COPY tsconfig.base.json .
 
+# Copy shared packages
+COPY packages ./packages
+
 # Copy app source
 COPY apps/api ./apps/api
 
