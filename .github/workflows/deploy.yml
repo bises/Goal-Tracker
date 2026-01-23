@@ -117,14 +117,32 @@ jobs:
             cd ~/goal-tracker
 
             # Check if containers are running
-            if docker compose ps | grep -q "Up"; then
-              echo "✅ Containers are running"
-              docker compose ps
-            else
-              echo "❌ Some containers failed to start"
+            if ! docker compose ps | grep -q "Up"; then
+              echo "❌ Containers failed to start"
               docker compose logs --tail=50
               exit 1
             fi
+
+            echo "✅ Containers are running"
+            docker compose ps
+
+            # Check API health endpoint
+            echo "🏥 Checking API health..."
+            max_attempts=30
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+              if curl -f http://localhost:3001/health > /dev/null 2>&1; then
+                echo "✅ API is healthy"
+                exit 0
+              fi
+              attempt=$((attempt + 1))
+              echo "Attempt $attempt/$max_attempts failed, retrying in 2s..."
+              sleep 2
+            done
+
+            echo "❌ API health check failed after $max_attempts attempts"
+            docker compose logs api --tail=100
+            exit 1
 
       - name: Notify deployment status
         if: always()
