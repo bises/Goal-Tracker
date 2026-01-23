@@ -5,6 +5,8 @@
 !package.json
 !pnpm-workspace.yaml
 !tsconfig.base.json
+!packages
+!packages/**
 !apps
 !apps/api
 !apps/api/package.json
