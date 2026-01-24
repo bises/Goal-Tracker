@@ -6,6 +6,10 @@ packages/shared/dist
 
 apps/api/.env
 
+# pnpm store
+.pnpm-store
+**/.pnpm-store
+
 # Keep VS Code workspace settings
 !.vscode/settings.json
 !.vscode/extensions.json
