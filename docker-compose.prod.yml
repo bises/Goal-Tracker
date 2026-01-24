@@ -8,6 +8,11 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       PORT: ${PORT:-3000}
       NODE_ENV: production
+      USE_HTTPS: ${USE_HTTPS:-false}
+      SSL_CERT_PATH: /certs/jbhouse.tail6c5f41.ts.net.crt
+      SSL_KEY_PATH: /certs/jbhouse.tail6c5f41.ts.net.key
+    volumes:
+      - /opt/certs:/certs:ro
     networks:
       - immich-net
     external_links:
@@ -19,6 +24,9 @@ services:
     container_name: goal-tracker-web
     ports:
       - "5137:80"
+      - "5138:443"
+    volumes:
+      - /opt/certs:/certs:ro
     depends_on:
       - api
     restart: unless-stopped
