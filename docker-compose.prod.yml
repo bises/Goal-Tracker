@@ -34,4 +34,3 @@ services:
 networks:
   immich-net:
     external: true
-
