@@ -1,12 +1,18 @@
 import cors from 'cors';
 import express from 'express';
-import https from 'https';
-import http from 'http';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
 import path from 'path';
 import calendarRoutes from './routes/calendar';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
+
+// Read version from package.json
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf-8')
+);
+const version = packageJson.version?.trim() || '1.0.0';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,7 +26,11 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/calendar', calendarRoutes);
 
 app.get('/health', (req, res) => {
-  res.send('OK');
+  res.json({
+    status: 'OK',
+    version: version,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 if (useHttps) {
