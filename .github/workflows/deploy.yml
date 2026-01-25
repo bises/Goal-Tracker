@@ -46,6 +46,10 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-api:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-api:buildcache,mode=max
 
+      - name: Replace Tailscale domain in nginx.conf
+        run: |
+          sed -i 's/TAILSCALE_DOMAIN/${{ secrets.TAILSCALE_DOMAIN }}/g' apps/web/nginx.conf
+
       - name: Build and push Web image
         uses: docker/build-push-action@v5
         with:
@@ -53,7 +57,7 @@ jobs:
           file: ./apps/web/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
-            VITE_API_URL=https://jbhouse.tail6c5f41.ts.net:3001/api
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
