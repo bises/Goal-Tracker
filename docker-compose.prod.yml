@@ -9,8 +9,8 @@ services:
       PORT: ${PORT:-3000}
       NODE_ENV: production
       USE_HTTPS: ${USE_HTTPS:-false}
-      SSL_CERT_PATH: /certs/jbhouse.tail6c5f41.ts.net.crt
-      SSL_KEY_PATH: /certs/jbhouse.tail6c5f41.ts.net.key
+      SSL_CERT_PATH: ${SSL_CERT_PATH:-/certs/cert.crt}
+      SSL_KEY_PATH: ${SSL_KEY_PATH:-/certs/cert.key}
     volumes:
       - /opt/certs:/certs:ro
     networks:
