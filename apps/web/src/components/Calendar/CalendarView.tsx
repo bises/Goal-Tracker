@@ -29,6 +29,7 @@ export function CalendarView({
   const [sheetDate, setSheetDate] = useState<Date | null>(null);
   const [actionTask, setActionTask] = useState<Task | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
   const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
 
@@ -125,6 +126,9 @@ export function CalendarView({
 
   const handleDayPress = (e: React.TouchEvent, date: Date) => {
     if (!isMobile()) return;
+ore initial touch position
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
 
     // Start 500ms timer for long-press detection
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -135,11 +139,30 @@ export function CalendarView({
   };
 
   const handleDayRelease = (e: React.TouchEvent, date: Date) => {
-    // Clear timer if touch ends before 500ms (wasn't a long-press)
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-      onDateClick?.(date);
+    // Check if finger moved more than 10px (indicates scrolling, not tapping)
+    const touch = e.changedTouches[0];
+    const startPos = touchStartPos.current;
+
+    if (startPos) {
+      const deltaX = Math.abs(touch.clientX - startPos.x);
+      const deltaY = Math.abs(touch.clientY - startPos.y);
+      const moved = deltaX > 10 || deltaY > 10;
+
+      // Clear timer if touch ends before 500ms (wasn't a long-press)
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+
+        // Only trigger click if finger didn't move (was a tap, not a scroll)
+        if (!moved) {
+          onDateClick?.(date);
+        }
+      }
+    }
+
+    // Reset touch position
+    touchStartPos.current = null;
+     onDateClick?.(date);
     }
     // Prevent onClick from firing on mobile after touch events
     e.preventDefault();

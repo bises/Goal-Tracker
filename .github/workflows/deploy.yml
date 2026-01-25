@@ -134,14 +134,23 @@ jobs:
             echo "🏥 Checking API health..."
             max_attempts=30
             attempt=0
+
             while [ $attempt -lt $max_attempts ]; do
               # Check health from inside the container (bypasses HTTPS/cert issues)
-              if docker exec goal-tracker-api curl -f http://localhost:3000/health > /dev/null 2>&1; then
+              if docker exec goal-tracker-api curl -f -s http://localhost:3000/health > /dev/null 2>&1; then
                 echo "✅ API is healthy"
                 exit 0
               fi
+
+              # Check if container is still running
+              if ! docker ps | grep -q goal-tracker-api; then
+                echo "❌ Container stopped running"
+                docker compose logs api --tail=100
+                exit 1
+              fi
+
               attempt=$((attempt + 1))
-              echo "Attempt $attempt/$max_attempts failed, retrying in 2s..."
+              echo "Attempt $attempt/$max_attempts: API not ready yet, retrying in 2s..."
               sleep 2
             done
 

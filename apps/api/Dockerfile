@@ -14,7 +14,7 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 
 # Install dependencies (including workspace)
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl curl
 RUN npm install -g pnpm
 RUN pnpm install --shamefully-hoist
 
