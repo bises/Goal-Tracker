@@ -135,7 +135,8 @@ jobs:
             max_attempts=30
             attempt=0
             while [ $attempt -lt $max_attempts ]; do
-              if curl -f http://localhost:3001/health > /dev/null 2>&1; then
+              # Check health from inside the container (bypasses HTTPS/cert issues)
+              if docker exec goal-tracker-api curl -f http://localhost:3000/health > /dev/null 2>&1; then
                 echo "✅ API is healthy"
                 exit 0
               fi
@@ -145,7 +146,11 @@ jobs:
             done
 
             echo "❌ API health check failed after $max_attempts attempts"
+            echo "Showing API logs:"
             docker compose logs api --tail=100
+            echo ""
+            echo "Container status:"
+            docker compose ps api
             exit 1
 
       - name: Notify deployment status
