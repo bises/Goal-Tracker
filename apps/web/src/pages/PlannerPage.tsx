@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarView } from '../components/Calendar/CalendarView';
 import AddTaskModal from '../components/modals/AddTaskModal';
-import { Modal } from '../components/modals/Modal';
+import { TasksForDateModal } from '../components/modals/TasksForDateModal';
 import { Toast } from '../components/shared/Toast';
-import { TaskListComponent } from '../components/Tasks/TaskListComponent';
 import { UnscheduledTasksContainer } from '../components/Tasks/UnscheduledTasksContainer';
 import { useTaskContext } from '../contexts/TaskContext';
 import { Task, TaskEvent } from '../types';
@@ -100,49 +99,28 @@ export function PlannerPage() {
       </div>
 
       {/* Date Tasks Modal */}
-      <Modal
+      <TasksForDateModal
         isOpen={isDateModalOpen}
         onClose={() => setIsDateModalOpen(false)}
-        title={
-          selectedDate
-            ? `Tasks for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-            : 'Tasks'
-        }
-        maxWidth="520px"
-      >
-        <TaskListComponent
-          tasks={tasksForSelectedDate}
-          onTaskEvent={(taskId: string, event: TaskEvent) => {
-            if (event === 'TaskEdited') {
-              const task = tasksForSelectedDate.find((t) => t.id === taskId);
-              if (task) {
-                handleTaskClick(task);
-                setIsDateModalOpen(false);
-              }
-            } else if (event === 'TaskDeleted') {
-              setToast({ level: 'success', message: 'Task deleted' });
-            }
-          }}
-          emptyMessage="No tasks for this date"
-          showLinkedGoals={false}
-          showBadges={false}
-        />
-        <div className="flex justify-end mt-3">
-          <button
-            className="primary-btn"
-            onClick={() => {
+        date={selectedDate}
+        tasks={tasksForSelectedDate}
+        onTaskEvent={(taskId: string, event: TaskEvent) => {
+          if (event === 'TaskEdited') {
+            const task = tasksForSelectedDate.find((t) => t.id === taskId);
+            if (task) {
+              handleTaskClick(task);
               setIsDateModalOpen(false);
-              setSelectedTask(null);
-              setIsEditModalOpen(true);
-            }}
-          >
-            Add Task
-            {selectedDate
-              ? ` — ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-              : ''}
-          </button>
-        </div>
-      </Modal>
+            }
+          } else if (event === 'TaskDeleted') {
+            setToast({ level: 'success', message: 'Task deleted' });
+          }
+        }}
+        onAddTask={() => {
+          setIsDateModalOpen(false);
+          setSelectedTask(null);
+          setIsEditModalOpen(true);
+        }}
+      />
 
       {/* Task Edit Modal */}
       <AddTaskModal

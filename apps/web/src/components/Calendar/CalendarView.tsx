@@ -126,7 +126,8 @@ export function CalendarView({
 
   const handleDayPress = (e: React.TouchEvent, date: Date) => {
     if (!isMobile()) return;
-ore initial touch position
+
+    // Store initial touch position
     const touch = e.touches[0];
     touchStartPos.current = { x: touch.clientX, y: touch.clientY };
 
@@ -162,8 +163,7 @@ ore initial touch position
 
     // Reset touch position
     touchStartPos.current = null;
-     onDateClick?.(date);
-    }
+
     // Prevent onClick from firing on mobile after touch events
     e.preventDefault();
   };
