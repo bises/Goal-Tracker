@@ -1,11 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
 import { parseLocalDate } from '../../utils/dateUtils';
 import { AddTaskToDateModal } from '../modals/AddTaskToDateModal';
 import { Modal } from '../modals/Modal';
+import { CalendarDay } from './CalendarDay';
 import './CalendarView.css';
+import { WeekDay } from './WeekDay';
 
 type ViewMode = 'month' | 'week' | 'day';
 
@@ -28,8 +30,6 @@ export function CalendarView({
   const [scheduling, setScheduling] = useState(false);
   const [sheetDate, setSheetDate] = useState<Date | null>(null);
   const [actionTask, setActionTask] = useState<Task | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
   const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
 
@@ -124,58 +124,6 @@ export function CalendarView({
     setCurrentDate(newDate);
   };
 
-  const handleDayPress = (e: React.TouchEvent, date: Date) => {
-    if (!isMobile()) return;
-
-    // Store initial touch position
-    const touch = e.touches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-
-    // Start 500ms timer for long-press detection
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => {
-      setSheetDate(date);
-      longPressTimerRef.current = null;
-    }, 500);
-  };
-
-  const handleDayRelease = (e: React.TouchEvent, date: Date) => {
-    // Check if finger moved more than 10px (indicates scrolling, not tapping)
-    const touch = e.changedTouches[0];
-    const startPos = touchStartPos.current;
-
-    if (startPos) {
-      const deltaX = Math.abs(touch.clientX - startPos.x);
-      const deltaY = Math.abs(touch.clientY - startPos.y);
-      const moved = deltaX > 10 || deltaY > 10;
-
-      // Clear timer if touch ends before 500ms (wasn't a long-press)
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-
-        // Only trigger click if finger didn't move (was a tap, not a scroll)
-        if (!moved) {
-          onDateClick?.(date);
-        }
-      }
-    }
-
-    // Reset touch position
-    touchStartPos.current = null;
-
-    // Prevent onClick from firing on mobile after touch events
-    e.preventDefault();
-  };
-
-  const handleDayClick = (date: Date) => {
-    // Desktop only: call onDateClick callback
-    // Mobile: skip onDateClick to avoid overlap with sheet
-    if (!isMobile()) {
-      onDateClick?.(date);
-    }
-  };
-
   const getTitle = () => {
     const options: Intl.DateTimeFormatOptions =
       viewMode === 'month'
@@ -254,56 +202,41 @@ export function CalendarView({
       const days = [];
       for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
         if ((week === 0 && dayOfWeek < firstDay) || day > daysInMonth) {
-          days.push(<div key={`empty-${week}-${dayOfWeek}`} className="calendar-day empty" />);
+          days.push(
+            <CalendarDay
+              key={`empty-${week}-${dayOfWeek}`}
+              date={new Date()}
+              isToday={false}
+              isEmpty={true}
+              incompleteTasks={[]}
+              isMobile={isMobile()}
+              onDayClick={() => {}}
+              onDayLongPress={() => {}}
+              onDragOver={handleDayDragOver}
+              onDragLeave={handleDayDragLeave}
+              onDrop={() => {}}
+            />
+          );
         } else {
           const currentDay = day;
           const date = new Date(year, month, currentDay);
-          const dayTasks = getTasksForDate(date);
           const incompleteTasks = incompleteTasksByDate.get(date.toDateString()) || [];
           const isToday = date.toDateString() === new Date().toDateString();
 
           days.push(
-            <div
+            <CalendarDay
               key={`day-${day}`}
-              className={`calendar-day ${isToday ? 'today' : ''}`}
+              date={date}
+              isToday={isToday}
+              isEmpty={false}
+              incompleteTasks={incompleteTasks}
+              isMobile={isMobile()}
+              onDayClick={onDateClick || (() => {})}
+              onDayLongPress={setSheetDate}
               onDragOver={handleDayDragOver}
               onDragLeave={handleDayDragLeave}
-              onDrop={(e) => handleDayDrop(date, e)}
-              onClick={() => handleDayClick(date)}
-              onTouchStart={(e) => handleDayPress(e, date)}
-              onTouchEnd={(e) => handleDayRelease(e, date)}
-            >
-              <div className="day-header">{currentDay}</div>
-              {/* Mobile: show incomplete count only */}
-              {incompleteTasks.length > 0 && (
-                <div className="md:hidden mt-1">
-                  <span className="inline-flex items-center justify-center text-[11px] font-bold bg-cyan-500/90 text-black rounded-full px-1.5 py-0.5 shadow-[0_1px_4px_rgba(6,182,212,0.4)]">
-                    {incompleteTasks.length}
-                  </span>
-                </div>
-              )}
-              {/* Desktop: show first incomplete pill + hidden count badge */}
-              <div className="day-tasks hidden md:flex md:flex-col md:gap-1">
-                {incompleteTasks.slice(0, 1).map((task) => (
-                  <div key={task.id} className="task-pill-wrapper">
-                    <div
-                      className={`task-pill ${task.isCompleted ? 'completed' : ''}`}
-                      draggable
-                      onDragStart={(e) => {
-                        e.stopPropagation();
-                        e.dataTransfer.setData('taskId', task.id);
-                      }}
-                    >
-                      {task.title}
-                    </div>
-                    <div className="task-tooltip">{task.title}</div>
-                  </div>
-                ))}
-                {incompleteTasks.length > 1 && (
-                  <div className="hidden-tasks-badge">+{incompleteTasks.length - 1}</div>
-                )}
-              </div>
-            </div>
+              onDrop={handleDayDrop}
+            />
           );
           day++;
         }
@@ -343,35 +276,18 @@ export function CalendarView({
       const isToday = date.toDateString() === new Date().toDateString();
 
       days.push(
-        <div
+        <WeekDay
           key={i}
-          className={`week-day ${isToday ? 'today' : ''}`}
+          date={date}
+          isToday={isToday}
+          tasks={dayTasks}
+          isMobile={isMobile()}
+          onDayClick={onDateClick || (() => {})}
+          onDayLongPress={setSheetDate}
           onDragOver={handleDayDragOver}
           onDragLeave={handleDayDragLeave}
-          onDrop={(e) => handleDayDrop(date, e)}
-          onClick={() => handleDayClick(date)}
-          onTouchStart={(e) => handleDayPress(e, date)}
-          onTouchEnd={(e) => handleDayRelease(e, date)}
-        >
-          <div className="day-header">
-            <div className="day-name">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-            <div className="day-number">{date.getDate()}</div>
-          </div>
-          <div className="day-tasks-list">
-            {dayTasks.map((task) => (
-              <div
-                key={task.id}
-                className={`task-card ${task.isCompleted ? 'completed' : ''}`}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('taskId', task.id);
-                }}
-              >
-                <div className="task-title">{task.title}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+          onDrop={handleDayDrop}
+        />
       );
     }
 
