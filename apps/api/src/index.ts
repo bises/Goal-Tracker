@@ -3,16 +3,12 @@ import express from 'express';
 import fs from 'fs';
 import http from 'http';
 import https from 'https';
-import path from 'path';
 import calendarRoutes from './routes/calendar';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
 
-// Read version from package.json
-const packageJson = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf-8')
-);
-const version = packageJson.version?.trim() || '1.0.0';
+// Get version from environment variable or default to 1.0.0
+const version = process.env.APP_VERSION?.trim() || '1.0.0';
 
 const app = express();
 const port = process.env.PORT || 3000;
