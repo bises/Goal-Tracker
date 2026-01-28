@@ -1,9 +1,14 @@
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
+import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
+import { ensureUser } from '../services/userService';
 
 const router = Router();
+
+// Apply authentication middleware to all routes
+router.use(validateJWT, requireAuth);
 
 // Lazy-initialize the completion service to avoid circular dependency issues
 let completionService: CompletionService;
@@ -78,6 +83,9 @@ const computeGoalView = (goal: any) => {
 // Get all goals
 router.get('/', async (req, res) => {
   try {
+    // Ensure user exists in database
+    const user = await ensureUser(req);
+
     // Parse query parameters
     const includeCompleted = req.query.completed === 'true';
     const startDate = req.query.startDate
@@ -91,6 +99,7 @@ router.get('/', async (req, res) => {
     const goals = await prisma.goal.findMany({
       relationLoadStrategy: 'join',
       where: {
+        userId: user.id,
         isMarkedComplete: includeCompleted ? undefined : false,
         createdAt: {
           gte: startDate,
@@ -130,8 +139,13 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const goal = await prisma.goal.findUnique({
-      where: { id },
+    const user = await ensureUser(req);
+
+    const goal = await prisma.goal.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
       include: {
         parent: {
           select: {
@@ -179,6 +193,8 @@ router.get('/:id', async (req, res) => {
 // Create a new goal
 router.post('/', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
     const {
       title,
       description,
@@ -195,6 +211,16 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // If parentId is provided, verify parent belongs to user
+      if (parentId) {
+        const parent = await tx.goal.findFirst({
+          where: { id: parentId, userId: user.id },
+        });
+        if (!parent) {
+          throw new Error('Parent goal not found or access denied');
+        }
+      }
+
       // Create the goal first
       const goal = await tx.goal.create({
         data: {
@@ -210,6 +236,7 @@ router.post('/', async (req, res) => {
           customDataLabel,
           parentId,
           scope: scope || 'STANDALONE',
+          userId: user.id,
         },
       });
 
@@ -252,6 +279,16 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    const user = await ensureUser(req);
+
+    // Verify goal belongs to user
+    const existingGoal = await prisma.goal.findFirst({
+      where: { id, userId: user.id },
+    });
+    if (!existingGoal) {
+      return res.status(404).json({ error: 'Goal not found or access denied' });
+    }
+
     const {
       title,
       description,
@@ -294,6 +331,16 @@ router.post('/:id/progress', async (req, res) => {
   const { value, note, date, customData } = req.body;
 
   try {
+    const user = await ensureUser(req);
+
+    // Verify goal belongs to user
+    const existingGoal = await prisma.goal.findFirst({
+      where: { id, userId: user.id },
+    });
+    if (!existingGoal) {
+      return res.status(404).json({ error: 'Goal not found or access denied' });
+    }
+
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create progress entry
       const progress = await tx.progress.create({
@@ -327,10 +374,12 @@ router.post('/:id/progress', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    const user = await ensureUser(req);
+
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Look up the goal to capture parent and mode before deletion
-      const goal = await tx.goal.findUnique({
-        where: { id },
+      const goal = await tx.goal.findFirst({
+        where: { id, userId: user.id },
         select: { parentId: true, progressMode: true },
       });
 
@@ -369,8 +418,13 @@ router.delete('/:id', async (req, res) => {
 // Get hierarchical goal tree (top-level goals with nested children)
 router.get('/tree', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
     const goals = await prisma.goal.findMany({
-      where: { parentId: null }, // Only top-level goals
+      where: {
+        parentId: null,
+        userId: user.id,
+      }, // Only top-level goals
       include: {
         children: {
           include: {
@@ -437,8 +491,13 @@ router.get('/tree', async (req, res) => {
 router.get('/scope/:scope', async (req, res) => {
   const { scope } = req.params;
   try {
+    const user = await ensureUser(req);
+
     const goals = await prisma.goal.findMany({
-      where: { scope: scope as any },
+      where: {
+        scope: scope as any,
+        userId: user.id,
+      },
       include: {
         progress: {
           orderBy: { date: 'desc' },
@@ -494,7 +553,17 @@ router.post('/:id/bulk-tasks', async (req, res) => {
   const { tasks } = req.body; // Array of { title, scheduledDate?, size? }
 
   try {
+    const user = await ensureUser(req);
+
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Verify goal belongs to user
+      const existingGoal = await tx.goal.findFirst({
+        where: { id, userId: user.id },
+      });
+      if (!existingGoal) {
+        throw new Error('Goal not found or access denied');
+      }
+
       // Create all tasks linked to the goal id
       const createdTasks = [] as any[];
       for (const task of tasks as any[]) {
@@ -504,6 +573,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
             scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : null,
             size: task.size || 1,
             isCompleted: false,
+            userId: user.id,
             goalTasks: {
               create: {
                 goalId: id,
@@ -556,6 +626,16 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 // POST /api/goals/:id/complete - Mark goal as completed and update parent
 router.post('/:id/complete', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
+    // Verify goal belongs to user
+    const existingGoal = await prisma.goal.findFirst({
+      where: { id: req.params.id, userId: user.id },
+    });
+    if (!existingGoal) {
+      return res.status(404).json({ error: 'Goal not found or access denied' });
+    }
+
     const result = await getCompletionService().completeGoal(req.params.id);
 
     if (!result.success) {
@@ -572,6 +652,16 @@ router.post('/:id/complete', async (req, res) => {
 // POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
 router.post('/:id/uncomplete', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
+    // Verify goal belongs to user
+    const existingGoal = await prisma.goal.findFirst({
+      where: { id: req.params.id, userId: user.id },
+    });
+    if (!existingGoal) {
+      return res.status(404).json({ error: 'Goal not found or access denied' });
+    }
+
     const result = await getCompletionService().uncompleteGoal(req.params.id);
 
     if (!result.success) {
@@ -588,8 +678,13 @@ router.post('/:id/uncomplete', async (req, res) => {
 // GET /api/goals/:id/tasks - Fetch tasks and children for a specific goal
 router.get('/:id/tasks', async (req, res) => {
   try {
-    const goal = await prisma.goal.findUnique({
-      where: { id: req.params.id },
+    const user = await ensureUser(req);
+
+    const goal = await prisma.goal.findFirst({
+      where: {
+        id: req.params.id,
+        userId: user.id,
+      },
       select: {
         goalTasks: {
           select: {
@@ -639,8 +734,13 @@ router.get('/:id/tasks', async (req, res) => {
 // GET /api/goals/:id/activities - Fetch progress/activities for a specific goal
 router.get('/:id/activities', async (req, res) => {
   try {
-    const goal = await prisma.goal.findUnique({
-      where: { id: req.params.id },
+    const user = await ensureUser(req);
+
+    const goal = await prisma.goal.findFirst({
+      where: {
+        id: req.params.id,
+        userId: user.id,
+      },
       select: {
         progress: {
           select: {

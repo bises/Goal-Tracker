@@ -1,9 +1,14 @@
 import { parseDateOnly } from '@goal-tracker/shared';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
+import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { ensureUser } from '../services/userService';
 
 const router = Router();
+
+// Apply authentication middleware to all routes
+router.use(validateJWT, requireAuth);
 
 // Helper function to include goals with tasks
 const taskWithGoals = {
@@ -35,8 +40,13 @@ const taskWithGoals = {
 // GET /api/tasks - Get all tasks
 router.get('/', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
     const tasks = await prisma.task.findMany({
       relationLoadStrategy: 'join',
+      where: {
+        userId: user.id,
+      },
       select: {
         id: true,
         title: true,
@@ -86,8 +96,13 @@ router.get('/', async (req, res) => {
 // GET /api/tasks/:id - Get task by ID
 router.get('/:id', async (req, res) => {
   try {
-    const task = await prisma.task.findUnique({
-      where: { id: req.params.id },
+    const user = await ensureUser(req);
+
+    const task = await prisma.task.findFirst({
+      where: {
+        id: req.params.id,
+        userId: user.id,
+      },
       relationLoadStrategy: 'join',
       select: {
         id: true,
@@ -140,6 +155,8 @@ router.get('/:id', async (req, res) => {
 // POST /api/tasks - Create task
 router.post('/', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
     const {
       title,
       description,
@@ -155,6 +172,29 @@ router.post('/', async (req, res) => {
     }
 
     const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Verify all goals belong to the user
+      if (goalIds.length > 0) {
+        const goalCount = await tx.goal.count({
+          where: {
+            id: { in: goalIds },
+            userId: user.id,
+          },
+        });
+        if (goalCount !== goalIds.length) {
+          throw new Error('One or more goals not found or access denied');
+        }
+      }
+
+      // Verify parent task belongs to user if provided
+      if (parentTaskId) {
+        const parentTask = await tx.task.findFirst({
+          where: { id: parentTaskId, userId: user.id },
+        });
+        if (!parentTask) {
+          throw new Error('Parent task not found or access denied');
+        }
+      }
+
       // Create the task
       // Parse YYYY-MM-DD string for date-only field
       let parsedScheduledDate = null;
@@ -169,6 +209,7 @@ router.post('/', async (req, res) => {
           scheduledDate: parsedScheduledDate,
           parentTaskId: parentTaskId || null,
           customData,
+          userId: user.id,
           goalTasks: {
             create: goalIds.map((goalId: string) => ({
               goal: {
@@ -251,6 +292,16 @@ router.post('/', async (req, res) => {
 // PUT /api/tasks/:id - Update task (no longer handles goal linking)
 router.put('/:id', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
+    // Verify task belongs to user
+    const existingTask = await prisma.task.findFirst({
+      where: { id: req.params.id, userId: user.id },
+    });
+    if (!existingTask) {
+      return res.status(404).json({ error: 'Task not found or access denied' });
+    }
+
     const { title, description, size, scheduledDate, parentTaskId, customData, isCompleted } =
       req.body;
 
@@ -290,16 +341,20 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/tasks/:id - Delete task
 router.delete('/:id', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { goalIds = [] } = req.body;
 
     // Fetch task state first to know if we need to decrease currentValue
-    const existingTask = await prisma.task.findUnique({
-      where: { id: req.params.id },
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        id: req.params.id,
+        userId: user.id,
+      },
       select: { isCompleted: true, size: true },
     });
 
     if (!existingTask) {
-      return res.status(404).json({ error: 'Task not found' });
+      return res.status(404).json({ error: 'Task not found or access denied' });
     }
 
     const progressDelta = existingTask.isCompleted ? -1 * (existingTask.size || 1) : 0;
@@ -360,15 +415,20 @@ router.delete('/:id', async (req, res) => {
 // POST /api/tasks/:id/complete - Toggle completion
 router.post('/:id/complete', async (req, res) => {
   try {
-    const task = await prisma.task.findUnique({
-      where: { id: req.params.id },
+    const user = await ensureUser(req);
+
+    const task = await prisma.task.findFirst({
+      where: {
+        id: req.params.id,
+        userId: user.id,
+      },
       include: {
         goalTasks: true,
       },
     });
 
     if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+      return res.status(404).json({ error: 'Task not found or access denied' });
     }
 
     const toggledCompleted = !task.isCompleted;
@@ -482,12 +542,14 @@ router.post('/:id/complete', async (req, res) => {
 // GET /api/tasks/scheduled/:date - Get tasks for date
 router.get('/scheduled/:date', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const date = new Date(req.params.date);
     const startOfDay = new Date(date.setHours(0, 0, 0, 0));
     const endOfDay = new Date(date.setHours(23, 59, 59, 999));
 
     const tasks = await prisma.task.findMany({
       where: {
+        userId: user.id,
         scheduledDate: {
           gte: startOfDay,
           lte: endOfDay,
@@ -509,8 +571,11 @@ router.get('/scheduled/:date', async (req, res) => {
 // GET /api/tasks/unscheduled - Get unscheduled tasks
 router.get('/unscheduled/list', async (req, res) => {
   try {
+    const user = await ensureUser(req);
+
     const tasks = await prisma.task.findMany({
       where: {
+        userId: user.id,
         scheduledDate: null,
         isCompleted: false,
       },
@@ -530,6 +595,7 @@ router.get('/unscheduled/list', async (req, res) => {
 // POST /api/tasks/:id/link-goal - Link task to a goal
 router.post('/:id/link-goal', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { goalId } = req.body;
 
     if (!goalId) {
@@ -537,6 +603,23 @@ router.post('/:id/link-goal', async (req, res) => {
     }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Verify task belongs to user
+      const task = await tx.task.findFirst({
+        where: { id: req.params.id, userId: user.id },
+      });
+      if (!task) {
+        throw new Error('Task not found or access denied');
+      }
+
+      // Verify goal belongs to user
+      const goal = await tx.goal.findFirst({
+        where: { id: goalId, userId: user.id },
+        select: { progressMode: true, targetValue: true },
+      });
+      if (!goal) {
+        throw new Error('Goal not found or access denied');
+      }
+
       // Check if link already exists
       const existing = await tx.goalTask.findFirst({
         where: { taskId: req.params.id, goalId },
@@ -552,12 +635,7 @@ router.post('/:id/link-goal', async (req, res) => {
       });
 
       // Increment goal's targetValue if TASK_BASED
-      const goal = await tx.goal.findUnique({
-        where: { id: goalId },
-        select: { progressMode: true, targetValue: true },
-      });
-
-      if (goal && goal.progressMode === 'TASK_BASED') {
+      if (goal.progressMode === 'TASK_BASED') {
         await tx.goal.update({
           where: { id: goalId },
           data: { targetValue: (goal.targetValue ?? 0) + 1 },
@@ -582,6 +660,7 @@ router.post('/:id/link-goal', async (req, res) => {
 // POST /api/tasks/:id/unlink-goal - Unlink task from a goal
 router.post('/:id/unlink-goal', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { goalId } = req.body;
 
     if (!goalId) {
@@ -589,14 +668,22 @@ router.post('/:id/unlink-goal', async (req, res) => {
     }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Fetch the task to check if it's completed
-      const task = await tx.task.findUnique({
-        where: { id: req.params.id },
+      // Verify task belongs to user
+      const task = await tx.task.findFirst({
+        where: { id: req.params.id, userId: user.id },
         select: { isCompleted: true, size: true },
       });
-
       if (!task) {
-        throw new Error('Task not found');
+        throw new Error('Task not found or access denied');
+      }
+
+      // Verify goal belongs to user and fetch its properties
+      const goal = await tx.goal.findFirst({
+        where: { id: goalId, userId: user.id },
+        select: { progressMode: true, targetValue: true, currentValue: true },
+      });
+      if (!goal) {
+        throw new Error('Goal not found or access denied');
       }
 
       // Delete the link
@@ -609,12 +696,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
       }
 
       // Update goal's targetValue and currentValue if TASK_BASED
-      const goal = await tx.goal.findUnique({
-        where: { id: goalId },
-        select: { progressMode: true, targetValue: true, currentValue: true },
-      });
-
-      if (goal && goal.progressMode === 'TASK_BASED') {
+      if (goal.progressMode === 'TASK_BASED') {
         const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
 
         // If task was completed, also decrement currentValue
@@ -651,7 +733,16 @@ router.post('/:id/unlink-goal', async (req, res) => {
 // POST /api/tasks/:id/schedule - Schedule or unschedule a task
 router.post('/:id/schedule', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { scheduledDate } = req.body;
+
+    // Verify task belongs to user
+    const existingTask = await prisma.task.findFirst({
+      where: { id: req.params.id, userId: user.id },
+    });
+    if (!existingTask) {
+      return res.status(404).json({ error: 'Task not found or access denied' });
+    }
 
     // Parse YYYY-MM-DD string as local date (not UTC)
     let parsedDate = null;

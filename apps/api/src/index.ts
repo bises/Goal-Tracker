@@ -3,6 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import http from 'http';
 import https from 'https';
+import authRoutes from './routes/auth';
 import calendarRoutes from './routes/calendar';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
@@ -17,6 +18,7 @@ const useHttps = process.env.USE_HTTPS === 'true';
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/calendar', calendarRoutes);
