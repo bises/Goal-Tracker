@@ -68,6 +68,7 @@ In Authentik Admin Panel:
 
 4. Click **Create**
 5. Note down these values:
+
    ```
    Client ID: _____________________
    Client Secret: _____________________
@@ -86,18 +87,21 @@ pnpm install
 ```
 
 This installs:
+
 - `express-oauth2-jwt-bearer` (v1.6.0) - Industry-standard JWT validation for Express
 - `jwks-rsa` (v3.1.0) - JSON Web Key Set handling for public key retrieval
 
 ### Step 3: Configure API Environment
 
 1. Copy environment template:
+
    ```bash
    cd apps/api
    cp .env.example .env
    ```
 
 2. Edit `.env` with your Authentik values:
+
    ```env
    AUTHENTIK_ISSUER=https://auth.yourdomain.com/application/o/goal-tracker/
    AUTHENTIK_AUDIENCE=your-actual-client-id
@@ -117,12 +121,14 @@ npx prisma migrate dev
 ```
 
 This creates:
+
 - User table with fields: `id`, `sub` (Authentik user ID), `email`, `name`
 - `userId` foreign key in Goal table with cascade delete
 - `userId` foreign key in Task table with cascade delete
 - Indexes for performance: `sub`, `email`, `userId`
 
 **Verify in database**:
+
 ```sql
 -- Check User table exists
 SELECT * FROM "User" LIMIT 1;
@@ -160,6 +166,7 @@ docker-compose up api
 ```
 
 **Expected output**:
+
 ```
 HTTP Server running on port 3000
 ```
@@ -208,6 +215,7 @@ curl http://localhost:3000/api/auth/me
 ### Test 3: Get Token from Authentik
 
 **Option A - Using curl:**
+
 ```bash
 curl -X POST https://auth.domain.com/application/o/token/ \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -215,6 +223,7 @@ curl -X POST https://auth.domain.com/application/o/token/ \
 ```
 
 **Option B - Using browser:**
+
 1. Go to your Authentik domain
 2. Log in with a test user
 3. Use browser dev tools to capture the access token
@@ -228,6 +237,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ```
 
 **Expected**:
+
 ```json
 {
   "id": "...",
@@ -259,6 +269,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ### Validate Token
 
 Go to https://jwt.io and paste your token. Verify:
+
 - `iss` matches `AUTHENTIK_ISSUER`
 - `aud` matches `AUTHENTIK_AUDIENCE`
 - `exp` (expiration) is in the future
@@ -281,6 +292,7 @@ Go to https://jwt.io and paste your token. Verify:
 ### Protected (All require `Authorization: Bearer <token>`)
 
 **Goals Routes**:
+
 - `GET /api/goals` - List user's goals
 - `GET /api/goals/:id` - Get specific goal (ownership verified)
 - `POST /api/goals` - Create goal (auto-assigns userId)
@@ -296,6 +308,7 @@ Go to https://jwt.io and paste your token. Verify:
 - `GET /api/goals/:id/activities` - Get progress activities (ownership verified)
 
 **Tasks Routes**:
+
 - `GET /api/tasks` - List user's tasks
 - `GET /api/tasks/:id` - Get specific task (ownership verified)
 - `POST /api/tasks` - Create task (auto-assigns userId, verifies goals)
@@ -309,6 +322,7 @@ Go to https://jwt.io and paste your token. Verify:
 - `POST /api/tasks/:id/schedule` - Schedule task (ownership verified)
 
 **Calendar Routes**:
+
 - `GET /api/calendar/tasks` - Get tasks for date range (user-filtered)
 - `GET /api/calendar/goals` - Get goals for date range (user-filtered)
 
@@ -345,40 +359,52 @@ Go to https://jwt.io and paste your token. Verify:
 ### Common Issues
 
 #### "Cannot find module 'express-oauth2-jwt-bearer'"
+
 **Solution**: Run `pnpm install` in `apps/api`
 
 #### "Property 'user' does not exist on type 'PrismaClient'"
+
 **Solution**: Run `npx prisma generate` to regenerate Prisma client
 
 #### 401 Unauthorized with valid-looking token
+
 **Solutions**:
+
 - Verify `AUTHENTIK_ISSUER` matches token's `iss` claim exactly
 - Verify `AUTHENTIK_AUDIENCE` matches token's `aud` claim
 - Check token hasn't expired (decode at jwt.io)
 - Ensure JWKS endpoint is accessible from API server
 
 #### "Missing required auth configuration"
+
 **Solution**: Set all `AUTHENTIK_*` variables in `.env` and restart API
 
 #### Token validation fails with JWKS errors
+
 **Solutions**:
+
 - Verify `AUTHENTIK_JWKS_URI` is correct and accessible
 - Check Authentik signing key is RS256
 - Ensure API server can reach Authentik server (network/firewall)
 
 #### 500 Internal Server Error
+
 **Solutions**:
+
 - Check API logs for details
 - Verify database connection
 - Ensure User table exists (run migrations)
 
 #### Token expired
+
 **Solution**: Get a new token from Authentik
 
 #### Wrong ISSUER/AUDIENCE
+
 **Solution**: Check .env values match Authentik configuration
 
 #### Token malformed
+
 **Solution**: Check Authorization header format: `Bearer <token>`
 
 ---
