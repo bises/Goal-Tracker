@@ -1,18 +1,18 @@
-import { Plus, LogOut, User } from 'lucide-react';
+import { LogOut, Plus, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { useAuth } from 'react-oidc-context';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { GoalCard } from './components/Goals/GoalCard';
 import { AddGoalModal } from './components/modals/AddGoalModal';
 import AddTaskModal from './components/modals/AddTaskModal';
-import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { ProtectedRoute } from './components/shared/ProtectedRoute';
+import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
-import { GoalDetailsPage } from './pages/GoalDetailsPage';
-import { PlannerPage } from './pages/PlannerPage';
-import { LoginPage } from './pages/LoginPage';
 import { CallbackPage } from './pages/CallbackPage';
+import { GoalDetailsPage } from './pages/GoalDetailsPage';
+import { LoginPage } from './pages/LoginPage';
+import { PlannerPage } from './pages/PlannerPage';
 
 type ViewMode = 'goals' | 'tasks' | 'planner';
 
