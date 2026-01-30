@@ -6,12 +6,14 @@ import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
 import './styles/design-system.css';
 
+//TODO replace import.meta.env with a config file
 const oidcConfig = {
   authority: import.meta.env.VITE_AUTHENTIK_AUTHORITY || '',
   client_id: import.meta.env.VITE_AUTHENTIK_CLIENT_ID || '',
   redirect_uri: window.location.origin + '/callback',
   post_logout_redirect_uri: window.location.origin + '/login',
   scope: 'openid email profile',
+  audience: import.meta.env.VITE_AUTHENTIK_API_AUDIENCE || '',
   automaticSilentRenew: true,
   loadUserInfo: true,
 };
