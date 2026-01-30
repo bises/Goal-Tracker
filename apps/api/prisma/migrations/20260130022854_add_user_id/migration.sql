@@ -18,6 +18,7 @@ UPDATE "Task" SET "userId" = '4ac85d5d8f2c883db1925b4080e632cd873765fb7bc605b537
 ALTER TABLE "Goal" ALTER COLUMN "userId" SET NOT NULL;
 ALTER TABLE "Task" ALTER COLUMN "userId" SET NOT NULL;
 
+-- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "sub" TEXT NOT NULL,
@@ -28,7 +29,6 @@ CREATE TABLE "User" (
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
-
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_sub_key" ON "User"("sub");
