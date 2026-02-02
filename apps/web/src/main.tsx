@@ -6,18 +6,20 @@ import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
 import './styles/design-system.css';
 
-const domain = import.meta.env.VITE_AUTH0_DOMAIN;
-const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-const audience = import.meta.env.VITE_AUTH0_AUDIENCE;
+// TODO: Make Auth0 configuration environment-specific
+// For now, hardcoded to simplify deployment
+const DEFAULT_AUTH0_DOMAIN = 'bises.auth0.com';
+const DEFAULT_AUTH0_CLIENT_ID = 'izygI8zTKeFDiyME5JETirr288UDMr7q';
+const DEFAULT_AUTH0_AUDIENCE = 'https://goal-tracker-api';
+
+const domain = import.meta.env.VITE_AUTH0_DOMAIN || DEFAULT_AUTH0_DOMAIN;
+const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || DEFAULT_AUTH0_CLIENT_ID;
+const audience = import.meta.env.VITE_AUTH0_AUDIENCE || DEFAULT_AUTH0_AUDIENCE;
 
 // Validate Auth0 configuration
 if (!domain || !clientId) {
-  console.error('Auth0 configuration missing. Please check your .env file.');
-  console.error('Required environment variables:');
-  console.error('- VITE_AUTH0_DOMAIN');
-  console.error('- VITE_AUTH0_CLIENT_ID');
-  console.error('- VITE_AUTH0_AUDIENCE (recommended)');
-  throw new Error('Auth0 domain and client ID must be set in .env file');
+  console.error('Auth0 configuration missing.');
+  throw new Error('Auth0 domain and client ID must be configured');
 }
 
 // Validate domain format

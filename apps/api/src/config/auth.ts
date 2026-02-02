@@ -12,12 +12,17 @@ dotenv.config();
  * The actual JWT verification logic is in middleware/auth.ts
  */
 
+// TODO: Make Auth0 configuration environment-specific
+// For now, hardcoded to simplify deployment
+const DEFAULT_AUTH0_ISSUER = 'https://bises.auth0.com/';
+const DEFAULT_AUTH0_AUDIENCE = 'https://goal-tracker-api';
+
 export const authConfig = {
   // Auth0 issuer URL (e.g., https://your-tenant.auth0.com/)
-  issuer: process.env.AUTH0_ISSUER || '',
+  issuer: process.env.AUTH0_ISSUER || DEFAULT_AUTH0_ISSUER,
 
   // Expected audience (your API identifier)
-  audience: process.env.AUTH0_AUDIENCE || '',
+  audience: process.env.AUTH0_AUDIENCE || DEFAULT_AUTH0_AUDIENCE,
 };
 
 export const validateAuthConfig = () => {
