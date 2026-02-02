@@ -1,11 +1,17 @@
 import { Router } from 'express';
+import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { ensureUser } from '../services/userService';
 
 const router = Router();
+
+// Apply authentication middleware to all routes
+router.use(validateJWT, requireAuth);
 
 // GET /api/calendar/tasks - Fetch tasks for calendar view
 router.get('/tasks', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { startDate, endDate, includeUnscheduled, parentGoalId } = req.query;
 
     if (!startDate || !endDate) {
@@ -17,6 +23,7 @@ router.get('/tasks', async (req, res) => {
 
     // Fetch scheduled tasks in range
     const whereClause: any = {
+      userId: user.id,
       scheduledDate: {
         gte: start,
         lte: end,
@@ -55,6 +62,7 @@ router.get('/tasks', async (req, res) => {
     // Optionally include unscheduled tasks for drag-drop
     if (includeUnscheduled === 'true') {
       const unscheduledWhere: any = {
+        userId: user.id,
         scheduledDate: null,
         isCompleted: false,
       };
@@ -98,6 +106,7 @@ router.get('/tasks', async (req, res) => {
 // GET /api/calendar/goals - Fetch goals for calendar view
 router.get('/goals', async (req, res) => {
   try {
+    const user = await ensureUser(req);
     const { startDate, endDate, scope } = req.query;
 
     if (!startDate || !endDate) {
@@ -108,6 +117,7 @@ router.get('/goals', async (req, res) => {
     const end = new Date(endDate as string);
 
     const whereClause: any = {
+      userId: user.id,
       OR: [
         {
           // Goal starts within range

@@ -1,41 +1,80 @@
-import { Plus } from 'lucide-react';
+import { useAuth0 } from '@auth0/auth0-react';
+import { LogOut, Plus, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { setAuthTokenProvider } from './api';
 import { GoalCard } from './components/Goals/GoalCard';
 import { AddGoalModal } from './components/modals/AddGoalModal';
 import AddTaskModal from './components/modals/AddTaskModal';
+import { ProtectedRoute } from './components/shared/ProtectedRoute';
 import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
+import { CallbackPage } from './pages/CallbackPage';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
+import { LoginPage } from './pages/LoginPage';
 import { PlannerPage } from './pages/PlannerPage';
 
 type ViewMode = 'goals' | 'tasks' | 'planner';
 
 function AppContent() {
+  const { user, isAuthenticated, getAccessTokenSilently, logout } = useAuth0();
   const { goals, fetchGoals } = useGoalContext();
   const { tasks, fetchTasks } = useTaskContext();
   const [viewMode, setViewMode] = useState<ViewMode>('planner');
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Setup Auth0 token provider for API calls
+  useEffect(() => {
+    setAuthTokenProvider(async () => {
+      try {
+        const token = await getAccessTokenSilently();
+        return token;
+      } catch (error) {
+        console.error('Error getting access token:', error);
+        return '';
+      }
+    });
+  }, [getAccessTokenSilently]);
 
   useEffect(() => {
-    fetchGoals();
-    fetchTasks();
-  }, []);
+    if (isAuthenticated) {
+      fetchGoals();
+      fetchTasks();
+    }
+  }, [isAuthenticated]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);
   };
 
+  const handleLogout = () => {
+    logout({
+      logoutParams: {
+        returnTo: window.location.origin + '/login',
+      },
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 md:py-8 w-full">
       <Routes>
-        <Route path="/goals/:goalId" element={<GoalDetailsPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/callback" element={<CallbackPage />} />
+        <Route
+          path="/goals/:goalId"
+          element={
+            <ProtectedRoute>
+              <GoalDetailsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={
-            <>
+            <ProtectedRoute>
               <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6 sm:mb-8">
                 <div>
                   <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
@@ -45,18 +84,58 @@ function AppContent() {
                     Track your progress and achieve your dreams.
                   </p>
                 </div>
-                <button
-                  className="primary-btn flex items-center gap-2 text-sm sm:text-base whitespace-nowrap"
-                  onClick={() =>
-                    viewMode === 'goals' ? setIsGoalModalOpen(true) : setIsTaskModalOpen(true)
-                  }
-                >
-                  <Plus size={16} className="sm:w-5 sm:h-5" />
-                  <span className="hidden sm:inline">
-                    New {viewMode === 'goals' ? 'Goal' : 'Task'}
-                  </span>
-                  <span className="sm:hidden">New</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="primary-btn flex items-center gap-2 text-sm sm:text-base whitespace-nowrap"
+                    onClick={() =>
+                      viewMode === 'goals' ? setIsGoalModalOpen(true) : setIsTaskModalOpen(true)
+                    }
+                  >
+                    <Plus size={16} className="sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">
+                      New {viewMode === 'goals' ? 'Goal' : 'Task'}
+                    </span>
+                    <span className="sm:hidden">New</span>
+                  </button>
+
+                  {/* User Menu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                      title={user?.email || 'User menu'}
+                    >
+                      <User size={18} className="text-gray-400" />
+                      <span className="hidden sm:inline text-sm text-gray-300">
+                        {user?.name || user?.email || 'User'}
+                      </span>
+                    </button>
+
+                    {showUserMenu && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowUserMenu(false)}
+                        />
+                        <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                          <div className="px-4 py-3 border-b border-gray-700">
+                            <p className="text-sm font-medium text-gray-200">
+                              {user?.name || 'User'}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">{user?.email}</p>
+                          </div>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          >
+                            <LogOut size={16} />
+                            Sign Out
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </header>
 
               {/* View Mode Tabs */}
@@ -188,7 +267,7 @@ function AppContent() {
                   }}
                 />
               )}
-            </>
+            </ProtectedRoute>
           }
         />
       </Routes>

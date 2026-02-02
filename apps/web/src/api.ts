@@ -4,40 +4,78 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 type TaskPayload = Partial<Task> & { goalIds?: string[] };
 
+// Store the getAccessToken function to be set by the Auth0 context
+let getAccessToken: (() => Promise<string>) | null = null;
+
+export const setAuthTokenProvider = (provider: () => Promise<string>) => {
+  getAccessToken = provider;
+};
+
+// Custom fetch wrapper with automatic auth header injection (HTTP Interceptor)
+const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  // Merge headers with auth token
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Copy existing headers
+  if (options.headers) {
+    const existingHeaders = new Headers(options.headers);
+    existingHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
+
+  // Get Auth0 access token
+  if (getAccessToken) {
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (e) {
+      console.error('Failed to get auth token:', e);
+    }
+  }
+
+  // Make the request with injected headers
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+};
+
 export const api = {
   fetchGoals: async (): Promise<Goal[]> => {
-    const res = await fetch(`${API_URL}/goals`);
+    const res = await authenticatedFetch(`${API_URL}/goals`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
 
   getGoal: async (goalId: string): Promise<Goal> => {
-    const res = await fetch(`${API_URL}/goals/${goalId}`);
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}`);
     return res.json();
   },
 
   createGoal: async (goal: Partial<Goal>): Promise<Goal> => {
-    const res = await fetch(`${API_URL}/goals`, {
+    const res = await authenticatedFetch(`${API_URL}/goals`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(goal),
     });
     return res.json();
   },
 
   updateGoal: async (goalId: string, updates: Partial<Goal>): Promise<Goal> => {
-    const res = await fetch(`${API_URL}/goals/${goalId}`, {
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
     return res.json();
   },
 
   updateProgress: async (goalId: string, value: number, note?: string, customData?: string) => {
-    const res = await fetch(`${API_URL}/goals/${goalId}/progress`, {
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/progress`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         value,
         note,
@@ -49,20 +87,20 @@ export const api = {
   },
 
   deleteGoal: async (goalId: string) => {
-    await fetch(`${API_URL}/goals/${goalId}`, {
+    await authenticatedFetch(`${API_URL}/goals/${goalId}`, {
       method: 'DELETE',
     });
   },
 
   // Hierarchy endpoints
   getGoalTree: async () => {
-    const res = await fetch(`${API_URL}/goals/tree`);
+    const res = await authenticatedFetch(`${API_URL}/goals/tree`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
 
   getGoalsByScope: async (scope: string) => {
-    const res = await fetch(`${API_URL}/goals/scope/${scope}`);
+    const res = await authenticatedFetch(`${API_URL}/goals/scope/${scope}`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
@@ -71,37 +109,34 @@ export const api = {
     parentId: string,
     tasks: Array<{ title: string; scheduledDate?: string; size?: number }>
   ) => {
-    const res = await fetch(`${API_URL}/goals/${parentId}/bulk-tasks`, {
+    const res = await authenticatedFetch(`${API_URL}/goals/${parentId}/bulk-tasks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tasks }),
     });
     return res.json();
   },
 
   completeGoal: async (goalId: string) => {
-    const res = await fetch(`${API_URL}/goals/${goalId}/complete`, {
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/complete`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     });
     return res.json();
   },
 
   uncompleteGoal: async (goalId: string) => {
-    const res = await fetch(`${API_URL}/goals/${goalId}/uncomplete`, {
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/uncomplete`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     });
     return res.json();
   },
 
   getGoalTasks: async (goalId: string): Promise<GoalTasksResponse> => {
-    const res = await fetch(`${API_URL}/goals/${goalId}/tasks`);
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/tasks`);
     return res.json();
   },
 
   getGoalActivities: async (goalId: string) => {
-    const res = await fetch(`${API_URL}/goals/${goalId}/activities`);
+    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/activities`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
@@ -109,77 +144,70 @@ export const api = {
 
 export const taskApi = {
   fetchTasks: async (): Promise<Task[]> => {
-    const res = await fetch(`${API_URL}/tasks`);
+    const res = await authenticatedFetch(`${API_URL}/tasks`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   },
 
   createTask: async (task: TaskPayload): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(task),
     });
     return res.json();
   },
 
   updateTask: async (id: string, updates: TaskPayload): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks/${id}`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
     return res.json();
   },
 
   deleteTask: async (id: string, goalIds: string[] = []) => {
-    await fetch(`${API_URL}/tasks/${id}`, {
+    await authenticatedFetch(`${API_URL}/tasks/${id}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goalIds }),
     });
   },
 
   toggleComplete: async (id: string): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks/${id}/complete`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks/${id}/complete`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     });
     return res.json();
   },
 
   getScheduledTasks: async (date: string): Promise<Task[]> => {
-    const res = await fetch(`${API_URL}/tasks/scheduled/${date}`);
+    const res = await authenticatedFetch(`${API_URL}/tasks/scheduled/${date}`);
     return res.json();
   },
 
   getUnscheduledTasks: async (): Promise<Task[]> => {
-    const res = await fetch(`${API_URL}/tasks/unscheduled/list`);
+    const res = await authenticatedFetch(`${API_URL}/tasks/unscheduled/list`);
     return res.json();
   },
 
   linkGoal: async (taskId: string, goalId: string): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks/${taskId}/link-goal`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks/${taskId}/link-goal`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goalId }),
     });
     return res.json();
   },
 
   unlinkGoal: async (taskId: string, goalId: string): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks/${taskId}/unlink-goal`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks/${taskId}/unlink-goal`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goalId }),
     });
     return res.json();
   },
 
   scheduleTask: async (taskId: string, scheduledDate: string | null): Promise<Task> => {
-    const res = await fetch(`${API_URL}/tasks/${taskId}/schedule`, {
+    const res = await authenticatedFetch(`${API_URL}/tasks/${taskId}/schedule`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scheduledDate }),
     });
     const data = await res.json();
@@ -204,7 +232,7 @@ export const calendarApi = {
       params.append('parentGoalId', parentGoalId);
     }
 
-    const res = await fetch(`${API_URL}/calendar/tasks?${params}`);
+    const res = await authenticatedFetch(`${API_URL}/calendar/tasks?${params}`);
     return res.json();
   },
 
@@ -215,7 +243,7 @@ export const calendarApi = {
       params.append('scope', scope);
     }
 
-    const res = await fetch(`${API_URL}/calendar/goals?${params}`);
+    const res = await authenticatedFetch(`${API_URL}/calendar/goals?${params}`);
     return res.json();
   },
 };
