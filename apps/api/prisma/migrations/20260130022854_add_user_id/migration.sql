@@ -6,13 +6,13 @@
 
 */
 
--- 1. Add userId as nullable
-ALTER TABLE "Goal" ADD COLUMN "userId" TEXT;
-ALTER TABLE "Task" ADD COLUMN "userId" TEXT;
+-- 1. Add userId as nullable INTEGER
+ALTER TABLE "Goal" ADD COLUMN "userId" INTEGER;
+ALTER TABLE "Task" ADD COLUMN "userId" INTEGER;
 
 -- 2. Set default userId for existing rows
-UPDATE "Goal" SET "userId" = '4ac85d5d8f2c883db1925b4080e632cd873765fb7bc605b5372aa806dbd5d053' WHERE "userId" IS NULL;
-UPDATE "Task" SET "userId" = '4ac85d5d8f2c883db1925b4080e632cd873765fb7bc605b5372aa806dbd5d053' WHERE "userId" IS NULL;
+UPDATE "Goal" SET "userId" = 1 WHERE "userId" IS NULL;
+UPDATE "Task" SET "userId" = 1 WHERE "userId" IS NULL;
 
 -- 3. Make userId required
 ALTER TABLE "Goal" ALTER COLUMN "userId" SET NOT NULL;
@@ -20,7 +20,7 @@ ALTER TABLE "Task" ALTER COLUMN "userId" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "User" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
     "sub" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "name" TEXT,

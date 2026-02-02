@@ -1,5 +1,5 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { ReactNode } from 'react';
-import { useAuth } from 'react-oidc-context';
 import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -7,9 +7,9 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const auth = useAuth();
+  const { isAuthenticated, isLoading, error, loginWithRedirect } = useAuth0();
 
-  if (auth.isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
         <div className="flex flex-col items-center gap-4">
@@ -20,14 +20,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (auth.error) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
         <div className="bg-gray-800 border border-red-500/30 p-8 rounded-lg shadow-xl max-w-md w-full">
           <h1 className="text-2xl font-bold text-red-400 mb-4">Authentication Error</h1>
-          <p className="text-gray-300 mb-6">{auth.error.message}</p>
+          <p className="text-gray-300 mb-6">{error.message}</p>
           <button
-            onClick={() => auth.signinRedirect()}
+            onClick={() => loginWithRedirect()}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
           >
             Sign In
@@ -37,7 +37,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!auth.isAuthenticated) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 

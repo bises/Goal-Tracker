@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Authentication configuration for JWT validation with Authentik OIDC.
+ * Authentication configuration for JWT validation with Auth0.
  *
  * This file provides:
  * - Configuration values loaded from environment variables
@@ -13,17 +13,11 @@ dotenv.config();
  */
 
 export const authConfig = {
-  // Authentik OIDC issuer URL (e.g., https://auth.yourdomain.com/application/o/goal-tracker/)
-  issuer: process.env.AUTHENTIK_ISSUER || '',
+  // Auth0 issuer URL (e.g., https://your-tenant.auth0.com/)
+  issuer: process.env.AUTH0_ISSUER || '',
 
-  // JWKS URI for fetching public keys
-  jwksUri: process.env.AUTHENTIK_JWKS_URI || '',
-
-  // Expected audience (usually the client ID)
-  audience: process.env.AUTHENTIK_AUDIENCE || '',
-
-  // Token issuer
-  tokenIssuer: process.env.AUTHENTIK_TOKEN_ISSUER || process.env.AUTHENTIK_ISSUER || '',
+  // Expected audience (your API identifier)
+  audience: process.env.AUTH0_AUDIENCE || '',
 };
 
 export const validateAuthConfig = () => {
@@ -33,7 +27,7 @@ export const validateAuthConfig = () => {
   if (missing.length > 0) {
     throw new Error(
       `Missing required auth configuration: ${missing.join(', ')}. ` +
-        `Please set the following environment variables: ${missing.map((k) => `AUTHENTIK_${k.toUpperCase()}`).join(', ')}`
+        `Please set the following environment variables: ${missing.map((k) => `AUTH0_${k.toUpperCase()}`).join(', ')}`
     );
   }
 };

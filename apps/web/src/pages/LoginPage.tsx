@@ -1,25 +1,25 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { useEffect } from 'react';
-import { useAuth } from 'react-oidc-context';
 
 export function LoginPage() {
-  const auth = useAuth();
+  const { isAuthenticated, isLoading, loginWithRedirect, error } = useAuth0();
 
   useEffect(() => {
     // If already authenticated, this won't execute
     // Auto-redirect to login
-    if (!auth.isAuthenticated && !auth.isLoading) {
-      auth.signinRedirect();
+    if (!isAuthenticated && !isLoading) {
+      loginWithRedirect();
     }
-  }, [auth.isAuthenticated, auth.isLoading]);
+  }, [isAuthenticated, isLoading, loginWithRedirect]);
 
-  if (auth.error) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
         <div className="bg-gray-800 border border-red-500/30 p-8 rounded-lg shadow-xl max-w-md w-full">
           <h1 className="text-2xl font-bold text-red-400 mb-4">Authentication Error</h1>
-          <p className="text-gray-300 mb-6">{auth.error.message}</p>
+          <p className="text-gray-300 mb-6">{error.message}</p>
           <button
-            onClick={() => auth.signinRedirect()}
+            onClick={() => loginWithRedirect()}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
           >
             Try Again
@@ -38,17 +38,17 @@ export function LoginPage() {
           </h1>
           <p className="text-gray-400 mb-8">Track your progress and achieve your dreams</p>
 
-          {auth.isLoading ? (
+          {isLoading ? (
             <div className="flex flex-col items-center gap-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
               <p className="text-gray-400">Redirecting to login...</p>
             </div>
           ) : (
             <button
-              onClick={() => auth.signinRedirect()}
+              onClick={() => loginWithRedirect()}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
             >
-              Sign In with Authentik
+              Sign In with Auth0
             </button>
           )}
         </div>

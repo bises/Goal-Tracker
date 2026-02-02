@@ -7,6 +7,93 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id        Int      @id @default(autoincrement())
+  sub       String   @unique
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  goals     Goal[]
+  tasks     Task[]
+
+  @@index([sub])
+  @@index([email])
+}
+
+model Goal {
+  id               String         @id @default(uuid())
+  title            String
+  description      String?
+  type             GoalType
+  targetValue      Float?
+  currentValue     Float          @default(0)
+  stepSize         Float          @default(1)
+  frequencyTarget  Int?
+  frequencyType    FrequencyType?
+  startDate        DateTime       @default(now())
+  endDate          DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  customDataLabel  String?
+  parentId         String?
+  scope            GoalScope      @default(STANDALONE)
+  progressMode     ProgressMode   @default(TASK_BASED)
+  isMarkedComplete Boolean        @default(false)
+  userId           Int
+  parent           Goal?          @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children         Goal[]         @relation("GoalHierarchy")
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalTasks        GoalTask[]
+  progress         Progress[]
+
+  @@index([userId])
+}
+
+model Task {
+  id            String     @id @default(uuid())
+  title         String
+  description   String?
+  size          Int        @default(1)
+  isCompleted   Boolean    @default(false)
+  completedAt   DateTime?
+  scheduledDate DateTime?
+  parentTaskId  String?
+  customData    String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  userId        Int
+  goalTasks     GoalTask[]
+  parentTask    Task?      @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subTasks      Task[]     @relation("TaskHierarchy")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([scheduledDate, isCompleted])
+  @@index([isCompleted])
+}
+
+model GoalTask {
+  id        String   @id @default(uuid())
+  goalId    String
+  taskId    String
+  createdAt DateTime @default(now())
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, taskId])
+}
+
+model Progress {
+  id         String   @id @default(uuid())
+  goalId     String
+  value      Float
+  date       DateTime @default(now())
+  note       String?
+  customData String?
+  goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+}
+
 enum GoalType {
   TOTAL_TARGET
   FREQUENCY
@@ -19,7 +106,6 @@ enum ProgressMode {
   HABIT
 }
 
-
 enum GoalScope {
   YEARLY
   MONTHLY
@@ -31,126 +117,4 @@ enum FrequencyType {
   DAILY
   WEEKLY
   MONTHLY
-}
-
-model User {
-  id        String   @id @default(uuid())
-  sub       String   @unique  // Authentik user ID (subject claim from JWT)
-  email     String   @unique
-  name      String?
-
-  goals     Goal[]
-  tasks     Task[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([sub])
-  @@index([email])
-}
-
-model Goal {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  type        GoalType
-  progressMode ProgressMode @default(TASK_BASED)
-  customDataLabel String?
-
-  // User ownership
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Hierarchy fields
-  parentId    String?
-  parent      Goal?    @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children    Goal[]   @relation("GoalHierarchy")
-
-  // Scope
-  scope       GoalScope @default(STANDALONE)
-
-  // For TOTAL_TARGET (e.g., Read 12 books)
-  targetValue Float?
-  currentValue Float    @default(0)
-  stepSize     Float    @default(1)
-
-  // Completion tracking for parent updates
-  isMarkedComplete Boolean @default(false)
-
-  // For FREQUENCY (e.g., 2 times per week)
-  frequencyTarget Int?
-  frequencyType   FrequencyType?
-
-  startDate   DateTime  @default(now())
-  endDate     DateTime?
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  progress    Progress[]
-  goalTasks   GoalTask[]
-
-  @@index([userId])
-}
-
-model Task {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-
-  // User ownership
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Size estimation (in days, default 1)
-  size        Int      @default(1)
-
-  // Completion tracking
-  isCompleted Boolean  @default(false)
-  completedAt DateTime?
-
-  // Scheduling (date only, no time)
-  scheduledDate DateTime?
-
-  // Linking to multiple goals (many-to-many)
-  goalTasks   GoalTask[]
-
-  // Hierarchy (tasks can have subtasks)
-  parentTaskId String?
-  parentTask   Task?    @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subTasks     Task[]   @relation("TaskHierarchy")
-
-  // Metadata
-  customData  String?  // For logging specific info when completing
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-  @@index([scheduledDate, isCompleted])
-  @@index([isCompleted])
-}
-
-model GoalTask {
-  id      String   @id @default(uuid())
-  goalId  String
-  taskId  String
-  goal    Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([goalId, taskId])
-}
-
-model Progress {
-  id        String   @id @default(uuid())
-  goalId    String
-  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
-
-  value     Float // Amount added (e.g., 1 book, or 1 gym session)
-  date      DateTime @default(now())
-
-  note      String?
-  customData String?
 }

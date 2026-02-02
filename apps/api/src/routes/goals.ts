@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
-import { ensureUser } from '../services/userService';
+import { ensureUser, getUser } from '../services/userService';
 
 const router = Router();
 
@@ -83,8 +83,14 @@ const computeGoalView = (goal: any) => {
 // Get all goals
 router.get('/', async (req, res) => {
   try {
-    // Ensure user exists in database
-    const user = await ensureUser(req);
+    // Get existing user from database
+    const user = await getUser(req);
+
+    if (!user) {
+      return res
+        .status(403)
+        .json({ error: 'User profile not found. Please complete registration.' });
+    }
 
     // Parse query parameters
     const includeCompleted = req.query.completed === 'true';

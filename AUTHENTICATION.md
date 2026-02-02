@@ -1,6 +1,6 @@
 # Authentication Guide
 
-Complete guide for Authentik authentication integration in Goal Tracker.
+Complete guide for Auth0 authentication integration in Goal Tracker.
 
 ## 📋 Table of Contents
 
@@ -21,24 +21,29 @@ Complete guide for Authentik authentication integration in Goal Tracker.
 ```bash
 # 1. Install dependencies
 cd apps/api && pnpm install
+cd ../web && pnpm install
 
 # 2. Configure environment
-cp .env.example .env
-# Edit .env with your Authentik values
+# Create .env files in both apps/api and apps/web
+# See Configuration section below
 
-# 3. Run migration
+# 3. Run database migration
+cd apps/api
 npx prisma generate && npx prisma migrate dev
 
-# 4. Start API
-pnpm run dev
+# 4. Start services
+# Terminal 1 - API
+cd apps/api && pnpm run dev
+
+# Terminal 2 - Web
+cd apps/web && pnpm run dev
 ```
 
 ---
 
 ## 📦 Prerequisites
 
-- ☐ Authentik server is configured and accessible
-- ☐ You have admin access to Authentik
+- ☐ Auth0 account (free tier works)
 - ☐ PostgreSQL database is running
 - ☐ Node.js and pnpm installed
 
@@ -46,142 +51,77 @@ pnpm run dev
 
 ## 🔧 Setup Steps
 
-### Step 1: Configure Authentik Provider
+### Step 1: Create Auth0 Application
 
-In Authentik Admin Panel:
+1. Go to [Auth0 Dashboard](https://manage.auth0.com/)
+2. Navigate to **Applications** → **Applications**
+3. Click **Create Application**
+4. Configure:
+   - **Name**: Goal Tracker
+   - **Application Type**: Single Page Application
+5. Click **Create**
 
-1. Navigate to **Applications** → **Providers**
-2. Click **Create** → **OAuth2/OpenID Provider**
-3. Configure the provider:
+### Step 2: Configure Auth0 Application Settings
+
+In your application settings:
+
+1. **Application URIs**:
+   - **Allowed Callback URLs**:
+     ```
+     http://localhost:5173/callback,https://yourdomain.com/callback
+     ```
+   - **Allowed Logout URLs**:
+     ```
+     http://localhost:5173/login,https://yourdomain.com/login
+     ```
+   - **Allowed Web Origins**:
+     ```
+     http://localhost:5173,https://yourdomain.com
+     ```
+
+2. **Cross-Origin Authentication**: Enable
+3. **Token Endpoint Authentication Method**: None (for SPA)
+4. Click **Save Changes**
+
+### Step 3: Create Auth0 API
+
+1. Navigate to **Applications** → **APIs**
+2. Click **Create API**
+3. Configure:
    - **Name**: Goal Tracker API
-   - **Authentication flow**: default-authentication-flow
-   - **Authorization flow**: default-provider-authorization-explicit-consent
-   - **Client type**: Confidential
-   - **Client ID**: (auto-generated or custom)
-   - **Client Secret**: (note this down for frontend)
-   - **Redirect URIs**:
-     - `http://localhost:5173/callback` (development)
-     - `https://yourdomain.com/callback` (production)
-   - **Signing Key**: Select or create RS256 key
-   - **JWT Algorithm**: RS256 (recommended)
-   - **Scopes**: `openid`, `email`, `profile`
-
+   - **Identifier**: `https://api.goaltracker.com` (or your API URL)
+   - **Signing Algorithm**: RS256
 4. Click **Create**
-5. Note down these values:
 
-   ```
-   Client ID: _____________________
-   Client Secret: _____________________
-   Issuer URL: _____________________
-   JWKS URI: _____________________
-   ```
+### Step 4: Configure API Permissions (Optional)
 
-6. Create an **Application** and bind the provider
-7. Test the provider works (use Authentik's test feature)
+In your API settings, you can define custom scopes:
 
-### Step 2: Install Dependencies
+- Go to **Permissions** tab
+- Add scopes like: `read:goals`, `write:goals`, `read:tasks`, `write:tasks`
+- For now, the basic `openid profile email` scopes are sufficient
 
-```bash
-cd apps/api
-pnpm install
-```
+### Step 5: Note Down Configuration Values
 
-This installs:
+From Auth0 Dashboard, collect these values:
 
-- `express-oauth2-jwt-bearer` (v1.6.0) - Industry-standard JWT validation for Express
-- `jwks-rsa` (v3.1.0) - JSON Web Key Set handling for public key retrieval
+**From Application Settings**:
 
-### Step 3: Configure API Environment
+- Domain: `your-tenant.auth0.com`
+- Client ID: `xxxxxxxxxxxxxxxxxxxx`
 
-1. Copy environment template:
+**From API Settings**:
 
-   ```bash
-   cd apps/api
-   cp .env.example .env
-   ```
+- API Identifier (Audience): `https://api.goaltracker.com`
 
-2. Edit `.env` with your Authentik values:
+### Step 6: Configure Backend Environment
 
-   ```env
-   AUTHENTIK_ISSUER=https://auth.yourdomain.com/application/o/goal-tracker/
-   AUTHENTIK_AUDIENCE=your-actual-client-id
-   AUTHENTIK_JWKS_URI=https://auth.yourdomain.com/application/o/goal-tracker/jwks/
-   ```
-
-3. Verify database URL is correct in `.env`
-
-### Step 4: Run Database Migration
-
-```bash
-# Generate Prisma client
-npx prisma generate
-
-# Create and run migration
-npx prisma migrate dev
-```
-
-This creates:
-
-- User table with fields: `id`, `sub` (Authentik user ID), `email`, `name`
-- `userId` foreign key in Goal table with cascade delete
-- `userId` foreign key in Task table with cascade delete
-- Indexes for performance: `sub`, `email`, `userId`
-
-**Verify in database**:
-
-```sql
--- Check User table exists
-SELECT * FROM "User" LIMIT 1;
-
--- Check userId columns exist
-\d "Goal"
-\d "Task"
-```
-
-### Step 5: Data Migration (If Needed)
-
-If you have existing goals/tasks without userId:
-
-```sql
--- Option 1: Assign all existing data to first user
-UPDATE "Goal" SET "userId" = (SELECT id FROM "User" LIMIT 1)
-WHERE "userId" IS NULL;
-
-UPDATE "Task" SET "userId" = (SELECT id FROM "User" LIMIT 1)
-WHERE "userId" IS NULL;
-
--- Option 2: Delete existing data and start fresh
-DELETE FROM "Goal";
-DELETE FROM "Task";
-```
-
-### Step 6: Start the API
-
-```bash
-# Development mode
-pnpm run dev
-
-# Or with Docker
-docker-compose up api
-```
-
-**Expected output**:
-
-```
-HTTP Server running on port 3000
-```
-
----
-
-## 🔑 Configuration
-
-### Required Environment Variables
+Create `apps/api/.env`:
 
 ```env
-# Authentik Configuration
-AUTHENTIK_ISSUER=https://auth.domain.com/application/o/app-slug/
-AUTHENTIK_AUDIENCE=your-client-id
-AUTHENTIK_JWKS_URI=https://auth.domain.com/application/o/app-slug/jwks/
+# Auth0 Configuration
+AUTH0_ISSUER=https://your-tenant.auth0.com/
+AUTH0_AUDIENCE=https://api.goaltracker.com
 
 # Database
 DATABASE_URL=postgresql://user:password@localhost:5432/goaltracker
@@ -190,50 +130,103 @@ DATABASE_URL=postgresql://user:password@localhost:5432/goaltracker
 PORT=3000
 ```
 
-**Get these from**: Authentik Admin → Applications → Providers → Your Provider
+### Step 7: Configure Frontend Environment
+
+Create `apps/web/.env` or `apps/web/.env.local`:
+
+```env
+# Auth0 Configuration
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=your_client_id_here
+VITE_AUTH0_AUDIENCE=https://api.goaltracker.com
+
+# API URL
+VITE_API_URL=http://localhost:3000/api
+```
+
+### Step 8: Install Dependencies
+
+```bash
+# Backend dependencies (already installed)
+cd apps/api
+pnpm install
+
+# Frontend dependencies (already installed)
+cd apps/web
+pnpm install
+```
+
+### Step 9: Run Database Migration
+
+```bash
+cd apps/api
+npx prisma generate
+npx prisma migrate dev
+```
+
+### Step 10: Start Development Servers
+
+```bash
+# Terminal 1 - API
+cd apps/api
+pnpm run dev
+
+# Terminal 2 - Web
+cd apps/web
+pnpm run dev
+```
+
+---
+
+## 🔑 Configuration
+
+### Backend Environment Variables (.env)
+
+```env
+# Auth0 Configuration
+AUTH0_ISSUER=https://your-tenant.auth0.com/
+AUTH0_AUDIENCE=https://api.goaltracker.com
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/goaltracker
+
+# Server
+PORT=3000
+NODE_ENV=development
+```
+
+### Frontend Environment Variables (.env)
+
+```env
+# Auth0 Configuration
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=AbCdEf123456
+VITE_AUTH0_AUDIENCE=https://api.goaltracker.com
+
+# API URL
+VITE_API_URL=http://localhost:3000/api
+```
 
 ---
 
 ## 🧪 Testing Authentication
 
-### Test 1: Health Check (No Auth Required)
+### Test 1: Frontend Login Flow
+
+1. Open browser to `http://localhost:5173`
+2. You should be redirected to Auth0 login
+3. Create an account or sign in
+4. You should be redirected back to `/callback` then to home page
+
+### Test 2: Protected API Endpoint
+
+In browser dev tools, you should see API calls with Bearer token:
 
 ```bash
-curl http://localhost:3000/health
-```
-
-**Expected**: `{"status":"OK","version":"1.0.0","timestamp":"..."}`
-
-### Test 2: Protected Endpoint Without Token
-
-```bash
-curl http://localhost:3000/api/auth/me
-```
-
-**Expected**: `401 Unauthorized`
-
-### Test 3: Get Token from Authentik
-
-**Option A - Using curl:**
-
-```bash
-curl -X POST https://auth.domain.com/application/o/token/ \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&username=testuser&password=testpass&client_id=YOUR_CLIENT_ID&client_secret=YOUR_SECRET"
-```
-
-**Option B - Using browser:**
-
-1. Go to your Authentik domain
-2. Log in with a test user
-3. Use browser dev tools to capture the access token
-
-### Test 4: Protected Endpoint With Token
-
-```bash
-# Replace YOUR_TOKEN with actual token from Authentik
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:3000/api/auth/me
+# From browser console
+fetch('http://localhost:3000/api/auth/me', {
+  headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth0_token') }
+})
 ```
 
 **Expected**:
@@ -241,40 +234,40 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ```json
 {
   "id": "...",
-  "sub": "...",
+  "sub": "auth0|...",
   "email": "user@example.com",
   "name": "Test User",
   "createdAt": "..."
 }
 ```
 
-### Test 5: Verify User Was Created
+### Test 3: Verify User Was Created
 
 ```bash
 # Check database
 psql $DATABASE_URL -c "SELECT * FROM \"User\";"
 ```
 
-**Expected**: Your test user should appear in the table
+**Expected**: Your test user should appear with Auth0 sub
 
-### Test 6: Test Goals Endpoint
+### Test 4: Test Goals Endpoint
 
 ```bash
+# Use the token from Auth0
 curl -H "Authorization: Bearer YOUR_TOKEN" \
   http://localhost:3000/api/goals
 ```
 
-**Expected**: Empty array `[]` (or your existing goals if migrated)
+**Expected**: Empty array `[]` or your existing goals
 
 ### Validate Token
 
 Go to https://jwt.io and paste your token. Verify:
 
-- `iss` matches `AUTHENTIK_ISSUER`
-- `aud` matches `AUTHENTIK_AUDIENCE`
+- `iss` matches `https://your-tenant.auth0.com/`
+- `aud` matches your API audience
 - `exp` (expiration) is in the future
-- `sub` (user ID) exists
-- `email` claim exists
+- `sub` (user ID) exists (format: `auth0|...`)
 
 ---
 
@@ -330,7 +323,7 @@ Go to https://jwt.io and paste your token. Verify:
 
 ## 🔒 Security Features
 
-✅ **JWT Validation**: All tokens validated against Authentik's JWKS endpoint using industry-standard library (Auth0)
+✅ **JWT Validation**: All tokens validated against Auth0's JWKS endpoint using industry-standard library
 ✅ **User Auto-Provisioning**: Users automatically created on first login (just-in-time provisioning)
 ✅ **Data Isolation**: All data queries filtered by authenticated user ID
 ✅ **Ownership Verification**: All mutations verify resource ownership
@@ -343,14 +336,17 @@ Go to https://jwt.io and paste your token. Verify:
 
 ## 🔄 Authentication Flow
 
-1. **User logs in via Authentik** (handled by frontend)
-2. **Frontend receives JWT token** from Authentik
-3. **Frontend sends token** in Authorization header: `Bearer <token>`
-4. **API validates token** using express-oauth2-jwt-bearer
-5. **API extracts user claims** (sub, email, name)
-6. **API ensures User record exists** (creates if first login)
-7. **API processes request** with userId context
-8. **API returns filtered data** for authenticated user only
+1. **User clicks "Sign In"** in the app
+2. **Redirected to Auth0** Universal Login page
+3. **User authenticates** with Auth0 (email/password, social, etc.)
+4. **Auth0 redirects back** to `/callback` with authorization code
+5. **Frontend exchanges code** for access token (handled by @auth0/auth0-react)
+6. **Frontend stores token** and uses it for API calls
+7. **API validates token** using express-oauth2-jwt-bearer
+8. **API extracts user claims** (sub, email, name)
+9. **API ensures User record exists** (creates if first login)
+10. **API processes request** with userId context
+11. **API returns filtered data** for authenticated user only
 
 ---
 
@@ -358,9 +354,9 @@ Go to https://jwt.io and paste your token. Verify:
 
 ### Common Issues
 
-#### "Cannot find module 'express-oauth2-jwt-bearer'"
+#### "Cannot find module '@auth0/auth0-react'"
 
-**Solution**: Run `pnpm install` in `apps/api`
+**Solution**: Run `pnpm install` in `apps/web`
 
 #### "Property 'user' does not exist on type 'PrismaClient'"
 
@@ -370,42 +366,49 @@ Go to https://jwt.io and paste your token. Verify:
 
 **Solutions**:
 
-- Verify `AUTHENTIK_ISSUER` matches token's `iss` claim exactly
-- Verify `AUTHENTIK_AUDIENCE` matches token's `aud` claim
+- Verify `AUTH0_ISSUER` matches token's `iss` claim exactly (must end with `/`)
+- Verify `AUTH0_AUDIENCE` matches token's `aud` claim
 - Check token hasn't expired (decode at jwt.io)
 - Ensure JWKS endpoint is accessible from API server
 
 #### "Missing required auth configuration"
 
-**Solution**: Set all `AUTHENTIK_*` variables in `.env` and restart API
+**Solution**: Set all `AUTH0_*` variables in `.env` and restart services
 
 #### Token validation fails with JWKS errors
 
 **Solutions**:
 
-- Verify `AUTHENTIK_JWKS_URI` is correct and accessible
-- Check Authentik signing key is RS256
-- Ensure API server can reach Authentik server (network/firewall)
+- Verify Auth0 domain is correct and accessible
+- Check network/firewall allows access to Auth0
+- Ensure signing algorithm is RS256
 
-#### 500 Internal Server Error
+#### "Audience is invalid" error
+
+**Solution**: Verify the API audience in frontend matches the API identifier in Auth0
+
+#### Login redirect loop
 
 **Solutions**:
 
-- Check API logs for details
-- Verify database connection
-- Ensure User table exists (run migrations)
+- Check callback URL is added to Auth0 app settings
+- Verify Auth0 domain and client ID are correct
+- Clear browser storage and try again
 
-#### Token expired
+#### "Failed to fetch user" or similar errors
 
-**Solution**: Get a new token from Authentik
+**Solutions**:
 
-#### Wrong ISSUER/AUDIENCE
+- Check Auth0 API permissions
+- Ensure audience is configured in frontend
+- Verify user has profile data in Auth0
 
-**Solution**: Check .env values match Authentik configuration
+#### CORS errors
 
-#### Token malformed
+**Solutions**:
 
-**Solution**: Check Authorization header format: `Bearer <token>`
+- Verify web origin is added to Auth0 app settings
+- Check API CORS configuration allows frontend origin
 
 ---
 
@@ -414,7 +417,7 @@ Go to https://jwt.io and paste your token. Verify:
 ```
 apps/api/src/
 ├── config/
-│   └── auth.ts              # Auth configuration (JWKS, issuer, audience)
+│   └── auth.ts              # Auth0 configuration (issuer, audience)
 ├── middleware/
 │   └── auth.ts              # JWT validation middleware
 ├── services/
@@ -426,6 +429,16 @@ apps/api/src/
 │   └── calendar.ts          # Protected calendar routes
 └── index.ts                 # Main app with routes
 
+apps/web/src/
+├── main.tsx                 # Auth0Provider setup
+├── App.tsx                  # Auth0 hooks usage
+├── api.ts                   # Authenticated fetch wrapper
+├── pages/
+│   ├── LoginPage.tsx        # Login page with Auth0
+│   └── CallbackPage.tsx     # OAuth callback handler
+└── components/shared/
+    └── ProtectedRoute.tsx   # Route protection component
+
 apps/api/prisma/
 └── schema.prisma            # User, Goal, Task models with relationships
 ```
@@ -436,14 +449,14 @@ apps/api/prisma/
 
 Complete integration checklist:
 
-- [ ] Can log in via Authentik
+- [ ] Can log in via Auth0
 - [ ] Token is received and stored by client
 - [ ] API `/auth/me` returns user info
 - [ ] Can create goals (automatically assigned to user)
 - [ ] Can view only own goals
 - [ ] Can create tasks linked to own goals
 - [ ] Cannot access other users' data
-- [ ] Logout clears session
+- [ ] Logout redirects properly
 - [ ] User record created automatically on first login
 - [ ] Each user sees only their own data
 - [ ] All CRUD operations work with authentication
@@ -452,33 +465,58 @@ Complete integration checklist:
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Production Deployment
 
-1. ✅ API authentication implemented
-2. ⬜ Frontend Authentik integration
-3. ⬜ Token refresh implementation
-4. ⬜ Production HTTPS setup
-5. ⬜ CORS configuration for production
-6. ⬜ Set up proper logging/monitoring
-7. ⬜ Create additional test users in Authentik
+### Auth0 Settings for Production
+
+1. Update **Allowed Callback URLs** to include production URL
+2. Update **Allowed Logout URLs** to include production URL
+3. Update **Allowed Web Origins** to include production domain
+4. Consider enabling **Multi-Factor Authentication** in Auth0 Dashboard
+5. Review **Password Strength** settings
+6. Configure **Custom Domain** (optional but recommended)
+
+### Environment Variables
+
+Update production `.env` files with production values:
+
+**Backend**:
+
+```env
+AUTH0_ISSUER=https://your-tenant.auth0.com/
+AUTH0_AUDIENCE=https://api.yourdomain.com
+DATABASE_URL=postgresql://...
+NODE_ENV=production
+```
+
+**Frontend**:
+
+```env
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=your_production_client_id
+VITE_AUTH0_AUDIENCE=https://api.yourdomain.com
+VITE_API_URL=https://api.yourdomain.com/api
+```
 
 ---
 
 ## 📚 Additional Resources
 
+- [Auth0 React SDK](https://auth0.com/docs/quickstart/spa/react)
+- [Auth0 Node.js API](https://auth0.com/docs/quickstart/backend/nodejs/interactive)
 - [express-oauth2-jwt-bearer docs](https://github.com/auth0/node-oauth2-jwt-bearer)
-- [Authentik Provider docs](https://goauthentik.io/docs/providers/oauth2/)
 - [JWT.io](https://jwt.io) - Token validation and debugging
+- [Auth0 Dashboard](https://manage.auth0.com/)
 
 ---
 
 ## 🆘 Need Help?
 
 1. Check this guide's troubleshooting section
-2. Review API logs for specific errors
-3. Verify Authentik provider configuration
+2. Review browser console and API logs for specific errors
+3. Verify Auth0 application configuration
 4. Test token at jwt.io
-5. Check database for User table and userId columns
+5. Check Auth0 logs in Dashboard → Monitoring → Logs
 
 ---
 
@@ -486,9 +524,9 @@ Complete integration checklist:
 
 - Always use HTTPS in production
 - Keep client secrets secure (never commit to version control)
-- Tokens should be short-lived (configure in Authentik)
-- Implement token refresh on the frontend
+- Tokens should be short-lived (configure in Auth0 Dashboard)
+- Token refresh is handled automatically by Auth0 SDK
 - Use environment-specific `.env` files (don't use same tokens for dev/prod)
 - Configure proper CORS for production domain
-- Monitor authentication logs
-- Regularly rotate signing keys in Authentik
+- Monitor authentication logs in Auth0 Dashboard
+- Regularly review security settings in Auth0

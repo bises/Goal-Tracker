@@ -4,26 +4,37 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 type TaskPayload = Partial<Task> & { goalIds?: string[] };
 
+// Store the getAccessToken function to be set by the Auth0 context
+let getAccessToken: (() => Promise<string>) | null = null;
+
+export const setAuthTokenProvider = (provider: () => Promise<string>) => {
+  getAccessToken = provider;
+};
+
 // Custom fetch wrapper with automatic auth header injection (HTTP Interceptor)
 const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
-  // Get auth token from storage
-  const storageKey = `oidc.user:${import.meta.env.VITE_AUTHENTIK_AUTHORITY}:${import.meta.env.VITE_AUTHENTIK_CLIENT_ID}`;
-  const token = sessionStorage.getItem(storageKey);
-
   // Merge headers with auth token
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
   };
 
-  if (token) {
+  // Copy existing headers
+  if (options.headers) {
+    const existingHeaders = new Headers(options.headers);
+    existingHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
+
+  // Get Auth0 access token
+  if (getAccessToken) {
     try {
-      const user = JSON.parse(token);
-      if (user?.access_token) {
-        headers['Authorization'] = `Bearer ${user.access_token}`;
+      const token = await getAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
     } catch (e) {
-      console.error('Failed to parse auth token:', e);
+      console.error('Failed to get auth token:', e);
     }
   }
 

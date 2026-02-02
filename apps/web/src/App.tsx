@@ -1,7 +1,8 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { LogOut, Plus, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useAuth } from 'react-oidc-context';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { setAuthTokenProvider } from './api';
 import { GoalCard } from './components/Goals/GoalCard';
 import { AddGoalModal } from './components/modals/AddGoalModal';
 import AddTaskModal from './components/modals/AddTaskModal';
@@ -17,7 +18,7 @@ import { PlannerPage } from './pages/PlannerPage';
 type ViewMode = 'goals' | 'tasks' | 'planner';
 
 function AppContent() {
-  const auth = useAuth();
+  const { user, isAuthenticated, getAccessTokenSilently, logout } = useAuth0();
   const { goals, fetchGoals } = useGoalContext();
   const { tasks, fetchTasks } = useTaskContext();
   const [viewMode, setViewMode] = useState<ViewMode>('planner');
@@ -25,20 +26,36 @@ function AppContent() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  // Setup Auth0 token provider for API calls
   useEffect(() => {
-    if (auth.isAuthenticated) {
+    setAuthTokenProvider(async () => {
+      try {
+        const token = await getAccessTokenSilently();
+        return token;
+      } catch (error) {
+        console.error('Error getting access token:', error);
+        return '';
+      }
+    });
+  }, [getAccessTokenSilently]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
       fetchGoals();
       fetchTasks();
     }
-  }, [auth.isAuthenticated]);
+  }, [isAuthenticated]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);
   };
 
   const handleLogout = () => {
-    auth.removeUser();
-    auth.signoutRedirect();
+    logout({
+      logoutParams: {
+        returnTo: window.location.origin + '/login',
+      },
+    });
   };
 
   return (
@@ -86,11 +103,11 @@ function AppContent() {
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                      title={auth.user?.profile?.email || 'User menu'}
+                      title={user?.email || 'User menu'}
                     >
                       <User size={18} className="text-gray-400" />
                       <span className="hidden sm:inline text-sm text-gray-300">
-                        {auth.user?.profile?.name || auth.user?.profile?.email || 'User'}
+                        {user?.name || user?.email || 'User'}
                       </span>
                     </button>
 
@@ -103,11 +120,9 @@ function AppContent() {
                         <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
                           <div className="px-4 py-3 border-b border-gray-700">
                             <p className="text-sm font-medium text-gray-200">
-                              {auth.user?.profile?.name || 'User'}
+                              {user?.name || 'User'}
                             </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {auth.user?.profile?.email}
-                            </p>
+                            <p className="text-xs text-gray-400 mt-1">{user?.email}</p>
                           </div>
                           <button
                             onClick={handleLogout}

@@ -2,18 +2,18 @@ import { NextFunction, Request, Response } from 'express';
 import { auth } from 'express-oauth2-jwt-bearer';
 import { authConfig } from '../config/auth';
 
-// Define the expected JWT payload structure from Authentik
+// Define the expected JWT payload structure from Auth0
 interface AuthPayload {
   sub: string;
   email?: string;
   name?: string;
-  preferred_username?: string;
+  nickname?: string;
   [key: string]: any;
 }
 
 /**
  * JWT validation middleware using express-oauth2-jwt-bearer
- * Validates JWT tokens from Authentik and extracts user claims
+ * Validates JWT tokens from Auth0 and extracts user claims
  */
 export const validateJWT = auth({
   issuerBaseURL: authConfig.issuer,
@@ -59,5 +59,5 @@ export const getUserEmail = (req: Request): string | undefined => {
  */
 export const getUserName = (req: Request): string | undefined => {
   const payload = req.auth?.payload as AuthPayload | undefined;
-  return payload?.name || payload?.preferred_username;
+  return payload?.name || payload?.nickname;
 };
