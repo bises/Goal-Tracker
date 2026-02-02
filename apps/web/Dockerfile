@@ -1,6 +1,6 @@
 FROM node:22-alpine AS builder
 
-# Accept build argument for API URL
+# Accept build argument for API URL only (may vary by environment)
 ARG VITE_API_URL=http://localhost:3000
 
 WORKDIR /app
