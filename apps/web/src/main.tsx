@@ -45,7 +45,6 @@ ReactDOM.createRoot(rootElement).render(
       authorizationParams={{
         redirect_uri: window.location.origin + '/callback',
         audience: audience || undefined,
-        cacheLocation = 'memory',
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}
