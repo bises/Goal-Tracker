@@ -1,6 +1,17 @@
 export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'STANDALONE';
 export type ProgressMode = 'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT';
 
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type TaskCategory =
+  | 'WORK'
+  | 'PERSONAL'
+  | 'HEALTH'
+  | 'LEARNING'
+  | 'FINANCE'
+  | 'SOCIAL'
+  | 'HOUSEHOLD'
+  | 'OTHER';
+
 export type TaskEvent =
   | 'TaskCompleted'
   | 'TaskUncompleted'
@@ -16,6 +27,15 @@ export interface Task {
   isCompleted: boolean;
   completedAt?: string;
   scheduledDate?: string;
+
+  // New fields
+  priority?: TaskPriority;
+  category?: TaskCategory;
+  scheduledTime?: string;
+  estimatedDurationMinutes?: number;
+  estimatedCompletionDate?: string;
+
+  // Relationships
   goalTasks?: GoalTask[];
   parentTaskId?: string;
   parentTask?: Partial<Task>;

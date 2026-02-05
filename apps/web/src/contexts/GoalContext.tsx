@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../api';
 import { Goal } from '../types';
 
@@ -32,6 +32,12 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-fetch goals on mount
+  useEffect(() => {
+    fetchGoals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addGoal = useCallback((goal: Goal) => {

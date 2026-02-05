@@ -1,5 +1,5 @@
 import { formatLocalDate } from '@goal-tracker/shared';
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { taskApi } from '../api';
 import { Task } from '../types';
 
@@ -31,7 +31,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const data = await taskApi.fetchTasks();
-      setTasks(Array.isArray(data) ? data : []);
+      const validTasks = Array.isArray(data) ? data.filter((task) => task && task.id) : [];
+      setTasks(validTasks);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
     } finally {
@@ -39,13 +40,27 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Auto-fetch tasks on mount (only once)
+  useEffect(() => {
+    fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addTask = useCallback((task: Task) => {
+    if (!task || !task.id) {
+      console.error('Attempted to add invalid task:', task);
+      return;
+    }
     setTasks((prev) => [...prev, task]);
   }, []);
 
   const upsertTask = useCallback((task: Task) => {
+    if (!task || !task.id) {
+      console.error('Attempted to upsert invalid task:', task);
+      return;
+    }
     setTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === task.id);
+      const idx = prev.findIndex((t) => t && t.id === task.id);
       if (idx === -1) return [...prev, task];
       const copy = [...prev];
       copy[idx] = task;
