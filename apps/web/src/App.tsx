@@ -13,6 +13,7 @@ import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
 import { AchievementDashboardPage } from './pages-2/AchievementDashboardPage';
+import { TasksPage } from './pages-2/TasksPage';
 import { CallbackPage } from './pages/CallbackPage';
 import { GoalDetailsPage } from './pages/GoalDetailsPage';
 import { LoginPage } from './pages/LoginPage';
@@ -93,6 +94,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <AchievementDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedRoute>
+                <TasksPage />
               </ProtectedRoute>
             }
           />

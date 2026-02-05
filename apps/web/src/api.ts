@@ -142,10 +142,47 @@ export const api = {
   },
 };
 
+export interface PaginatedTasksResponse {
+  tasks: Task[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const taskApi = {
-  fetchTasks: async (): Promise<Task[]> => {
-    const res = await authenticatedFetch(`${API_URL}/tasks`);
+  fetchTasks: async (params?: {
+    status?: 'pending' | 'completed';
+    page?: number;
+    limit?: number;
+    month?: string;
+  }): Promise<Task[] | PaginatedTasksResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.month) queryParams.append('month', params.month);
+
+    const url = queryParams.toString()
+      ? `${API_URL}/tasks?${queryParams.toString()}`
+      : `${API_URL}/tasks`;
+
+    const res = await authenticatedFetch(url);
     const data = await res.json();
+
+    // Check if the response is paginated (has tasks and pagination properties)
+    if (data && typeof data === 'object' && 'tasks' in data && 'pagination' in data) {
+      // Return paginated response if pagination params were explicitly provided
+      if (params?.page || params?.limit) {
+        return data as PaginatedTasksResponse;
+      }
+      // If no pagination params provided, extract just the tasks array
+      return data.tasks as Task[];
+    }
+
+    // Otherwise return array for backward compatibility
     return Array.isArray(data) ? data : [];
   },
 

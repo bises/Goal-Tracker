@@ -83,10 +83,18 @@ export const BottomNav = ({ onAddClick }: BottomNavProps) => {
             {/* Tasks */}
             <button
               className="flex flex-col items-center gap-1 px-4 py-2 transition-colors hover:opacity-80"
-              onClick={() => console.log('Tasks clicked')}
+              onClick={() => navigate('/tasks')}
             >
-              <CheckSquare size={24} style={{ color: 'var(--warm-gray)' }} />
-              <span className="text-xs font-medium" style={{ color: 'var(--warm-gray)' }}>
+              <CheckSquare
+                size={24}
+                style={{
+                  color: isActive('/tasks') ? 'var(--energizing-orange)' : 'var(--warm-gray)',
+                }}
+              />
+              <span
+                className="text-xs font-medium"
+                style={{ color: isActive('/tasks') ? 'var(--deep-charcoal)' : 'var(--warm-gray)' }}
+              >
                 Tasks
               </span>
             </button>

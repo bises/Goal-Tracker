@@ -1,5 +1,5 @@
 import { getTodayString } from '@goal-tracker/shared';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -8,18 +8,37 @@ import {
 } from '../components/ui/accordion';
 import { Badge } from '../components/ui/badge';
 
+import { api } from '../api';
 import { Spinner } from '../components/ui/spinner';
 import { useTaskContext } from '../contexts/TaskContext';
+import { Goal } from '../types';
 import { SquircleCard } from './SquircleCard';
 import { TaskCard } from './TaskCard';
+import { TaskEditSheet } from './TaskEditSheet';
 
 export const DailyFocusList = () => {
-  const { tasks, loading, toggleComplete } = useTaskContext();
+  const { tasks, loading, toggleComplete, refreshTasks } = useTaskContext();
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [goals, setGoals] = useState<Goal[]>([]);
+
+  useEffect(() => {
+    fetchGoals();
+  }, []);
+
+  const fetchGoals = async () => {
+    try {
+      const goalsData = await api.fetchGoals();
+      setGoals(goalsData);
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    }
+  };
 
   const todayTasks = useMemo(() => {
     const today = getTodayString();
 
-    return tasks
+    const filtered = tasks
       .filter((task) => task && task.id) // Filter out undefined/invalid tasks
       .filter((task) => {
         if (!task.scheduledDate) return false;
@@ -33,6 +52,8 @@ export const DailyFocusList = () => {
         }
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       });
+
+    return filtered;
   }, [tasks]);
 
   const incompleteTasks = todayTasks.filter((task) => !task.isCompleted);
@@ -59,8 +80,11 @@ export const DailyFocusList = () => {
   };
 
   const handleEdit = (taskId: string) => {
-    console.log('Edit task clicked:', taskId);
-    // TODO: Open edit modal
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+      setIsEditSheetOpen(true);
+    }
   };
 
   if (loading) {
@@ -196,6 +220,18 @@ export const DailyFocusList = () => {
           </p>
         </SquircleCard>
       )}
+
+      {/* Task Edit Sheet */}
+      <TaskEditSheet
+        isOpen={isEditSheetOpen}
+        onClose={() => {
+          setIsEditSheetOpen(false);
+          setSelectedTask(null);
+        }}
+        task={selectedTask}
+        onSave={refreshTasks}
+        availableGoals={goals}
+      />
     </div>
   );
 };

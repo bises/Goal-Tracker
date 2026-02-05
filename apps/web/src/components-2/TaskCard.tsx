@@ -1,5 +1,6 @@
+import { parseLocalDate } from '@goal-tracker/shared';
 import { Calendar, Check } from 'lucide-react';
-import { Task } from '../types';
+import { Task, TaskCategory } from '../types';
 import { SquircleCard } from './SquircleCard';
 
 interface TaskCardProps {
@@ -9,6 +10,54 @@ interface TaskCardProps {
   onEdit?: (taskId: string) => void;
 }
 
+const getCategoryIcon = (category?: TaskCategory): string => {
+  if (!category) return '📝';
+
+  const iconMap: Record<TaskCategory, string> = {
+    WORK: '💼',
+    PERSONAL: '👤',
+    HEALTH: '🏃',
+    LEARNING: '📚',
+    FINANCE: '💰',
+    SOCIAL: '👥',
+    HOUSEHOLD: '🏠',
+    OTHER: '📌',
+  };
+
+  return iconMap[category] || '📝';
+};
+
+const getCategoryLabel = (category?: TaskCategory): string => {
+  if (!category) return '';
+
+  const labelMap: Record<TaskCategory, string> = {
+    WORK: 'Work',
+    PERSONAL: 'Personal',
+    HEALTH: 'Health',
+    LEARNING: 'Learning',
+    FINANCE: 'Finance',
+    SOCIAL: 'Social',
+    HOUSEHOLD: 'Household',
+    OTHER: 'Other',
+  };
+
+  return labelMap[category] || '';
+};
+
+const formatDuration = (minutes?: number): string => {
+  if (!minutes) return '';
+
+  if (minutes >= 1440) {
+    const days = minutes / 1440;
+    return `${days} ${days === 1 ? 'day' : 'days'}`;
+  } else if (minutes >= 60) {
+    const hours = minutes / 60;
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  } else {
+    return `${minutes} min`;
+  }
+};
+
 export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps) => {
   if (!task) {
     console.error('TaskCard received undefined task');
@@ -16,6 +65,7 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
   }
 
   const isCompleted = task.isCompleted;
+  const categoryIcon = getCategoryIcon(task.category);
 
   return (
     <SquircleCard
@@ -39,7 +89,7 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
             opacity: isCompleted ? 0.6 : 1,
           }}
         >
-          {isCompleted ? '✅' : '📝'}
+          {categoryIcon}
         </div>
 
         {/* Content - Clickable */}
@@ -57,16 +107,55 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
           >
             {task.title}
           </div>
-          {task.description && (
-            <p
-              className="text-xs mt-0.5 truncate"
+          {(task.category || task.estimatedDurationMinutes || (task.goalTasks && task.goalTasks.length > 0)) && (
+            <div
+              className="text-xs mt-0.5"
               style={{
-                color: isCompleted ? 'rgba(34, 197, 94, 0.6)' : 'var(--warm-gray)',
+                color: 'var(--warm-gray)',
               }}
             >
-              {task.description}
-            </p>
+              {task.category && getCategoryLabel(task.category)}
+              {task.category && (task.estimatedDurationMinutes || (task.goalTasks && task.goalTasks.length > 0)) && ' · '}
+              {task.estimatedDurationMinutes && formatDuration(task.estimatedDurationMinutes)}
+              {task.estimatedDurationMinutes && task.goalTasks && task.goalTasks.length > 0 && ' · '}
+              {task.goalTasks && task.goalTasks.length > 0 && '🎯'}
+            </div>
           )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {isCompleted && task.completedAt ? (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  color: '#22C55E',
+                }}
+              >
+                ✓{' '}
+                {parseLocalDate(task.completedAt.split('T')[0]).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
+            ) : (
+              task.scheduledDate && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full"
+                  style={{
+                    background: 'rgba(255, 140, 66, 0.1)',
+                    color: 'var(--energizing-orange)',
+                  }}
+                >
+                  📅{' '}
+                  {parseLocalDate(task.scheduledDate.split('T')[0]).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              )
+            )}
+          </div>
         </button>
       </div>
 

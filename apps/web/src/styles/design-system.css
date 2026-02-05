@@ -215,9 +215,10 @@ h4 {
 }
 
 /* Form Elements - Sun-Kissed Style */
-input,
-select,
-textarea {
+/* Exclude shadcn/radix UI components from global styling */
+input:not([class*="rdp-"]):not([role]):not([data-slot]),
+select:not([class*="rdp-"]):not([role]):not([data-slot]),
+textarea:not([class*="rdp-"]):not([role]):not([data-slot]) {
   background: rgba(255, 255, 255, 0.8);
   border: 2px solid rgba(255, 140, 66, 0.2);
   color: var(--deep-charcoal);
@@ -230,9 +231,9 @@ textarea {
   box-shadow: 0 2px 8px rgba(255, 140, 66, 0.05);
 }
 
-input:focus,
-select:focus,
-textarea:focus {
+input:not([class*="rdp-"]):not([role]):not([data-slot]):focus,
+select:not([class*="rdp-"]):not([role]):not([data-slot]):focus,
+textarea:not([class*="rdp-"]):not([role]):not([data-slot]):focus {
   outline: none;
   border-color: var(--energizing-orange);
   box-shadow: 0 4px 16px rgba(255, 140, 66, 0.2);
