@@ -49,7 +49,10 @@ export function CalendarDialog({
           <span className="truncate">
             {value ? format(parseLocalDate(value), 'PPP') : placeholder}
           </span>
-          <CalendarIcon className="h-4 w-4 ml-2 flex-shrink-0" style={{ color: 'var(--warm-gray)' }} />
+          <CalendarIcon
+            className="h-4 w-4 ml-2 flex-shrink-0"
+            style={{ color: 'var(--warm-gray)' }}
+          />
         </button>
       </DialogTrigger>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0">

@@ -47,6 +47,7 @@ ReactDOM.createRoot(rootElement).render(
       authorizationParams={{
         redirect_uri: window.location.origin + '/callback',
         audience: audience || undefined,
+        scope: 'openid profile email offline_access',
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}

@@ -107,7 +107,9 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
           >
             {task.title}
           </div>
-          {(task.category || task.estimatedDurationMinutes || (task.goalTasks && task.goalTasks.length > 0)) && (
+          {(task.category ||
+            task.estimatedDurationMinutes ||
+            (task.goalTasks && task.goalTasks.length > 0)) && (
             <div
               className="text-xs mt-0.5"
               style={{
@@ -115,9 +117,14 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
               }}
             >
               {task.category && getCategoryLabel(task.category)}
-              {task.category && (task.estimatedDurationMinutes || (task.goalTasks && task.goalTasks.length > 0)) && ' · '}
+              {task.category &&
+                (task.estimatedDurationMinutes || (task.goalTasks && task.goalTasks.length > 0)) &&
+                ' · '}
               {task.estimatedDurationMinutes && formatDuration(task.estimatedDurationMinutes)}
-              {task.estimatedDurationMinutes && task.goalTasks && task.goalTasks.length > 0 && ' · '}
+              {task.estimatedDurationMinutes &&
+                task.goalTasks &&
+                task.goalTasks.length > 0 &&
+                ' · '}
               {task.goalTasks && task.goalTasks.length > 0 && '🎯'}
             </div>
           )}

@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Calendar } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 
@@ -10,7 +10,7 @@ export default function CalendarTestPage() {
   return (
     <div style={{ padding: '2rem', background: 'var(--bg-color)', minHeight: '100vh' }}>
       <h1 style={{ marginBottom: '2rem' }}>Calendar Test</h1>
-      
+
       <div style={{ maxWidth: '400px' }}>
         <label
           style={{
@@ -22,7 +22,7 @@ export default function CalendarTestPage() {
         >
           Test Calendar
         </label>
-        
+
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -58,9 +58,16 @@ export default function CalendarTestPage() {
             />
           </PopoverContent>
         </Popover>
-        
+
         {date && (
-          <div style={{ marginTop: '1rem', padding: '1rem', background: 'white', borderRadius: '12px' }}>
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              background: 'white',
+              borderRadius: '12px',
+            }}
+          >
             <strong>Selected:</strong> {date}
           </div>
         )}

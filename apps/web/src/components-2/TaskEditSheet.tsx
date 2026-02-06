@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
