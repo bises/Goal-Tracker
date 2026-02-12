@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { extractDateOnly } from '@goal-tracker/shared';
 import { Drawer } from 'vaul';
 import { taskApi } from '../api';
 import {
@@ -57,7 +58,7 @@ export const TaskEditSheet = ({
       setDescription(task.description || '');
       setPriority(task.priority || '');
       setCategory(task.category || '');
-      setScheduledDate(task.scheduledDate ? task.scheduledDate.split('T')[0] : '');
+      setScheduledDate(task.scheduledDate ? extractDateOnly(task.scheduledDate) : '');
       setScheduledTime(task.scheduledTime || '');
 
       // Convert minutes to appropriate unit
@@ -182,10 +183,13 @@ export const TaskEditSheet = ({
   return (
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/60" />
+        <Drawer.Overlay
+          className="fixed inset-0 bg-black/60"
+          style={{ zIndex: 'var(--z-modal-backdrop)' }}
+        />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] h-[90vh] max-h-[90vh] overflow-hidden"
-          style={{ background: 'var(--card-bg)' }}
+          style={{ background: 'var(--peach-cream)', zIndex: 'var(--z-modal)' }}
           aria-describedby="task-edit-description"
         >
           {/* Handle */}

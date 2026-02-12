@@ -48,7 +48,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const addTask = useCallback((task: Task) => {
     if (!task || !task.id) {
-      console.error('Attempted to add invalid task:', task);
       return;
     }
     setTasks((prev) => [...prev, task]);
@@ -56,7 +55,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const upsertTask = useCallback((task: Task) => {
     if (!task || !task.id) {
-      console.error('Attempted to upsert invalid task:', task);
       return;
     }
     setTasks((prev) => {

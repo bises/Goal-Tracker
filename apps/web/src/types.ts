@@ -1,5 +1,4 @@
 export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'STANDALONE';
-export type ProgressMode = 'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT';
 
 export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type TaskCategory =
@@ -58,8 +57,7 @@ export interface Goal {
   id: string;
   title: string;
   description?: string;
-  type: 'TOTAL_TARGET' | 'FREQUENCY' | 'HABIT';
-  progressMode: ProgressMode;
+  type: 'TOTAL_TARGET' | 'FREQUENCY';
   targetValue?: number;
   currentValue: number;
   frequencyTarget?: number;
@@ -86,7 +84,6 @@ export interface Goal {
 }
 
 export interface ProgressSummary {
-  mode: ProgressMode;
   percentComplete: number;
   taskTotals: {
     totalCount: number;
@@ -125,7 +122,6 @@ export interface GoalTasksResponse {
     title: string;
     description?: string;
     scope: string;
-    progressMode: string;
     targetValue: number;
     currentValue: number;
     parentId: string | null;

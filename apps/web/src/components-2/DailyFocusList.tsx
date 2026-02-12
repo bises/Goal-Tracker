@@ -1,5 +1,6 @@
-import { getTodayString } from '@goal-tracker/shared';
+import { extractDateOnly, getTodayString } from '@goal-tracker/shared';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Accordion,
   AccordionContent,
@@ -17,6 +18,7 @@ import { TaskCard } from './TaskCard';
 import { TaskEditSheet } from './TaskEditSheet';
 
 export const DailyFocusList = () => {
+  const navigate = useNavigate();
   const { tasks, loading, toggleComplete, refreshTasks } = useTaskContext();
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
@@ -69,13 +71,11 @@ export const DailyFocusList = () => {
 
   const handleDelete = async (taskId: string) => {
     // TODO: Implement delete functionality
-    console.log('Delete task:', taskId);
     // For now, just log - we'll implement the actual API call later
   };
 
   const handleReschedule = (taskId: string) => {
     // TODO: Open date picker modal
-    console.log('Reschedule task:', taskId);
     // For now, just log - we'll implement the date picker modal later
   };
 
@@ -130,8 +130,8 @@ export const DailyFocusList = () => {
                     style={{ color: 'var(--energizing-orange)' }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // TODO: Navigate to planner page
-                      console.log('Navigate to planner page');
+                      const today = getTodayString();
+                      navigate(`/tasks?tab=completed&date=${today}`);
                     }}
                   >
                     See all
@@ -184,8 +184,8 @@ export const DailyFocusList = () => {
                   className="text-sm font-semibold transition-colors hover:underline cursor-pointer"
                   style={{ color: 'var(--energizing-orange)' }}
                   onClick={() => {
-                    // TODO: Navigate to planner page
-                    console.log('Navigate to planner page');
+                    const today = getTodayString();
+                    navigate(`/tasks?tab=pending&date=${today}`);
                   }}
                 >
                   See all

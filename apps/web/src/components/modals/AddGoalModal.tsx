@@ -13,10 +13,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [target, setTarget] = useState('');
-  const [type, setType] = useState('TOTAL_TARGET');
-  const [progressMode, setProgressMode] = useState<'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT'>(
-    'TASK_BASED'
-  );
+  const [type, setType] = useState<'TOTAL_TARGET' | 'FREQUENCY'>('TOTAL_TARGET');
   const [customEndDate, setCustomEndDate] = useState('');
   const [customDataLabel, setCustomDataLabel] = useState('');
 
@@ -53,7 +50,6 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
       title,
       description,
       type: type as any,
-      progressMode,
       targetValue: target ? parseFloat(target) : undefined,
       currentValue: 0,
       stepSize: allowDecimals ? 0.1 : 1,
@@ -97,56 +93,17 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({ onClose, onAdded, pa
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Type
-            </label>
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="TOTAL_TARGET">Total Target</option>
-              <option value="FREQUENCY">Frequency</option>
-              <option value="HABIT">Habit</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-              Progress Mode
-            </label>
-            <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
-              <option value="TASK_BASED">Task-based</option>
-              <option value="MANUAL_TOTAL">Manual total</option>
-              <option value="HABIT">Habit</option>
-            </select>
-          </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+            Goal Type
+          </label>
+          <select value={type} onChange={(e) => setType(e.target.value as any)}>
+            <option value="TOTAL_TARGET">Total Target (Task-based)</option>
+            <option value="FREQUENCY">Frequency (Recurring)</option>
+          </select>
         </div>
 
-        {type === 'FREQUENCY' && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Times
-              </label>
-              <input
-                type="number"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="2"
-                required
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                Per
-              </label>
-              <select style={{ height: '42px' }}>
-                <option value="WEEKLY">Week</option>
-                <option value="MONTHLY">Month</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {progressMode === 'MANUAL_TOTAL' && (
+        {type === 'TOTAL_TARGET' && (
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
               Target Value (optional)

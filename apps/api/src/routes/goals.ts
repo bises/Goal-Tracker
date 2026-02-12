@@ -31,8 +31,8 @@ const computeGoalView = (goal: any) => {
   let totalCount = goalTasks.length;
   let completedCount = goalTasks.filter((gt: any) => gt.task?.isCompleted).length;
 
-  // If goal has children, include their task progress
-  if (children.length > 0 && goal.progressMode === 'TASK_BASED') {
+  // If goal has children, include their task progress (all goals are task-based now)
+  if (children.length > 0) {
     // Recursively calculate child task totals
     for (const child of children) {
       const childTasks = child.goalTasks || [];
@@ -51,20 +51,13 @@ const computeGoalView = (goal: any) => {
     }
   }
 
-  const taskProgress = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
-  const manualProgress = goal.targetValue
-    ? Math.min((goal.currentValue / goal.targetValue) * 100, 100)
-    : 0;
-
-  let percentComplete = manualProgress;
-  if (goal.progressMode === 'TASK_BASED') {
-    percentComplete = taskProgress;
-  }
+  // Task progress is the primary calculation (all goals use tasks)
+  const percentComplete = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
 
   return {
     ...goal,
     progressSummary: {
-      mode: goal.progressMode,
+      type: goal.type,
       percentComplete,
       taskTotals: {
         totalCount,
@@ -116,7 +109,7 @@ router.get('/', async (req, res) => {
         id: true,
         title: true,
         scope: true,
-        progressMode: true,
+        type: true,
         currentValue: true,
         targetValue: true,
         parentId: true,
@@ -166,7 +159,7 @@ router.get('/:id', async (req, res) => {
             title: true,
             description: true,
             scope: true,
-            progressMode: true,
+            type: true,
             targetValue: true,
             currentValue: true,
             parentId: true,
@@ -213,7 +206,6 @@ router.post('/', async (req, res) => {
       customDataLabel,
       parentId,
       scope,
-      progressMode,
     } = req.body;
 
     const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -232,8 +224,7 @@ router.post('/', async (req, res) => {
         data: {
           title,
           description,
-          type,
-          progressMode: progressMode || 'TASK_BASED',
+          type: type || 'TOTAL_TARGET',
           targetValue,
           frequencyTarget,
           frequencyType,
@@ -246,9 +237,9 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // If this goal has a parent and this goal uses TASK_BASED progress,
+      // If this goal has a parent (all goals are task-based now),
       // then bump the parent's targetValue by 1 to reflect a new sub-goal unit.
-      if (goal.parentId && goal.progressMode === 'TASK_BASED') {
+      if (goal.parentId) {
         // Note: Using a read + set to safely handle null targetValue on parent
         const parent = await tx.goal.findUnique({
           where: { id: goal.parentId },
@@ -305,7 +296,6 @@ router.put('/:id', async (req, res) => {
       customDataLabel,
       parentId,
       scope,
-      progressMode,
     } = req.body;
 
     const goal = await prisma.goal.update({
@@ -320,7 +310,6 @@ router.put('/:id', async (req, res) => {
         customDataLabel,
         parentId,
         scope,
-        progressMode,
       },
     });
 
@@ -383,18 +372,18 @@ router.delete('/:id', async (req, res) => {
     const user = await ensureUser(req);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Look up the goal to capture parent and mode before deletion
+      // Look up the goal to capture parent before deletion
       const goal = await tx.goal.findFirst({
         where: { id, userId: user.id },
-        select: { parentId: true, progressMode: true },
+        select: { parentId: true },
       });
 
       // Delete related progress entries then the goal itself
       await tx.progress.deleteMany({ where: { goalId: id } });
       await tx.goal.delete({ where: { id } });
 
-      // If this was a TASK_BASED child with a parent, decrement parent's targetValue
-      if (goal?.parentId && goal.progressMode === 'TASK_BASED') {
+      // If this was a child goal with a parent, decrement parent's targetValue (all goals are task-based now)
+      if (goal?.parentId) {
         const parent = await tx.goal.findUnique({
           where: { id: goal.parentId },
           select: { targetValue: true },
@@ -407,11 +396,6 @@ router.delete('/:id', async (req, res) => {
             data: { targetValue: newTarget },
           });
         }
-
-        // TODO: Consider whether deleting a MANUAL_TOTAL child should
-        //       adjust parent's targetValue or remain manual-only.
-        // TODO: For HABIT mode, define if child deletion impacts target cadence
-        //       or streak metrics before introducing adjustments.
       }
     });
     res.json({ message: 'Goal deleted' });
@@ -602,13 +586,13 @@ router.post('/:id/bulk-tasks', async (req, res) => {
         createdTasks.push(created);
       }
 
-      // If the goal is TASK_BASED, bump its targetValue by the number of tasks created
+      // All goals are task-based now, bump targetValue by the number of tasks created
       const parentGoal = await tx.goal.findUnique({
         where: { id },
-        select: { progressMode: true, targetValue: true },
+        select: { targetValue: true },
       });
 
-      if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+      if (parentGoal) {
         await tx.goal.update({
           where: { id },
           data: {
@@ -616,8 +600,6 @@ router.post('/:id/bulk-tasks', async (req, res) => {
           },
         });
       }
-
-      // TODO: For MANUAL_TOTAL/HABIT, define desired behavior before changing targetValue here.
 
       return createdTasks;
     });
@@ -713,7 +695,7 @@ router.get('/:id/tasks', async (req, res) => {
             title: true,
             description: true,
             scope: true,
-            progressMode: true,
+            type: true,
             targetValue: true,
             currentValue: true,
             parentId: true,
@@ -742,30 +724,47 @@ router.get('/:id/activities', async (req, res) => {
   try {
     const user = await ensureUser(req);
 
-    const goal = await prisma.goal.findFirst({
-      where: {
-        id: req.params.id,
-        userId: user.id,
-      },
-      select: {
-        progress: {
-          select: {
-            id: true,
-            date: true,
-            value: true,
-            note: true,
-            customData: true,
-          },
-          orderBy: { date: 'desc' },
-        },
-      },
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+    const skip = (page - 1) * limit;
+
+    const goalCheck = await prisma.goal.findFirst({
+      where: { id: req.params.id, userId: user.id },
+      select: { id: true },
     });
 
-    if (!goal) {
+    if (!goalCheck) {
       return res.status(404).json({ error: 'Goal not found' });
     }
 
-    res.json(goal.progress);
+    const [activities, total] = await Promise.all([
+      prisma.progress.findMany({
+        where: { goalId: req.params.id },
+        select: {
+          id: true,
+          date: true,
+          value: true,
+          note: true,
+          customData: true,
+        },
+        orderBy: { date: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.progress.count({
+        where: { goalId: req.params.id },
+      }),
+    ]);
+
+    res.json({
+      activities,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('Failed to fetch goal activities:', error);
     res.status(500).json({ error: 'Failed to fetch goal activities' });

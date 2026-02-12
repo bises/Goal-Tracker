@@ -419,9 +419,6 @@ export const GoalDetailsPage: React.FC = () => {
                                   <span className="inline-flex items-center px-2.5 py-1 bg-blue-500/20 text-blue-300 rounded-full font-medium border border-blue-500/40">
                                     {child.scope}
                                   </span>
-                                  <span className="inline-flex items-center px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-full font-medium border border-purple-500/40">
-                                    {child.progressMode.replace(/_/g, ' ')}
-                                  </span>
                                   <span className="inline-flex items-center px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-full font-medium border border-emerald-500/40">
                                     {progress}% ({child.currentValue}/{child.targetValue})
                                   </span>

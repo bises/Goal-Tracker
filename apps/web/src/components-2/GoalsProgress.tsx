@@ -164,7 +164,6 @@ export const GoalsProgress = () => {
           style={{ color: 'var(--warm-gray)' }}
           onClick={() => {
             // TODO: Navigate to goals page
-            console.log('Navigate to goals page');
           }}
         >
           See all {activeGoals.length} goals →

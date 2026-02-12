@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { formatScheduledDate, formatTimestamp } from '@goal-tracker/shared';
 import { Calendar, Edit2, Hash, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task, TaskEvent } from '../../types';
-import { parseLocalDate } from '../../utils/dateUtils';
 import AddTaskModal from '../modals/AddTaskModal';
 import { ConfirmDialog } from '../modals/ConfirmDialog';
 
@@ -144,10 +144,7 @@ export default function TaskCard({
                       )}
                     >
                       <Calendar className="w-3 h-3 mr-1" />
-                      {parseLocalDate(task.scheduledDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatScheduledDate(task.scheduledDate, { month: 'short', day: 'numeric' })}
                     </Badge>
                   )}
                   {showCompletedBadge && task.isCompleted && task.completedAt && (
@@ -165,10 +162,7 @@ export default function TaskCard({
                           d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      {new Date(task.completedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatTimestamp(task.completedAt, { month: 'short', day: 'numeric' })}
                     </Badge>
                   )}
                 </div>

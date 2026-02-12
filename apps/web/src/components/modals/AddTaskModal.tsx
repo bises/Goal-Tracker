@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { extractDateOnly } from '@goal-tracker/shared';
 import { useGoalContext } from '../../contexts/GoalContext';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
@@ -46,7 +47,7 @@ export default function AddTaskModal({
         .map((gt) => gt.goalId || gt.goal?.id)
         .filter((id): id is string => Boolean(id));
       setSelectedGoalIds(preselectedIds);
-      setScheduledDate(editTask.scheduledDate ? editTask.scheduledDate.split('T')[0] : '');
+      setScheduledDate(editTask.scheduledDate ? extractDateOnly(editTask.scheduledDate) : '');
       setIsCompleted(editTask.isCompleted || false);
       // Auto-expand goals if task has linked goals
       setShowGoals((editTask.goalTasks?.length || 0) > 0);

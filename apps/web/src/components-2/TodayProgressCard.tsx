@@ -1,4 +1,4 @@
-import { getTodayString } from '@goal-tracker/shared';
+import { extractDateOnly, getTodayString } from '@goal-tracker/shared';
 import { useMemo } from 'react';
 import { Badge } from '../components/ui/badge';
 import { useTaskContext } from '../contexts/TaskContext';

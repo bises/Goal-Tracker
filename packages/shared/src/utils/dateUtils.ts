@@ -140,3 +140,55 @@ export function addDays(dateStr: string, days: number): string {
   date.setUTCDate(date.getUTCDate() + days);
   return formatDateOnly(date);
 }
+
+/**
+ * Format a date field (which may include time) as a localized date string
+ * Handles both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss' formats
+ * This is specifically for scheduledDate fields that may come from the API
+ *
+ * @param dateStr - Date string (may include time component)
+ * @param options - Intl.DateTimeFormat options
+ * @returns Formatted date string in user's locale
+ */
+export function formatScheduledDate(
+  dateStr: string,
+  options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }
+): string {
+  const dateOnly = dateStr.split('T')[0];
+  const date = parseLocalDate(dateOnly);
+  return date.toLocaleDateString('en-US', options);
+}
+
+/**
+ * Format a timestamp (like completedAt) as a localized date string
+ * This properly handles UTC timestamps and converts to local timezone
+ *
+ * @param timestamp - ISO 8601 timestamp string
+ * @param options - Intl.DateTimeFormat options
+ * @returns Formatted date string in user's locale
+ */
+export function formatTimestamp(
+  timestamp: string,
+  options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }
+): string {
+  return new Date(timestamp).toLocaleDateString('en-US', options);
+}
+
+/**
+ * Extract just the date part from a date field (removes time if present)
+ * Useful for form inputs that expect YYYY-MM-DD format
+ *
+ * @param dateStr - Date string that may include time component
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function extractDateOnly(dateStr: string): string {
+  return dateStr.split('T')[0];
+}

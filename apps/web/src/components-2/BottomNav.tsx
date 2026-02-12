@@ -69,10 +69,20 @@ export const BottomNav = ({ onAddClick }: BottomNavProps) => {
             {/* Planner */}
             <button
               className="flex flex-col items-center gap-1 px-4 py-2 transition-colors hover:opacity-80"
-              onClick={() => console.log('Planner clicked')}
+              onClick={() => navigate('/planner')}
             >
-              <Calendar size={24} style={{ color: 'var(--warm-gray)' }} />
-              <span className="text-xs font-medium" style={{ color: 'var(--warm-gray)' }}>
+              <Calendar
+                size={24}
+                style={{
+                  color: isActive('/planner') ? 'var(--energizing-orange)' : 'var(--warm-gray)',
+                }}
+              />
+              <span
+                className="text-xs font-medium"
+                style={{
+                  color: isActive('/planner') ? 'var(--deep-charcoal)' : 'var(--warm-gray)',
+                }}
+              >
                 Planner
               </span>
             </button>
@@ -102,10 +112,18 @@ export const BottomNav = ({ onAddClick }: BottomNavProps) => {
             {/* Goals */}
             <button
               className="flex flex-col items-center gap-1 px-4 py-2 transition-colors hover:opacity-80"
-              onClick={() => console.log('Goals clicked')}
+              onClick={() => navigate('/goals')}
             >
-              <Target size={24} style={{ color: 'var(--warm-gray)' }} />
-              <span className="text-xs font-medium" style={{ color: 'var(--warm-gray)' }}>
+              <Target
+                size={24}
+                style={{
+                  color: isActive('/goals') ? 'var(--energizing-orange)' : 'var(--warm-gray)',
+                }}
+              />
+              <span
+                className="text-xs font-medium"
+                style={{ color: isActive('/goals') ? 'var(--deep-charcoal)' : 'var(--warm-gray)' }}
+              >
                 Goals
               </span>
             </button>

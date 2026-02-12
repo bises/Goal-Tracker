@@ -13,11 +13,12 @@ import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
 import { useTaskContext } from './contexts/TaskContext';
 import { AchievementDashboardPage } from './pages-2/AchievementDashboardPage';
+import { GoalDetailsPage } from './pages-2/GoalDetailsPage';
+import { GoalsPage } from './pages-2/GoalsPage';
+import { PlannerPage } from './pages-2/PlannerPage';
 import { TasksPage } from './pages-2/TasksPage';
 import { CallbackPage } from './pages/CallbackPage';
-import { GoalDetailsPage } from './pages/GoalDetailsPage';
 import { LoginPage } from './pages/LoginPage';
-import { PlannerPage } from './pages/PlannerPage';
 
 type ViewMode = 'goals' | 'tasks' | 'planner';
 
@@ -98,10 +99,26 @@ function AppContent() {
             }
           />
           <Route
+            path="/goals"
+            element={
+              <ProtectedRoute>
+                <GoalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/tasks"
             element={
               <ProtectedRoute>
                 <TasksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/planner"
+            element={
+              <ProtectedRoute>
+                <PlannerPage />
               </ProtectedRoute>
             }
           />

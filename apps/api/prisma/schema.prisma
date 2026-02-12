@@ -25,7 +25,7 @@ model Goal {
   id               String         @id @default(uuid())
   title            String
   description      String?
-  type             GoalType
+  type             GoalType       @default(TOTAL_TARGET)
   targetValue      Float?
   currentValue     Float          @default(0)
   stepSize         Float          @default(1)
@@ -38,7 +38,6 @@ model Goal {
   customDataLabel  String?
   parentId         String?
   scope            GoalScope      @default(STANDALONE)
-  progressMode     ProgressMode   @default(TASK_BASED)
   isMarkedComplete Boolean        @default(false)
   userId           Int
   parent           Goal?          @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
@@ -102,13 +101,6 @@ model Progress {
 enum GoalType {
   TOTAL_TARGET
   FREQUENCY
-  HABIT
-}
-
-enum ProgressMode {
-  TASK_BASED
-  MANUAL_TOTAL
-  HABIT
 }
 
 enum GoalScope {

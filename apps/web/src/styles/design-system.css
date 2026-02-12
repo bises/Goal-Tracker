@@ -48,6 +48,17 @@
   --radius-squircle-lg: 32px;
   --radius-squircle-xl: 40px;
 
+  /* Z-Index Scale - Layering System */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-fixed: 1200;
+  --z-modal-backdrop: 1300;
+  --z-modal: 1400;
+  --z-popover: 1500;
+  --z-tooltip: 1600;
+  --z-notification: 1700;
+
   /* Colored Glow Shadows */
   --glow-orange: 0 10px 30px rgba(255, 140, 66, 0.25);
   --glow-pink: 0 10px 30px rgba(255, 62, 131, 0.25);
@@ -128,14 +139,40 @@
 
 /* Remove the global reset - Tailwind handles this */
 
-body {
-  font-family: var(--font-body);
-  background-color: var(--bg-color);
-  color: var(--color-text-main);
-  min-height: 100vh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  position: relative;
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    color: var(--color-text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* Typography - Outfit Extra Bold for headings */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--deep-charcoal);
+  }
+
+  h1 {
+    font-size: 2.25rem; /* 36px - Main page headings */
+  }
+  h2 {
+    font-size: 1.875rem; /* 30px - Section headings */
+  }
+  h3 {
+    font-size: 1.5rem; /* 24px - Subsection headings */
+  }
+  h4 {
+    font-size: 1.25rem; /* 20px - Small headings */
+  }
 }
 
 /* Grain Texture Overlay (3% opacity) */
@@ -157,30 +194,6 @@ body::before {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-/* Typography - Outfit Extra Bold for headings */
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-display);
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--deep-charcoal);
-}
-
-h1 {
-  font-size: 3.5rem;
-}
-h2 {
-  font-size: 2.5rem;
-}
-h3 {
-  font-size: 1.75rem;
-}
-h4 {
-  font-size: 1.25rem;
 }
 
 /* Sun-Kissed Squircle Card */

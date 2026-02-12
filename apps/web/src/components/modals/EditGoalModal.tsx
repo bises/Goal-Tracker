@@ -13,9 +13,7 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
   const [title, setTitle] = useState(goal.title);
   const [description, setDescription] = useState(goal.description || '');
   const [target, setTarget] = useState(goal.targetValue?.toString() || '');
-  const [progressMode, setProgressMode] = useState<'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT'>(
-    goal.progressMode || 'TASK_BASED'
-  );
+  const [type, setType] = useState<'TOTAL_TARGET' | 'FREQUENCY'>(goal.type || 'TOTAL_TARGET');
   const [customEndDate, setCustomEndDate] = useState(
     goal.endDate ? new Date(goal.endDate).toLocaleDateString('en-CA') : ''
   );
@@ -28,7 +26,7 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
     await api.updateGoal(goal.id, {
       title,
       description,
-      progressMode,
+      type,
       targetValue: target ? parseFloat(target) : undefined,
       endDate: customEndDate ? new Date(customEndDate + 'T00:00:00').toISOString() : undefined,
       customDataLabel,
@@ -98,16 +96,15 @@ export const EditGoalModal: React.FC<EditGoalModalProps> = ({ goal, onClose, onU
 
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-            Progress Mode
+            Goal Type
           </label>
-          <select value={progressMode} onChange={(e) => setProgressMode(e.target.value as any)}>
-            <option value="TASK_BASED">Task-based</option>
-            <option value="MANUAL_TOTAL">Manual total</option>
-            <option value="HABIT">Habit</option>
+          <select value={type} onChange={(e) => setType(e.target.value as any)}>
+            <option value="TOTAL_TARGET">Total Target (Task-based)</option>
+            <option value="FREQUENCY">Frequency (Recurring)</option>
           </select>
         </div>
 
-        {progressMode === 'MANUAL_TOTAL' && (
+        {type === 'TOTAL_TARGET' && (
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
               Target Value (optional)

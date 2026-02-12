@@ -51,9 +51,10 @@ router.get('/', async (req, res) => {
     // Extract query parameters
     const {
       status, // 'completed' | 'pending'
-      page = '1',
-      limit = '10',
+      page,
+      limit,
       month, // Format: YYYY-MM
+      date, // Format: YYYY-MM-DD
     } = req.query;
 
     // Build where clause
@@ -68,11 +69,22 @@ router.get('/', async (req, res) => {
       where.isCompleted = false;
     }
 
-    // Filter by month
-    if (month && typeof month === 'string') {
+    // Filter by specific date
+    if (date && typeof date === 'string') {
+      const [year, monthNum, day] = date.split('-');
+      const startDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day)));
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day) + 1));
+
+      where.scheduledDate = {
+        gte: startDate,
+        lt: endDate,
+      };
+    }
+    // Filter by month (if date is not provided)
+    else if (month && typeof month === 'string') {
       const [year, monthNum] = month.split('-');
-      const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-      const endDate = new Date(parseInt(year), parseInt(monthNum), 1);
+      const startDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, 1));
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum), 1));
 
       where.scheduledDate = {
         gte: startDate,
@@ -354,14 +366,14 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // Update target value for each parent goal (only for TASK_BASED)
+      // Update target value for each parent goal (all goals are task-based now)
       if (goalIds.length > 0) {
         for (const goalId of goalIds) {
           const parentGoal = await tx.goal.findUnique({
             where: { id: goalId },
-            select: { progressMode: true, targetValue: true },
+            select: { targetValue: true },
           });
-          if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+          if (parentGoal) {
             await tx.goal.update({
               where: { id: goalId },
               data: {
@@ -531,33 +543,27 @@ router.delete('/:id', async (req, res) => {
         effectiveGoalIds = links.map((l) => l.goalId);
       }
 
-      // Adjust parent goals (only for TASK_BASED)
+      // Adjust parent goals (all goals are task-based now)
       for (const goalId of effectiveGoalIds) {
         const parentGoal = await tx.goal.findUnique({
           where: { id: goalId },
-          select: { progressMode: true, targetValue: true, currentValue: true },
+          select: { targetValue: true, currentValue: true },
         });
         if (!parentGoal) continue;
 
-        if (parentGoal.progressMode === 'TASK_BASED') {
-          const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
-          const newCurrent =
-            progressDelta !== 0
-              ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
-              : (parentGoal.currentValue ?? 0);
+        const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
+        const newCurrent =
+          progressDelta !== 0
+            ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
+            : (parentGoal.currentValue ?? 0);
 
-          await tx.goal.update({
-            where: { id: goalId },
-            data: {
-              targetValue: newTarget,
-              currentValue: newCurrent,
-            },
-          });
-
-          // Optional: log a negative progress entry to reflect deletion
-          // Skipped for now; add if you want audit trail.
-        }
-        // TODO: Consider MANUAL_TOTAL & HABIT: should removing a task influence targets/progress?
+        await tx.goal.update({
+          where: { id: goalId },
+          data: {
+            targetValue: newTarget,
+            currentValue: newCurrent,
+          },
+        });
       }
     });
 
@@ -607,7 +613,6 @@ router.post('/:id/complete', async (req, res) => {
           select: {
             title: true,
             currentValue: true,
-            progressMode: true,
             targetValue: true,
             parentId: true,
             goalTasks: {
@@ -617,7 +622,6 @@ router.post('/:id/complete', async (req, res) => {
         });
 
         if (!goal) continue;
-        if (goal.progressMode !== 'TASK_BASED') continue;
 
         const newValue = Math.max(0, (goal.currentValue || 0) + effortDelta);
 
@@ -654,10 +658,10 @@ router.post('/:id/complete', async (req, res) => {
           if (percentComplete >= 100) {
             const parentGoal = await tx.goal.findUnique({
               where: { id: goal.parentId },
-              select: { progressMode: true, title: true },
+              select: { title: true },
             });
 
-            if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+            if (parentGoal) {
               // Add 1 progress unit to parent when subgoal completes
               await tx.goal.update({
                 where: { id: goal.parentId },
@@ -770,7 +774,7 @@ router.post('/:id/link-goal', async (req, res) => {
       // Verify goal belongs to user
       const goal = await tx.goal.findFirst({
         where: { id: goalId, userId: user.id },
-        select: { progressMode: true, targetValue: true },
+        select: { targetValue: true },
       });
       if (!goal) {
         throw new Error('Goal not found or access denied');
@@ -790,14 +794,11 @@ router.post('/:id/link-goal', async (req, res) => {
         data: { goalId, taskId: req.params.id },
       });
 
-      // Increment goal's targetValue if TASK_BASED
-      if (goal.progressMode === 'TASK_BASED') {
-        await tx.goal.update({
-          where: { id: goalId },
-          data: { targetValue: (goal.targetValue ?? 0) + 1 },
-        });
-      }
-      // TODO: Consider MANUAL_TOTAL & HABIT link effect on targets
+      // Increment goal's targetValue (all goals are task-based now)
+      await tx.goal.update({
+        where: { id: goalId },
+        data: { targetValue: (goal.targetValue ?? 0) + 1 },
+      });
     });
 
     // Return updated task
@@ -836,7 +837,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
       // Verify goal belongs to user and fetch its properties
       const goal = await tx.goal.findFirst({
         where: { id: goalId, userId: user.id },
-        select: { progressMode: true, targetValue: true, currentValue: true },
+        select: { targetValue: true, currentValue: true },
       });
       if (!goal) {
         throw new Error('Goal not found or access denied');
@@ -851,26 +852,23 @@ router.post('/:id/unlink-goal', async (req, res) => {
         throw new Error('Task is not linked to this goal');
       }
 
-      // Update goal's targetValue and currentValue if TASK_BASED
-      if (goal.progressMode === 'TASK_BASED') {
-        const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
+      // Update goal's targetValue and currentValue (all goals are task-based now)
+      const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
 
-        // If task was completed, also decrement currentValue
-        let newCurrentValue = goal.currentValue;
-        if (task.isCompleted) {
-          const progressDelta = task.size || 1;
-          newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
-        }
-
-        await tx.goal.update({
-          where: { id: goalId },
-          data: {
-            targetValue: newTargetValue,
-            currentValue: newCurrentValue,
-          },
-        });
+      // If task was completed, also decrement currentValue
+      let newCurrentValue = goal.currentValue;
+      if (task.isCompleted) {
+        const progressDelta = task.size || 1;
+        newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
       }
-      // TODO: Consider MANUAL_TOTAL & HABIT unlink effect on targets
+
+      await tx.goal.update({
+        where: { id: goalId },
+        data: {
+          targetValue: newTargetValue,
+          currentValue: newCurrentValue,
+        },
+      });
     });
 
     // Return updated task

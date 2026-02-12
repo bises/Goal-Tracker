@@ -1,4 +1,4 @@
-import { parseLocalDate } from '@goal-tracker/shared';
+import { formatScheduledDate, formatTimestamp } from '@goal-tracker/shared';
 import { Calendar, Check } from 'lucide-react';
 import { Task, TaskCategory } from '../types';
 import { SquircleCard } from './SquircleCard';
@@ -60,7 +60,6 @@ const formatDuration = (minutes?: number): string => {
 
 export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps) => {
   if (!task) {
-    console.error('TaskCard received undefined task');
     return null;
   }
 
@@ -137,12 +136,7 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
                   color: '#22C55E',
                 }}
               >
-                ✓{' '}
-                {parseLocalDate(task.completedAt.split('T')[0]).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
+                ✓ {formatTimestamp(task.completedAt)}
               </span>
             ) : (
               task.scheduledDate && (
@@ -153,12 +147,7 @@ export const TaskCard = ({ task, onToggle, onReschedule, onEdit }: TaskCardProps
                     color: 'var(--energizing-orange)',
                   }}
                 >
-                  📅{' '}
-                  {parseLocalDate(task.scheduledDate.split('T')[0]).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+                  📅 {formatScheduledDate(task.scheduledDate)}
                 </span>
               )
             )}

@@ -135,10 +135,16 @@ export const api = {
     return res.json();
   },
 
-  getGoalActivities: async (goalId: string) => {
-    const res = await authenticatedFetch(`${API_URL}/goals/${goalId}/activities`);
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+  getGoalActivities: async (goalId: string, params?: { page?: number; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    const queryString = queryParams.toString();
+    const url = queryString
+      ? `${API_URL}/goals/${goalId}/activities?${queryString}`
+      : `${API_URL}/goals/${goalId}/activities`;
+    const res = await authenticatedFetch(url);
+    return res.json();
   },
 };
 
@@ -158,12 +164,14 @@ export const taskApi = {
     page?: number;
     limit?: number;
     month?: string;
+    date?: string;
   }): Promise<Task[] | PaginatedTasksResponse> => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.month) queryParams.append('month', params.month);
+    if (params?.date) queryParams.append('date', params.date);
 
     const url = queryParams.toString()
       ? `${API_URL}/tasks?${queryParams.toString()}`
