@@ -1,4 +1,4 @@
-import { extractDateOnly, getTodayString } from '@goal-tracker/shared';
+import { getTodayString } from '@goal-tracker/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

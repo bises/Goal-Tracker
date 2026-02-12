@@ -2,7 +2,6 @@ import { format } from 'date-fns';
 import { CalendarIcon, RefreshCw, ServerOff, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getTodayString } from '@goal-tracker/shared';
 import { api, PaginatedTasksResponse, taskApi } from '../api';
 import { SquircleCard } from '../components-2/SquircleCard';
 import { TaskCard } from '../components-2/TaskCard';
@@ -29,7 +28,9 @@ export const TasksPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as TaskStatus | null;
   const dateParam = searchParams.get('date');
-  const [activeTab, setActiveTab] = useState<TaskStatus>(tabParam === 'completed' ? 'completed' : 'pending');
+  const [activeTab, setActiveTab] = useState<TaskStatus>(
+    tabParam === 'completed' ? 'completed' : 'pending'
+  );
   const [selectedDate, setSelectedDate] = useState<string | null>(dateParam || null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,11 +93,11 @@ export const TasksPage = () => {
         page,
         limit: 10,
       };
-      
+
       if (selectedDate) {
         params.date = selectedDate;
       }
-      
+
       const data = await taskApi.fetchTasks(params);
 
       // Type assertion since we're passing pagination params
@@ -330,8 +331,8 @@ export const TasksPage = () => {
             {selectedDate
               ? `No ${activeTab} tasks scheduled for ${format(new Date(selectedDate + 'T00:00:00'), 'MMMM d, yyyy')}`
               : activeTab === 'pending'
-              ? 'Create some tasks to get started!'
-              : "You haven't completed any tasks yet."}
+                ? 'Create some tasks to get started!'
+                : "You haven't completed any tasks yet."}
           </p>
         </SquircleCard>
       )}

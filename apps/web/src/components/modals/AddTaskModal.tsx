@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { extractDateOnly } from '@goal-tracker/shared';
+import { useEffect, useState } from 'react';
 import { useGoalContext } from '../../contexts/GoalContext';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
