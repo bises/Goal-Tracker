@@ -1,147 +1,579 @@
-import React, { useMemo, useState } from 'react';
-import { CalendarView } from '../components/Calendar/CalendarView';
-import AddTaskModal from '../components/modals/AddTaskModal';
-import { TasksForDateModal } from '../components/modals/TasksForDateModal';
-import { Toast } from '../components/shared/Toast';
-import { UnscheduledTasksContainer } from '../components/Tasks/UnscheduledTasksContainer';
+import { motion } from 'framer-motion';
+import {
+  CalendarDays,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  RefreshCw,
+  ServerOff,
+} from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { taskApi } from '../api';
+import { DailyTimelineView } from '../components/DailyTimelineView';
+import { RescheduleSheet } from '../components/RescheduleSheet';
+import { SquircleCard } from '../components/SquircleCard';
+import { TaskEditSheet } from '../components/TaskEditSheet';
+import { TasksForDateSheet } from '../components/TasksForDateSheet';
+import { UnscheduledTaskStrip } from '../components/UnscheduledTaskStrip';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { Button } from '../components/ui/button';
+import { ScrollArea } from '../components/ui/scroll-area';
+import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
-import { Task, TaskEvent } from '../types';
+import { Task } from '../types';
 import { parseLocalDate } from '../utils/dateUtils';
 
-export function PlannerPage() {
-  const { tasks, scheduleTask } = useTaskContext();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [toast, setToast] = useState<{
-    level: 'success' | 'error' | 'info' | 'warning';
-    message: string;
-  } | null>(null);
-  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+type PlannerView = 'month' | 'day';
 
-  // Compute unscheduled tasks from cached tasks
+const getCategoryColor = (category?: string): string => {
+  const colors: Record<string, string> = {
+    WORK: '#3b82f6',
+    PERSONAL: '#8b5cf6',
+    HEALTH: '#10b981',
+    LEARNING: '#f59e0b',
+    FINANCE: '#06b6d4',
+    SOCIAL: '#ec4899',
+    HOUSEHOLD: '#f97316',
+    OTHER: '#6b7280',
+  };
+  return colors[category || ''] || '#ff8c42';
+};
+
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+export const PlannerPage = () => {
+  const {
+    tasks: allTasks,
+    scheduleTask,
+    updateTaskFields,
+    error: taskError,
+    fetchTasks,
+  } = useTaskContext();
+  const { goals, error: goalError, fetchGoals } = useGoalContext();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<PlannerView>('month');
+  const [dailyDate, setDailyDate] = useState(new Date());
+  const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+
+  const error = taskError || goalError;
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    await Promise.all([fetchTasks(), fetchGoals()]);
+    setIsRetrying(false);
+  };
+
+  // Unscheduled tasks
   const unscheduledTasks = useMemo(() => {
-    return tasks.filter((t) => !t.scheduledDate && !t.isCompleted);
-  }, [tasks]);
+    return allTasks.filter((t) => !t.scheduledDate && !t.isCompleted);
+  }, [allTasks]);
+
+  // Tasks organized by date
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    allTasks
+      .filter((t) => t.scheduledDate && !t.isCompleted)
+      .forEach((task) => {
+        const dateKey = parseLocalDate(task.scheduledDate!).toDateString();
+        const existing = map.get(dateKey) || [];
+        map.set(dateKey, [...existing, task]);
+      });
+    return map;
+  }, [allTasks]);
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      if (direction === 'prev') {
+        newDate.setMonth(newDate.getMonth() - 1);
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1);
+      }
+      return newDate;
+    });
+  };
+
+  // Open reschedule sheet for an unscheduled task
+  const handleUnscheduledClick = (task: Task) => {
+    setRescheduleTask(task);
+    setIsRescheduleOpen(true);
+  };
+
+  // Handle rescheduling from the sheet
+  const handleReschedule = useCallback(
+    async (taskId: string, date: Date, time?: string) => {
+      // date of epoch 0 means "unschedule"
+      if (date.getTime() === 0) {
+        await scheduleTask(taskId, null);
+        return;
+      }
+      await scheduleTask(taskId, date);
+      if (time) {
+        await updateTaskFields(taskId, { scheduledTime: time });
+      }
+    },
+    [scheduleTask, updateTaskFields]
+  );
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
-    setIsEditModalOpen(true);
+    setIsEditSheetOpen(true);
   };
 
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-    setIsDateModalOpen(true);
+  const handleDayClick = (date: Date, taskCount: number) => {
+    // Switch to daily view for this date
+    setDailyDate(date);
+    setViewMode('day');
   };
 
-  const formatDateInput = (date: Date) => {
-    const tzOff = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - tzOff).toISOString().split('T')[0];
+  const handleSwitchToDay = (date: Date) => {
+    setDailyDate(date);
+    setViewMode('day');
   };
 
-  const tasksForSelectedDate = useMemo(() => {
-    if (!selectedDate) return [] as Task[];
-    const target = selectedDate.toDateString();
-    return tasks.filter(
-      (t) => t.scheduledDate && parseLocalDate(t.scheduledDate).toDateString() === target
-    );
-  }, [tasks, selectedDate]);
-
-  const handleTaskUpdate = () => {
-    // No need to reload - cache is automatically updated via context
+  const handleCreateTaskForTime = (date: Date, time: string) => {
     setSelectedTask(null);
-    setIsEditModalOpen(false);
+    setIsEditSheetOpen(true);
+    // The TaskEditSheet will open in create mode
   };
 
-  const handleCloseModal = () => {
-    setIsEditModalOpen(false);
-    setSelectedTask(null);
-  };
-
-  const handleTaskDragStart = (taskId: string) => {
-    // Store taskId for drag operations
-  };
-
-  const handleUnscheduleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('taskId');
-    if (!taskId) return;
+  const handleToggleComplete = async (taskId: string) => {
     try {
-      await scheduleTask(taskId, null);
-      setToast({ level: 'success', message: 'Task unscheduled' });
+      await taskApi.toggleComplete(taskId);
+      await fetchTasks();
     } catch (error) {
-      console.error('Failed to unschedule task:', error);
-      setToast({ level: 'error', message: 'Failed to unschedule task' });
+      console.error('Failed to toggle task:', error);
     }
   };
 
-  return (
-    <>
-      {/* Unscheduled Tasks Horizontal Bar - Always visible at top */}
-      <UnscheduledTasksContainer
-        tasks={unscheduledTasks}
-        isVisible={true}
-        onClose={() => {}}
-        onTaskDragStart={handleTaskDragStart}
-        onTaskClick={handleTaskClick}
-        onUnscheduleDrop={handleUnscheduleDrop}
-      />
+  const handleAddTaskForDate = () => {
+    setIsDateModalOpen(false);
+    setIsEditSheetOpen(true);
+  };
 
-      {/* Calendar */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <CalendarView
-          onTaskClick={handleTaskClick}
-          onDateClick={handleDateClick}
-          onScheduled={async () => {
-            setToast({ level: 'success', message: 'Task scheduled' });
-          }}
-        />
+  // Get tasks for selected date
+  const tasksForSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    const dateKey = selectedDate.toDateString();
+    return tasksByDate.get(dateKey) || [];
+  }, [selectedDate, tasksByDate]);
+
+  // Generate calendar days
+  const calendarDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date().toDateString();
+
+    const days: Array<{
+      date: Date | null;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      tasks: Task[];
+    }> = [];
+
+    // Previous month padding
+    for (let i = 0; i < firstDay; i++) {
+      days.push({ date: null, isCurrentMonth: false, isToday: false, tasks: [] });
+    }
+
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dateKey = date.toDateString();
+      const tasks = tasksByDate.get(dateKey) || [];
+      days.push({
+        date,
+        isCurrentMonth: true,
+        isToday: dateKey === today,
+        tasks,
+      });
+    }
+
+    return days;
+  }, [currentDate, tasksByDate]);
+
+  return (
+    <div className="max-w-7xl mx-auto h-full flex flex-col gap-4 pt-6 pb-4 overflow-x-hidden">
+      {/* Error Alert */}
+      {error && (
+        <div className="w-full px-4">
+          <Alert variant="destructive" className="rounded-2xl border-2">
+            <ServerOff className="h-5 w-5" />
+            <AlertTitle className="font-display">Cannot Connect to Database</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>The database is not running. Please start it using:</p>
+              <code className="block p-2 rounded-lg bg-black/5 text-xs font-mono">
+                docker-compose up -d postgres
+              </code>
+              <Button
+                onClick={handleRetry}
+                disabled={isRetrying}
+                size="sm"
+                className="mt-2"
+                style={{ background: 'var(--gradient-primary)' }}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                {isRetrying ? 'Retrying...' : 'Retry Connection'}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row gap-4 flex-1">
+        {/* Main Calendar Section */}
+        <div className="flex-1 px-4 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1
+                className="text-3xl font-bold font-display mb-1"
+                style={{ color: 'var(--deep-charcoal)' }}
+              >
+                Planner
+              </h1>
+              <p className="text-sm" style={{ color: 'var(--warm-gray)' }}>
+                {viewMode === 'month' ? 'Schedule your tasks visually' : 'Plan your day'}
+              </p>
+            </div>
+
+            {/* View Toggle */}
+            <div
+              className="flex rounded-xl p-0.5 gap-0.5"
+              style={{
+                background: 'rgba(255, 140, 66, 0.08)',
+                border: '1px solid var(--card-border)',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('month')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: viewMode === 'month' ? 'var(--gradient-primary)' : 'transparent',
+                  color: viewMode === 'month' ? 'white' : 'var(--warm-gray)',
+                  boxShadow: viewMode === 'month' ? '0 2px 8px rgba(255, 140, 66, 0.3)' : 'none',
+                }}
+              >
+                <CalendarDays size={14} />
+                Month
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('day');
+                  setDailyDate(new Date());
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: viewMode === 'day' ? 'var(--gradient-primary)' : 'transparent',
+                  color: viewMode === 'day' ? 'white' : 'var(--warm-gray)',
+                  boxShadow: viewMode === 'day' ? '0 2px 8px rgba(255, 140, 66, 0.3)' : 'none',
+                }}
+              >
+                <Clock size={14} />
+                Day
+              </button>
+            </div>
+          </div>
+
+          {/* Daily View */}
+          {viewMode === 'day' && (
+            <div className="flex-1 min-h-0">
+              <DailyTimelineView
+                date={dailyDate}
+                onDateChange={setDailyDate}
+                onTaskClick={handleTaskClick}
+                onCreateTask={handleCreateTaskForTime}
+                unscheduledTasks={unscheduledTasks}
+              />
+            </div>
+          )}
+
+          {/* Unscheduled Tasks Strip - Mobile Only (Month view) */}
+          {viewMode === 'month' && unscheduledTasks.length > 0 && (
+            <div className="md:hidden">
+              <UnscheduledTaskStrip
+                className="mb-4 -mx-4 px-4"
+                tasks={unscheduledTasks}
+                onTaskClick={handleUnscheduledClick}
+              />
+            </div>
+          )}
+
+          {/* Month Navigation (Month view only) */}
+          {viewMode === 'month' && (
+            <SquircleCard className="mb-3">
+              <div className="flex items-center justify-between px-3 py-2">
+                <button
+                  onClick={() => navigateMonth('prev')}
+                  className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
+                  style={{ color: 'var(--energizing-orange)' }}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <h2
+                  className="text-base font-bold font-display"
+                  style={{ color: 'var(--deep-charcoal)' }}
+                >
+                  {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+                </h2>
+                <button
+                  onClick={() => navigateMonth('next')}
+                  className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
+                  style={{ color: 'var(--energizing-orange)' }}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </SquircleCard>
+          )}
+
+          {/* Calendar Grid (Month view only) */}
+          {viewMode === 'month' && (
+            <SquircleCard className="flex-shrink-0">
+              <div className="p-1 md:p-2 h-full flex flex-col">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-2 mb-1">
+                  {DAYS_SHORT.map((day) => (
+                    <div
+                      key={day}
+                      className="text-center text-xs font-semibold py-1"
+                      style={{ color: 'var(--warm-gray)' }}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Days */}
+                <div className="grid grid-cols-7 gap-2 auto-rows-fr">
+                  {calendarDays.map((day, idx) => (
+                    <motion.div
+                      key={idx}
+                      data-calendar-day
+                      data-date={day.date?.toISOString()}
+                      className={`
+                    relative rounded-xl p-1 md:p-2 flex flex-col items-center justify-center overflow-hidden
+                    ${day.isCurrentMonth ? 'cursor-pointer' : 'opacity-30'}
+                    ${day.isToday ? 'ring-2' : ''}
+                  `}
+                      style={
+                        {
+                          background: day.isCurrentMonth
+                            ? hoveredDate === day.date?.toDateString()
+                              ? 'rgba(255, 140, 66, 0.15)'
+                              : 'rgba(255, 255, 255, 0.5)'
+                            : 'transparent',
+                          '--tw-ring-color': day.isToday ? 'var(--energizing-orange)' : undefined,
+                          border: '2px solid var(--card-border)',
+                          minHeight: '40px',
+                        } as React.CSSProperties
+                      }
+                      onClick={() =>
+                        day.date && day.isCurrentMonth && handleDayClick(day.date, day.tasks.length)
+                      }
+                      whileHover={day.isCurrentMonth ? { scale: 1.05 } : undefined}
+                      whileTap={day.isCurrentMonth ? { scale: 0.98 } : undefined}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    >
+                      {day.date && (
+                        <>
+                          <div
+                            className={`text-sm md:text-base font-bold mb-1 ${day.isToday ? 'font-extrabold' : ''}`}
+                            style={{
+                              color: day.isToday
+                                ? 'var(--energizing-orange)'
+                                : 'var(--deep-charcoal)',
+                            }}
+                          >
+                            {day.date.getDate()}
+                          </div>
+                          {day.tasks.length > 0 && (
+                            <motion.div
+                              className="px-2 py-0.5 rounded-full font-bold text-xs"
+                              style={{
+                                background: 'var(--gradient-primary)',
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(255, 140, 66, 0.3)',
+                              }}
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                            >
+                              {day.tasks.length}
+                            </motion.div>
+                          )}
+                        </>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </SquircleCard>
+          )}
+        </div>
+
+        {/* Desktop Sidebar - Unscheduled Tasks */}
+        <div className="hidden md:block w-80 px-4">
+          <SquircleCard className="h-full">
+            <div className="p-4 h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3
+                    className="text-lg font-bold font-display"
+                    style={{ color: 'var(--deep-charcoal)' }}
+                  >
+                    Unscheduled
+                  </h3>
+                  <p className="text-xs" style={{ color: 'var(--warm-gray)' }}>
+                    Click to schedule
+                  </p>
+                </div>
+                <div
+                  className="px-2.5 py-1 rounded-full font-bold text-sm"
+                  style={{
+                    background: 'var(--gradient-primary)',
+                    color: 'white',
+                    boxShadow: 'var(--glow-orange)',
+                  }}
+                >
+                  {unscheduledTasks.length}
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1">
+                <div className="space-y-2 pr-2">
+                  {unscheduledTasks.length === 0 ? (
+                    <div className="text-center py-8" style={{ color: 'var(--warm-gray)' }}>
+                      <CalendarIcon size={32} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">All tasks scheduled!</p>
+                    </div>
+                  ) : (
+                    unscheduledTasks.map((task) => (
+                      <motion.div
+                        key={task.id}
+                        className="p-3 rounded-2xl cursor-pointer"
+                        style={{
+                          background: 'var(--card-bg)',
+                          border: '1px solid var(--card-border)',
+                          boxShadow: '0 2px 8px rgba(255, 140, 66, 0.08)',
+                        }}
+                        whileHover={{
+                          scale: 1.02,
+                          boxShadow: '0 4px 16px rgba(255, 140, 66, 0.15)',
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleUnscheduledClick(task)}
+                      >
+                        <h4
+                          className="font-semibold text-sm mb-1 line-clamp-2"
+                          style={{ color: 'var(--deep-charcoal)' }}
+                        >
+                          {task.title}
+                        </h4>
+                        {task.description && (
+                          <p
+                            className="text-xs mb-2 line-clamp-1"
+                            style={{ color: 'var(--warm-gray)' }}
+                          >
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {task.size && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full"
+                              style={{
+                                background: 'rgba(255, 140, 66, 0.1)',
+                                color: 'var(--energizing-orange)',
+                              }}
+                            >
+                              {task.size}d
+                            </span>
+                          )}
+                          {task.goalTasks && task.goalTasks.length > 0 && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full"
+                              style={{
+                                background: 'var(--gradient-subtle)',
+                                color: 'var(--electric-pink)',
+                              }}
+                            >
+                              {task.goalTasks[0].goal?.title}
+                            </span>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </SquircleCard>
+        </div>
       </div>
 
-      {/* Date Tasks Modal */}
-      <TasksForDateModal
+      {/* Reschedule Sheet */}
+      <RescheduleSheet
+        isOpen={isRescheduleOpen}
+        onClose={() => {
+          setIsRescheduleOpen(false);
+          setRescheduleTask(null);
+        }}
+        task={rescheduleTask}
+        onSchedule={handleReschedule}
+        showTimePicker={viewMode === 'day'}
+      />
+
+      {/* Tasks For Date Sheet */}
+      <TasksForDateSheet
         isOpen={isDateModalOpen}
         onClose={() => setIsDateModalOpen(false)}
         date={selectedDate}
         tasks={tasksForSelectedDate}
-        onTaskEvent={(taskId: string, event: TaskEvent) => {
-          if (event === 'TaskEdited') {
-            const task = tasksForSelectedDate.find((t) => t.id === taskId);
-            if (task) {
-              handleTaskClick(task);
-              setIsDateModalOpen(false);
-            }
-          } else if (event === 'TaskDeleted') {
-            setToast({ level: 'success', message: 'Task deleted' });
-          }
-        }}
-        onAddTask={() => {
-          setIsDateModalOpen(false);
+        onTaskUpdated={fetchTasks}
+        onAddTask={handleAddTaskForDate}
+      />
+
+      {/* Task Edit Sheet */}
+      <TaskEditSheet
+        isOpen={isEditSheetOpen}
+        onClose={() => {
+          setIsEditSheetOpen(false);
           setSelectedTask(null);
-          setIsEditModalOpen(true);
         }}
+        task={selectedTask}
+        onSave={async () => {
+          await fetchTasks();
+          setIsEditSheetOpen(false);
+          setSelectedTask(null);
+          setIsDateModalOpen(false);
+        }}
+        availableGoals={goals}
       />
-
-      {/* Task Edit Modal */}
-      <AddTaskModal
-        isOpen={isEditModalOpen}
-        onClose={handleCloseModal}
-        onTaskAdded={handleTaskUpdate}
-        editTask={selectedTask}
-        defaultScheduledDate={
-          selectedDate && !selectedTask ? formatDateInput(selectedDate) : undefined
-        }
-      />
-
-      {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          level={toast.level}
-          onClose={() => setToast(null)}
-          autoClose={toast.level === 'error' ? 4000 : 2000}
-        />
-      )}
-    </>
+    </div>
   );
-}
+};

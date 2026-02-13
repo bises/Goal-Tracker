@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useState } from 'react';
 import { CustomCalendar } from './custom-calendar';
-import { Dialog, DialogContent, DialogTrigger } from './dialog';
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './dialog';
 
 interface CalendarDialogProps {
   value?: string; // Date string in YYYY-MM-DD format
@@ -56,6 +56,7 @@ export function CalendarDialog({
         </button>
       </DialogTrigger>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0">
+        <DialogTitle className="sr-only">Select Date</DialogTitle>
         <CustomCalendar
           selected={selectedDate}
           defaultMonth={selectedDate || new Date()}
