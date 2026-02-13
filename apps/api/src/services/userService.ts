@@ -83,7 +83,6 @@ export const ensureUser = async (req: Request) => {
   if (!user) {
     // If email is missing from JWT, try to fetch from Auth0 userinfo
     if (!email) {
-      console.log('Email missing from JWT, fetching from Auth0 userinfo...');
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         const accessToken = authHeader.slice(7);
@@ -91,7 +90,6 @@ export const ensureUser = async (req: Request) => {
         if (userInfo) {
           email = userInfo.email;
           name = name || userInfo.name || userInfo.nickname;
-          console.log('Successfully fetched user info from Auth0:', { email, name });
         }
       }
     }

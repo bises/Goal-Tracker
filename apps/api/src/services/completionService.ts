@@ -1,4 +1,4 @@
-import { PrismaClient, Goal, Prisma } from '@prisma/client';
+import { Goal, Prisma, PrismaClient } from '@prisma/client';
 
 /**
  * Result type for completion service operations
@@ -27,7 +27,6 @@ export class CompletionService {
           id: true,
           title: true,
           parentId: true,
-          progressMode: true,
           isMarkedComplete: true,
         },
       });
@@ -57,40 +56,36 @@ export class CompletionService {
         },
       });
 
-      // If goal has a parent, update parent's progress atomically
+      // If goal has a parent, update parent's progress atomically (all goals are task-based now)
       if (goal.parentId) {
         const parentGoal = await tx.goal.findUnique({
           where: { id: goal.parentId },
           select: {
-            progressMode: true,
             title: true,
             currentValue: true,
           },
         });
 
         if (parentGoal) {
-          // For TASK_BASED or HABIT mode parents, increment the progress
-          if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
-            // Increment parent's currentValue
-            await tx.goal.update({
-              where: { id: goal.parentId },
-              data: {
-                currentValue: {
-                  increment: 1,
-                },
+          // Increment parent's currentValue
+          await tx.goal.update({
+            where: { id: goal.parentId },
+            data: {
+              currentValue: {
+                increment: 1,
               },
-            });
+            },
+          });
 
-            // Log activity in parent goal
-            await tx.progress.create({
-              data: {
-                goalId: goal.parentId,
-                value: 1,
-                note: `Subgoal "${goal.title}" marked as completed`,
-                date: new Date(),
-              },
-            });
-          }
+          // Log activity in parent goal
+          await tx.progress.create({
+            data: {
+              goalId: goal.parentId,
+              value: 1,
+              note: `Subgoal "${goal.title}" marked as completed`,
+              date: new Date(),
+            },
+          });
         }
       }
 
@@ -114,7 +109,6 @@ export class CompletionService {
           id: true,
           title: true,
           parentId: true,
-          progressMode: true,
           isMarkedComplete: true,
         },
       });
@@ -144,40 +138,36 @@ export class CompletionService {
         },
       });
 
-      // If goal has a parent, update parent's progress atomically
+      // If goal has a parent, update parent's progress atomically (all goals are task-based now)
       if (goal.parentId) {
         const parentGoal = await tx.goal.findUnique({
           where: { id: goal.parentId },
           select: {
-            progressMode: true,
             title: true,
             currentValue: true,
           },
         });
 
         if (parentGoal) {
-          // For TASK_BASED or HABIT mode parents, decrement the progress
-          if (parentGoal.progressMode === 'TASK_BASED' || parentGoal.progressMode === 'HABIT') {
-            // Decrement parent's currentValue, but never go negative
-            const newParentValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
+          // Decrement parent's currentValue, but never go negative
+          const newParentValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
 
-            await tx.goal.update({
-              where: { id: goal.parentId },
-              data: {
-                currentValue: newParentValue,
-              },
-            });
+          await tx.goal.update({
+            where: { id: goal.parentId },
+            data: {
+              currentValue: newParentValue,
+            },
+          });
 
-            // Log activity in parent goal
-            await tx.progress.create({
-              data: {
-                goalId: goal.parentId,
-                value: -1,
-                note: `Subgoal "${goal.title}" marked as incomplete`,
-                date: new Date(),
-              },
-            });
-          }
+          // Log activity in parent goal
+          await tx.progress.create({
+            data: {
+              goalId: goal.parentId,
+              value: -1,
+              note: `Subgoal "${goal.title}" marked as incomplete`,
+              date: new Date(),
+            },
+          });
         }
       }
 

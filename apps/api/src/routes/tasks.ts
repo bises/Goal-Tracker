@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
-import { ensureUser, getUser } from '../services/userService';
+import { ensureUser } from '../services/userService';
 
 const router = Router();
 
@@ -37,29 +37,148 @@ const taskWithGoals = {
   },
 };
 
-// GET /api/tasks - Get all tasks
+// GET /api/tasks - Get all tasks with optional filtering and pagination
 router.get('/', async (req, res) => {
   try {
-    const user = await getUser(req);
+    const user = await ensureUser(req);
 
-    if (!user) {
-      return res
-        .status(403)
-        .json({ error: 'User profile not found. Please complete registration.' });
+    // Extract query parameters
+    const {
+      status, // 'completed' | 'pending'
+      page,
+      limit,
+      month, // Format: YYYY-MM
+      date, // Format: YYYY-MM-DD
+    } = req.query;
+
+    // Build where clause
+    const where: Prisma.TaskWhereInput = {
+      userId: user.id,
+    };
+
+    // Filter by completion status
+    if (status === 'completed') {
+      where.isCompleted = true;
+    } else if (status === 'pending') {
+      where.isCompleted = false;
     }
 
+    // Filter by specific date
+    if (date && typeof date === 'string') {
+      const [year, monthNum, day] = date.split('-');
+      const startDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day)));
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day) + 1));
+
+      where.scheduledDate = {
+        gte: startDate,
+        lt: endDate,
+      };
+    }
+    // Filter by month (if date is not provided)
+    else if (month && typeof month === 'string') {
+      const [year, monthNum] = month.split('-');
+      const startDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, 1));
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum), 1));
+
+      where.scheduledDate = {
+        gte: startDate,
+        lt: endDate,
+      };
+    }
+
+    // Determine ordering: scheduledDate ASC with nulls last, then createdAt DESC
+    const orderBy: Prisma.TaskOrderByWithRelationInput[] = [
+      { scheduledDate: { sort: 'asc', nulls: 'last' } },
+      { createdAt: 'desc' },
+    ];
+
+    // If pagination params provided, use pagination
+    if (page && limit) {
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Get total count for pagination metadata
+      const total = await prisma.task.count({ where });
+
+      // Get paginated tasks
+      const tasks = await prisma.task.findMany({
+        relationLoadStrategy: 'join',
+        where,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          size: true,
+          isCompleted: true,
+          completedAt: true,
+          scheduledDate: true,
+          priority: true,
+          category: true,
+          scheduledTime: true,
+          estimatedDurationMinutes: true,
+          estimatedCompletionDate: true,
+          customData: true,
+          createdAt: true,
+          updatedAt: true,
+          parentTaskId: true,
+          parentTask: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          goalTasks: {
+            select: {
+              goal: {
+                select: {
+                  id: true,
+                  title: true,
+                },
+              },
+            },
+          },
+          subTasks: {
+            select: {
+              id: true,
+              title: true,
+              isCompleted: true,
+            },
+          },
+        },
+        orderBy,
+        skip,
+        take: limitNum,
+      });
+
+      return res.json({
+        tasks,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
+    }
+
+    // Default: Return all tasks (backward compatible)
     const tasks = await prisma.task.findMany({
       relationLoadStrategy: 'join',
-      where: {
-        userId: user.id,
-      },
+      where,
       select: {
         id: true,
         title: true,
         description: true,
         size: true,
         isCompleted: true,
+        completedAt: true,
         scheduledDate: true,
+        priority: true,
+        category: true,
+        scheduledTime: true,
+        estimatedDurationMinutes: true,
+        estimatedCompletionDate: true,
         customData: true,
         createdAt: true,
         updatedAt: true,
@@ -88,10 +207,9 @@ router.get('/', async (req, res) => {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy,
     });
+
     res.json(tasks);
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -171,6 +289,11 @@ router.post('/', async (req, res) => {
       goalIds = [],
       parentTaskId,
       customData,
+      priority,
+      category,
+      scheduledTime,
+      estimatedDurationMinutes,
+      estimatedCompletionDate,
     } = req.body;
 
     if (!title) {
@@ -207,6 +330,10 @@ router.post('/', async (req, res) => {
       if (scheduledDate) {
         parsedScheduledDate = parseDateOnly(scheduledDate);
       }
+      let parsedEstimatedCompletionDate = null;
+      if (estimatedCompletionDate) {
+        parsedEstimatedCompletionDate = parseDateOnly(estimatedCompletionDate);
+      }
       const newTask = await tx.task.create({
         data: {
           title,
@@ -216,6 +343,11 @@ router.post('/', async (req, res) => {
           parentTaskId: parentTaskId || null,
           customData,
           userId: user.id,
+          priority: priority || null,
+          category: category || null,
+          scheduledTime: scheduledTime || null,
+          estimatedDurationMinutes: estimatedDurationMinutes || null,
+          estimatedCompletionDate: parsedEstimatedCompletionDate,
           goalTasks: {
             create: goalIds.map((goalId: string) => ({
               goal: {
@@ -228,14 +360,14 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // Update target value for each parent goal (only for TASK_BASED)
+      // Update target value for each parent goal (all goals are task-based now)
       if (goalIds.length > 0) {
         for (const goalId of goalIds) {
           const parentGoal = await tx.goal.findUnique({
             where: { id: goalId },
-            select: { progressMode: true, targetValue: true },
+            select: { targetValue: true },
           });
-          if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+          if (parentGoal) {
             await tx.goal.update({
               where: { id: goalId },
               data: {
@@ -308,8 +440,20 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Task not found or access denied' });
     }
 
-    const { title, description, size, scheduledDate, parentTaskId, customData, isCompleted } =
-      req.body;
+    const {
+      title,
+      description,
+      size,
+      scheduledDate,
+      parentTaskId,
+      customData,
+      isCompleted,
+      priority,
+      category,
+      scheduledTime,
+      estimatedDurationMinutes,
+      estimatedCompletionDate,
+    } = req.body;
 
     const updateData: any = {};
 
@@ -329,6 +473,18 @@ router.put('/:id', async (req, res) => {
     if (isCompleted !== undefined) {
       updateData.isCompleted = isCompleted;
       updateData.completedAt = isCompleted ? new Date() : null;
+    }
+    if (priority !== undefined) updateData.priority = priority || null;
+    if (category !== undefined) updateData.category = category || null;
+    if (scheduledTime !== undefined) updateData.scheduledTime = scheduledTime || null;
+    if (estimatedDurationMinutes !== undefined)
+      updateData.estimatedDurationMinutes = estimatedDurationMinutes || null;
+    if (estimatedCompletionDate !== undefined) {
+      let parsedDate = null;
+      if (estimatedCompletionDate) {
+        parsedDate = parseDateOnly(estimatedCompletionDate);
+      }
+      updateData.estimatedCompletionDate = parsedDate;
     }
 
     const task = await prisma.task.update({
@@ -381,33 +537,27 @@ router.delete('/:id', async (req, res) => {
         effectiveGoalIds = links.map((l) => l.goalId);
       }
 
-      // Adjust parent goals (only for TASK_BASED)
+      // Adjust parent goals (all goals are task-based now)
       for (const goalId of effectiveGoalIds) {
         const parentGoal = await tx.goal.findUnique({
           where: { id: goalId },
-          select: { progressMode: true, targetValue: true, currentValue: true },
+          select: { targetValue: true, currentValue: true },
         });
         if (!parentGoal) continue;
 
-        if (parentGoal.progressMode === 'TASK_BASED') {
-          const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
-          const newCurrent =
-            progressDelta !== 0
-              ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
-              : (parentGoal.currentValue ?? 0);
+        const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
+        const newCurrent =
+          progressDelta !== 0
+            ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
+            : (parentGoal.currentValue ?? 0);
 
-          await tx.goal.update({
-            where: { id: goalId },
-            data: {
-              targetValue: newTarget,
-              currentValue: newCurrent,
-            },
-          });
-
-          // Optional: log a negative progress entry to reflect deletion
-          // Skipped for now; add if you want audit trail.
-        }
-        // TODO: Consider MANUAL_TOTAL & HABIT: should removing a task influence targets/progress?
+        await tx.goal.update({
+          where: { id: goalId },
+          data: {
+            targetValue: newTarget,
+            currentValue: newCurrent,
+          },
+        });
       }
     });
 
@@ -457,7 +607,6 @@ router.post('/:id/complete', async (req, res) => {
           select: {
             title: true,
             currentValue: true,
-            progressMode: true,
             targetValue: true,
             parentId: true,
             goalTasks: {
@@ -467,7 +616,6 @@ router.post('/:id/complete', async (req, res) => {
         });
 
         if (!goal) continue;
-        if (goal.progressMode !== 'TASK_BASED') continue;
 
         const newValue = Math.max(0, (goal.currentValue || 0) + effortDelta);
 
@@ -504,10 +652,10 @@ router.post('/:id/complete', async (req, res) => {
           if (percentComplete >= 100) {
             const parentGoal = await tx.goal.findUnique({
               where: { id: goal.parentId },
-              select: { progressMode: true, title: true },
+              select: { title: true },
             });
 
-            if (parentGoal && parentGoal.progressMode === 'TASK_BASED') {
+            if (parentGoal) {
               // Add 1 progress unit to parent when subgoal completes
               await tx.goal.update({
                 where: { id: goal.parentId },
@@ -620,7 +768,7 @@ router.post('/:id/link-goal', async (req, res) => {
       // Verify goal belongs to user
       const goal = await tx.goal.findFirst({
         where: { id: goalId, userId: user.id },
-        select: { progressMode: true, targetValue: true },
+        select: { targetValue: true },
       });
       if (!goal) {
         throw new Error('Goal not found or access denied');
@@ -640,14 +788,11 @@ router.post('/:id/link-goal', async (req, res) => {
         data: { goalId, taskId: req.params.id },
       });
 
-      // Increment goal's targetValue if TASK_BASED
-      if (goal.progressMode === 'TASK_BASED') {
-        await tx.goal.update({
-          where: { id: goalId },
-          data: { targetValue: (goal.targetValue ?? 0) + 1 },
-        });
-      }
-      // TODO: Consider MANUAL_TOTAL & HABIT link effect on targets
+      // Increment goal's targetValue (all goals are task-based now)
+      await tx.goal.update({
+        where: { id: goalId },
+        data: { targetValue: (goal.targetValue ?? 0) + 1 },
+      });
     });
 
     // Return updated task
@@ -686,7 +831,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
       // Verify goal belongs to user and fetch its properties
       const goal = await tx.goal.findFirst({
         where: { id: goalId, userId: user.id },
-        select: { progressMode: true, targetValue: true, currentValue: true },
+        select: { targetValue: true, currentValue: true },
       });
       if (!goal) {
         throw new Error('Goal not found or access denied');
@@ -701,26 +846,23 @@ router.post('/:id/unlink-goal', async (req, res) => {
         throw new Error('Task is not linked to this goal');
       }
 
-      // Update goal's targetValue and currentValue if TASK_BASED
-      if (goal.progressMode === 'TASK_BASED') {
-        const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
+      // Update goal's targetValue and currentValue (all goals are task-based now)
+      const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
 
-        // If task was completed, also decrement currentValue
-        let newCurrentValue = goal.currentValue;
-        if (task.isCompleted) {
-          const progressDelta = task.size || 1;
-          newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
-        }
-
-        await tx.goal.update({
-          where: { id: goalId },
-          data: {
-            targetValue: newTargetValue,
-            currentValue: newCurrentValue,
-          },
-        });
+      // If task was completed, also decrement currentValue
+      let newCurrentValue = goal.currentValue;
+      if (task.isCompleted) {
+        const progressDelta = task.size || 1;
+        newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
       }
-      // TODO: Consider MANUAL_TOTAL & HABIT unlink effect on targets
+
+      await tx.goal.update({
+        where: { id: goalId },
+        data: {
+          targetValue: newTargetValue,
+          currentValue: newCurrentValue,
+        },
+      });
     });
 
     // Return updated task

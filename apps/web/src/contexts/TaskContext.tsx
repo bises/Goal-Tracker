@@ -31,7 +31,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const data = await taskApi.fetchTasks();
-      setTasks(Array.isArray(data) ? data : []);
+      const validTasks = Array.isArray(data) ? data.filter((task) => task && task.id) : [];
+      setTasks(validTasks);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
     } finally {
@@ -40,12 +41,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addTask = useCallback((task: Task) => {
+    if (!task || !task.id) {
+      return;
+    }
     setTasks((prev) => [...prev, task]);
   }, []);
 
   const upsertTask = useCallback((task: Task) => {
+    if (!task || !task.id) {
+      return;
+    }
     setTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === task.id);
+      const idx = prev.findIndex((t) => t && t.id === task.id);
       if (idx === -1) return [...prev, task];
       const copy = [...prev];
       copy[idx] = task;

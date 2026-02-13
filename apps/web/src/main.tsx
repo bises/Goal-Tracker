@@ -1,7 +1,7 @@
 import { Auth0Provider } from '@auth0/auth0-react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import AppContent from './App';
+import App from './App';
 import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
 import './styles/design-system.css';
@@ -47,13 +47,14 @@ ReactDOM.createRoot(rootElement).render(
       authorizationParams={{
         redirect_uri: window.location.origin + '/callback',
         audience: audience || undefined,
+        scope: 'openid profile email offline_access',
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}
     >
       <GoalProvider>
         <TaskProvider>
-          <AppContent />
+          <App />
         </TaskProvider>
       </GoalProvider>
     </Auth0Provider>

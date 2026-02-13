@@ -1,5 +1,15 @@
 export type GoalScope = 'YEARLY' | 'MONTHLY' | 'WEEKLY' | 'STANDALONE';
-export type ProgressMode = 'TASK_BASED' | 'MANUAL_TOTAL' | 'HABIT';
+
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type TaskCategory =
+  | 'WORK'
+  | 'PERSONAL'
+  | 'HEALTH'
+  | 'LEARNING'
+  | 'FINANCE'
+  | 'SOCIAL'
+  | 'HOUSEHOLD'
+  | 'OTHER';
 
 export type TaskEvent =
   | 'TaskCompleted'
@@ -16,6 +26,15 @@ export interface Task {
   isCompleted: boolean;
   completedAt?: string;
   scheduledDate?: string;
+
+  // New fields
+  priority?: TaskPriority;
+  category?: TaskCategory;
+  scheduledTime?: string;
+  estimatedDurationMinutes?: number;
+  estimatedCompletionDate?: string;
+
+  // Relationships
   goalTasks?: GoalTask[];
   parentTaskId?: string;
   parentTask?: Partial<Task>;
@@ -38,8 +57,7 @@ export interface Goal {
   id: string;
   title: string;
   description?: string;
-  type: 'TOTAL_TARGET' | 'FREQUENCY' | 'HABIT';
-  progressMode: ProgressMode;
+  type: 'TOTAL_TARGET' | 'FREQUENCY';
   targetValue?: number;
   currentValue: number;
   frequencyTarget?: number;
@@ -66,7 +84,6 @@ export interface Goal {
 }
 
 export interface ProgressSummary {
-  mode: ProgressMode;
   percentComplete: number;
   taskTotals: {
     totalCount: number;
@@ -105,7 +122,6 @@ export interface GoalTasksResponse {
     title: string;
     description?: string;
     scope: string;
-    progressMode: string;
     targetValue: number;
     currentValue: number;
     parentId: string | null;

@@ -25,7 +25,7 @@ model Goal {
   id               String         @id @default(uuid())
   title            String
   description      String?
-  type             GoalType
+  type             GoalType       @default(TOTAL_TARGET)
   targetValue      Float?
   currentValue     Float          @default(0)
   stepSize         Float          @default(1)
@@ -38,7 +38,6 @@ model Goal {
   customDataLabel  String?
   parentId         String?
   scope            GoalScope      @default(STANDALONE)
-  progressMode     ProgressMode   @default(TASK_BASED)
   isMarkedComplete Boolean        @default(false)
   userId           Int
   parent           Goal?          @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
@@ -51,22 +50,27 @@ model Goal {
 }
 
 model Task {
-  id            String     @id @default(uuid())
-  title         String
-  description   String?
-  size          Int        @default(1)
-  isCompleted   Boolean    @default(false)
-  completedAt   DateTime?
-  scheduledDate DateTime?
-  parentTaskId  String?
-  customData    String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  userId        Int
-  goalTasks     GoalTask[]
-  parentTask    Task?      @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subTasks      Task[]     @relation("TaskHierarchy")
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                        String        @id @default(uuid())
+  title                     String
+  description               String?
+  size                      Int           @default(1)
+  isCompleted               Boolean       @default(false)
+  completedAt               DateTime?
+  scheduledDate             DateTime?
+  priority                  TaskPriority?
+  category                  TaskCategory?
+  scheduledTime             String?
+  estimatedDurationMinutes  Int?
+  estimatedCompletionDate   DateTime?
+  parentTaskId              String?
+  customData                String?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  userId                    Int
+  goalTasks                 GoalTask[]
+  parentTask                Task?         @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subTasks                  Task[]        @relation("TaskHierarchy")
+  user                      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([scheduledDate, isCompleted])
@@ -97,13 +101,6 @@ model Progress {
 enum GoalType {
   TOTAL_TARGET
   FREQUENCY
-  HABIT
-}
-
-enum ProgressMode {
-  TASK_BASED
-  MANUAL_TOTAL
-  HABIT
 }
 
 enum GoalScope {
@@ -117,4 +114,21 @@ enum FrequencyType {
   DAILY
   WEEKLY
   MONTHLY
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskCategory {
+  WORK
+  PERSONAL
+  HEALTH
+  LEARNING
+  FINANCE
+  SOCIAL
+  HOUSEHOLD
+  OTHER
 }

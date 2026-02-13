@@ -1,43 +1,76 @@
 @import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-family: 'Outfit', sans-serif;
+  /* Sun-Kissed Typography */
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
 
-  /* HSL Colors */
-  --color-bg-h: 222;
-  --color-bg-s: 47%;
-  --color-bg-l: 11%;
+  /* Sun-Kissed Color Palette */
+  --peach-cream: #fff9f5;
+  --energizing-orange: #ff8c42;
+  --electric-pink: #ff3e83;
+  --soft-coral: #ffb088;
+  --warm-rose: #ff6b9d;
+  --deep-charcoal: #2a2a2a;
+  --warm-gray: #6b6b6b;
+  --light-peach: #ffeee5;
 
-  --color-primary-h: 265;
-  --color-primary-s: 83%;
-  --color-primary-l: 57%;
-
-  --color-secondary-h: 192;
-  --color-secondary-s: 91%;
-  --color-secondary-l: 36%;
-
-  --color-text-main: #ffffff;
-  --color-text-muted: #94a3b8;
-
-  --bg-color: hsl(var(--color-bg-h), var(--color-bg-s), var(--color-bg-l));
-  --card-bg: rgba(30, 41, 59, 0.7);
-  --card-border: rgba(255, 255, 255, 0.1);
-
+  /* Gradient - Orange to Pink */
   --gradient-primary: linear-gradient(
     135deg,
-    hsl(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l)),
-    hsl(var(--color-secondary-h), var(--color-secondary-s), var(--color-secondary-l))
+    var(--energizing-orange) 0%,
+    var(--electric-pink) 100%
+  );
+  --gradient-subtle: linear-gradient(
+    135deg,
+    rgba(255, 140, 66, 0.1) 0%,
+    rgba(255, 62, 131, 0.1) 100%
   );
 
-  --radius-lg: 24px;
-  --radius-md: 16px;
-  --radius-sm: 8px;
+  /* Background */
+  --bg-color: var(--peach-cream);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(255, 140, 66, 0.15);
 
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  /* Text Colors */
+  --color-text-main: var(--deep-charcoal);
+  --color-text-muted: var(--warm-gray);
+  --color-text-accent: var(--energizing-orange);
+
+  /* Squircle Border Radius (approximation using CSS) */
+  --radius-squircle-sm: 12px;
+  --radius-squircle-md: 20px;
+  --radius-squircle-lg: 32px;
+  --radius-squircle-xl: 40px;
+
+  /* Z-Index Scale - Layering System */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-fixed: 1200;
+  --z-modal-backdrop: 1300;
+  --z-modal: 1400;
+  --z-popover: 1500;
+  --z-tooltip: 1600;
+  --z-notification: 1700;
+
+  /* Colored Glow Shadows */
+  --glow-orange: 0 10px 30px rgba(255, 140, 66, 0.25);
+  --glow-pink: 0 10px 30px rgba(255, 62, 131, 0.25);
+  --glow-gradient: 0 12px 40px rgba(255, 140, 66, 0.15), 0 8px 20px rgba(255, 62, 131, 0.15);
+  --glow-soft: 0 8px 24px rgba(255, 140, 66, 0.12);
+  --glow-inner: inset 0 2px 8px rgba(255, 255, 255, 0.6);
+
+  /* Legacy support */
+  --radius-lg: var(--radius-squircle-lg);
+  --radius-md: var(--radius-squircle-md);
+  --radius-sm: var(--radius-squircle-sm);
+  --shadow-lg: var(--glow-gradient);
 
   --radius: 0.625rem;
 
@@ -106,13 +139,55 @@
 
 /* Remove the global reset - Tailwind handles this */
 
-body {
-  font-family: var(--font-family);
-  background-color: var(--bg-color);
-  color: var(--color-text-main);
-  min-height: 100vh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    color: var(--color-text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* Typography - Outfit Extra Bold for headings */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--deep-charcoal);
+  }
+
+  h1 {
+    font-size: 2.25rem; /* 36px - Main page headings */
+  }
+  h2 {
+    font-size: 1.875rem; /* 30px - Section headings */
+  }
+  h3 {
+    font-size: 1.5rem; /* 24px - Subsection headings */
+  }
+  h4 {
+    font-size: 1.25rem; /* 20px - Small headings */
+  }
+}
+
+/* Grain Texture Overlay (3% opacity) */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.03;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
 }
 
 #root {
@@ -121,63 +196,110 @@ body {
   flex-direction: column;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-/* Glassmorphism Utilities */
-.glass-panel {
+/* Sun-Kissed Squircle Card */
+.squircle-card {
   background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius-squircle-lg);
+  box-shadow: var(--glow-soft), var(--glow-inner);
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
-/* Form Elements */
-input,
-select,
-textarea {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--card-border);
-  color: white;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  font-family: inherit;
+.squircle-card:hover {
+  box-shadow: var(--glow-gradient), var(--glow-inner);
+  transform: translateY(-2px);
+  border-color: rgba(255, 140, 66, 0.3);
+}
+
+/* Tactile Raised Surface */
+.tactile-surface {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 249, 245, 0.95) 100%);
+  border: 2px solid rgba(255, 140, 66, 0.1);
+  border-radius: var(--radius-squircle-md);
+  box-shadow:
+    0 4px 16px rgba(255, 140, 66, 0.08),
+    0 2px 8px rgba(255, 62, 131, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: 1.5rem;
+}
+
+/* Form Elements - Sun-Kissed Style */
+/* Exclude shadcn/radix UI components from global styling */
+input:not([class*='rdp-']):not([role]):not([data-slot]),
+select:not([class*='rdp-']):not([role]):not([data-slot]),
+textarea:not([class*='rdp-']):not([role]):not([data-slot]) {
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(255, 140, 66, 0.2);
+  color: var(--deep-charcoal);
+  padding: 14px 18px;
+  border-radius: var(--radius-squircle-sm);
+  font-family: var(--font-body);
+  font-size: 1rem;
   width: 100%;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 140, 66, 0.05);
 }
 
-input:focus,
-select:focus {
+input:not([class*='rdp-']):not([role]):not([data-slot]):focus,
+select:not([class*='rdp-']):not([role]):not([data-slot]):focus,
+textarea:not([class*='rdp-']):not([role]):not([data-slot]):focus {
   outline: none;
-  border-color: hsl(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l));
+  border-color: var(--energizing-orange);
+  box-shadow: 0 4px 16px rgba(255, 140, 66, 0.2);
+  background: rgba(255, 255, 255, 1);
 }
 
+input::placeholder {
+  color: var(--warm-gray);
+  opacity: 0.6;
+}
+
+/* Primary Button - Gradient with Glow */
 button.primary-btn {
   background: var(--gradient-primary);
   border: none;
   color: white;
-  padding: 12px 24px;
-  border-radius: var(--radius-md);
-  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: var(--radius-squircle-md);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
   cursor: pointer;
-  transition:
-    transform 0.1s,
-    opacity 0.2s;
+  box-shadow: var(--glow-gradient);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+button.primary-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
 }
 
 button.primary-btn:hover {
-  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 48px rgba(255, 140, 66, 0.3),
+    0 8px 24px rgba(255, 62, 131, 0.25);
+}
+
+button.primary-btn:hover::before {
+  left: 100%;
 }
 
 button.primary-btn:active {
-  transform: scale(0.98);
+  transform: translateY(0px);
+  box-shadow: 0 8px 24px rgba(255, 140, 66, 0.2);
 }
 
 @theme inline {
@@ -262,4 +384,70 @@ button.primary-btn:active {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Sun-Kissed Utility Classes */
+.squircle-sm {
+  border-radius: var(--radius-squircle-sm);
+}
+.squircle-md {
+  border-radius: var(--radius-squircle-md);
+}
+.squircle-lg {
+  border-radius: var(--radius-squircle-lg);
+}
+.squircle-xl {
+  border-radius: var(--radius-squircle-xl);
+}
+
+.glow-orange {
+  box-shadow: var(--glow-orange);
+}
+.glow-pink {
+  box-shadow: var(--glow-pink);
+}
+.glow-gradient {
+  box-shadow: var(--glow-gradient);
+}
+.glow-soft {
+  box-shadow: var(--glow-soft);
+}
+
+.gradient-primary {
+  background: var(--gradient-primary);
+}
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.backdrop-blur-glass {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
