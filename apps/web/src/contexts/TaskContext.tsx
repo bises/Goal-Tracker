@@ -1,5 +1,5 @@
 import { formatLocalDate } from '@goal-tracker/shared';
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { taskApi } from '../api';
 import { Task } from '../types';
 
@@ -38,12 +38,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Auto-fetch tasks on mount (only once)
-  useEffect(() => {
-    fetchTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addTask = useCallback((task: Task) => {

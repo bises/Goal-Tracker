@@ -183,13 +183,10 @@ export const TaskEditSheet = ({
   return (
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Drawer.Portal>
-        <Drawer.Overlay
-          className="fixed inset-0 bg-black/60"
-          style={{ zIndex: 'var(--z-modal-backdrop)' }}
-        />
+        <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] h-[90vh] max-h-[90vh] overflow-hidden"
-          style={{ background: 'var(--peach-cream)', zIndex: 'var(--z-modal)' }}
+          style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
           aria-describedby="task-edit-description"
         >
           {/* Handle */}

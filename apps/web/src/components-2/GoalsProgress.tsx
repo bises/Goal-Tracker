@@ -1,17 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { useGoalContext } from '../contexts/GoalContext';
 import { Goal, GoalScope } from '../types';
 import { SquircleCard } from './SquircleCard';
 
 export const GoalsProgress = () => {
-  const { goals, loading, fetchGoals } = useGoalContext();
-
-  useEffect(() => {
-    if (goals.length === 0 && !loading) {
-      fetchGoals();
-    }
-  }, [goals.length, loading, fetchGoals]);
+  const { goals, loading } = useGoalContext();
+  const navigate = useNavigate();
 
   const activeGoals = useMemo(() => {
     // Filter goals by scope - show all goals with YEARLY, MONTHLY, or WEEKLY scope
@@ -100,11 +96,12 @@ export const GoalsProgress = () => {
           return (
             <SquircleCard
               key={goal.id}
-              className="p-3 transition-all hover:shadow-lg"
+              className="p-3 transition-all hover:shadow-lg cursor-pointer"
               style={{
                 background:
                   'linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(147, 51, 234, 0.03) 100%)',
               }}
+              onClick={() => navigate(`/goals/${goal.id}`)}
             >
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
@@ -162,9 +159,7 @@ export const GoalsProgress = () => {
         <button
           className="w-full mt-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 rounded-lg"
           style={{ color: 'var(--warm-gray)' }}
-          onClick={() => {
-            // TODO: Navigate to goals page
-          }}
+          onClick={() => navigate('/goals')}
         >
           See all {activeGoals.length} goals →
         </button>

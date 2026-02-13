@@ -10,8 +10,7 @@ interface TasksForDateSheetProps {
   onClose: () => void;
   date: Date | null;
   tasks: Task[];
-  onTaskClick: (task: Task) => void;
-  onToggleComplete: (taskId: string) => Promise<void>;
+  onTaskUpdated?: () => void;
   onAddTask: () => void;
 }
 
@@ -20,8 +19,7 @@ export const TasksForDateSheet = ({
   onClose,
   date,
   tasks,
-  onTaskClick,
-  onToggleComplete,
+  onTaskUpdated,
   onAddTask,
 }: TasksForDateSheetProps) => {
   const formattedDate = date
@@ -86,12 +84,7 @@ export const TasksForDateSheet = ({
             ) : (
               <div className="space-y-2">
                 {tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggle={onToggleComplete}
-                    onEdit={() => onTaskClick(task)}
-                  />
+                  <TaskCard key={task.id} task={task} onTaskUpdated={onTaskUpdated} />
                 ))}
               </div>
             )}

@@ -2,10 +2,9 @@ import { format } from 'date-fns';
 import { CalendarIcon, RefreshCw, ServerOff, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api, PaginatedTasksResponse, taskApi } from '../api';
+import { PaginatedTasksResponse, taskApi } from '../api';
 import { SquircleCard } from '../components-2/SquircleCard';
 import { TaskCard } from '../components-2/TaskCard';
-import { TaskEditSheet } from '../components-2/TaskEditSheet';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { CustomCalendar } from '../components/ui/custom-calendar';
@@ -20,12 +19,14 @@ import {
   PaginationPrevious,
 } from '../components/ui/pagination';
 import { Spinner } from '../components/ui/spinner';
-import { Goal, Task } from '../types';
+import { useGoalContext } from '../contexts/GoalContext';
+import { Task } from '../types';
 
 type TaskStatus = 'pending' | 'completed';
 
 export const TasksPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { goals } = useGoalContext();
   const tabParam = searchParams.get('tab') as TaskStatus | null;
   const dateParam = searchParams.get('date');
   const [activeTab, setActiveTab] = useState<TaskStatus>(
@@ -37,11 +38,6 @@ export const TasksPage = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [rescheduleTaskId, setRescheduleTaskId] = useState<string | null>(null);
-  const [isRescheduling, setIsRescheduling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -50,7 +46,6 @@ export const TasksPage = () => {
     setIsRetrying(true);
     setError(null);
     await fetchTasks();
-    await fetchGoals();
     setIsRetrying(false);
   };
 
@@ -68,22 +63,6 @@ export const TasksPage = () => {
   useEffect(() => {
     fetchTasks();
   }, [activeTab, page, selectedDate]);
-
-  useEffect(() => {
-    fetchGoals();
-  }, []);
-
-  const fetchGoals = async () => {
-    try {
-      const goalsData = await api.fetchGoals();
-      setGoals(goalsData);
-      setError(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to connect to server';
-      setError(message);
-      console.error('Error fetching goals:', err);
-    }
-  };
 
   const fetchTasks = async () => {
     try {
@@ -143,43 +122,6 @@ export const TasksPage = () => {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       handleDateChange(dateStr);
-    }
-  };
-
-  const handleToggle = async (taskId: string) => {
-    try {
-      await taskApi.toggleComplete(taskId);
-      // Refresh tasks after toggle
-      fetchTasks();
-    } catch (error) {
-      console.error('Failed to toggle task:', error);
-    }
-  };
-
-  const handleReschedule = (taskId: string) => {
-    setRescheduleTaskId(taskId);
-  };
-
-  const handleRescheduleDate = async (date: Date | undefined) => {
-    if (!date || !rescheduleTaskId) return;
-    try {
-      setIsRescheduling(true);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      await taskApi.scheduleTask(rescheduleTaskId, dateStr);
-      setRescheduleTaskId(null);
-      fetchTasks();
-    } catch (error) {
-      console.error('Failed to reschedule task:', error);
-    } finally {
-      setIsRescheduling(false);
-    }
-  };
-
-  const handleEdit = (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (task) {
-      setSelectedTask(task);
-      setIsEditSheetOpen(true);
     }
   };
 
@@ -309,13 +251,7 @@ export const TasksPage = () => {
       {!loading && tasks.length > 0 && (
         <div className="space-y-3">
           {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={handleToggle}
-              onReschedule={handleReschedule}
-              onEdit={handleEdit}
-            />
+            <TaskCard key={task.id} task={task} availableGoals={goals} onTaskUpdated={fetchTasks} />
           ))}
         </div>
       )}
@@ -409,40 +345,6 @@ export const TasksPage = () => {
         </div>
       )}
 
-      {/* Reschedule Calendar Modal */}
-      <Dialog
-        open={!!rescheduleTaskId}
-        onOpenChange={(open) => {
-          if (!open) setRescheduleTaskId(null);
-        }}
-      >
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0 bg-white border-gray-200">
-          <DialogHeader className="p-4 pb-0">
-            <DialogTitle
-              className="text-lg font-bold font-display"
-              style={{ color: 'var(--deep-charcoal)' }}
-            >
-              Reschedule Task
-            </DialogTitle>
-            <p className="text-sm mt-1" style={{ color: 'var(--warm-gray)' }}>
-              Pick a new date for this task
-            </p>
-          </DialogHeader>
-          <CustomCalendar
-            selected={undefined}
-            defaultMonth={new Date()}
-            fromYear={2024}
-            toYear={2030}
-            onSelect={handleRescheduleDate}
-          />
-          {isRescheduling && (
-            <div className="text-center text-sm pb-4" style={{ color: 'var(--warm-gray)' }}>
-              Rescheduling...
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Date Filter Calendar Modal */}
       <Dialog open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0 bg-white border-gray-200">
@@ -466,18 +368,6 @@ export const TasksPage = () => {
           />
         </DialogContent>
       </Dialog>
-
-      {/* Task Edit Sheet */}
-      <TaskEditSheet
-        isOpen={isEditSheetOpen}
-        onClose={() => {
-          setIsEditSheetOpen(false);
-          setSelectedTask(null);
-        }}
-        task={selectedTask}
-        onSave={fetchTasks}
-        availableGoals={goals}
-      />
     </div>
   );
 };

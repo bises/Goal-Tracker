@@ -1,13 +1,17 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
+  CalendarDays,
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
+  Clock,
   RefreshCw,
   ServerOff,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { taskApi } from '../api';
+import { DailyTimelineView } from '../components-2/DailyTimelineView';
+import { DraggableTaskStrip, DropTargetHit } from '../components-2/DraggableTaskStrip';
 import { SquircleCard } from '../components-2/SquircleCard';
 import { TaskEditSheet } from '../components-2/TaskEditSheet';
 import { TasksForDateSheet } from '../components-2/TasksForDateSheet';
@@ -18,6 +22,22 @@ import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
 import { Task } from '../types';
 import { parseLocalDate } from '../utils/dateUtils';
+
+type PlannerView = 'month' | 'day';
+
+const getCategoryColor = (category?: string): string => {
+  const colors: Record<string, string> = {
+    WORK: '#3b82f6',
+    PERSONAL: '#8b5cf6',
+    HEALTH: '#10b981',
+    LEARNING: '#f59e0b',
+    FINANCE: '#06b6d4',
+    SOCIAL: '#ec4899',
+    HOUSEHOLD: '#f97316',
+    OTHER: '#6b7280',
+  };
+  return colors[category || ''] || '#ff8c42';
+};
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -39,16 +59,14 @@ export const PlannerPage = () => {
   const { tasks: allTasks, scheduleTask, error: taskError, fetchTasks } = useTaskContext();
   const { goals, error: goalError, fetchGoals } = useGoalContext();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [dragPositions, setDragPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [resetKeys, setResetKeys] = useState<Record<string, number>>({});
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [isScheduling, setIsScheduling] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<PlannerView>('month');
+  const [dailyDate, setDailyDate] = useState(new Date());
 
   const error = taskError || goalError;
 
@@ -90,19 +108,33 @@ export const PlannerPage = () => {
     });
   };
 
-  const handleDrop = async (date: Date) => {
-    if (!draggedTask) return;
-    setIsScheduling(true);
-    try {
-      await scheduleTask(draggedTask.id, date);
-      setDraggedTask(null);
+  // Handler for DraggableTaskStrip drops on calendar day cells
+  const handleStripDrop = useCallback(
+    async (task: Task, hit: DropTargetHit) => {
+      const dateStr = hit.element.getAttribute('data-date');
+      if (!dateStr) return;
+      const date = new Date(dateStr);
+      try {
+        await scheduleTask(task.id, date);
+      } catch (error) {
+        console.error('Failed to schedule task:', error);
+      }
       setHoveredDate(null);
-    } catch (error) {
-      console.error('Failed to schedule task:', error);
-    } finally {
-      setIsScheduling(false);
+    },
+    [scheduleTask]
+  );
+
+  // Hover highlight while dragging over a calendar day
+  const handleStripDragOver = useCallback((_task: Task, hit: DropTargetHit | null) => {
+    if (hit) {
+      const dateStr = hit.element.getAttribute('data-date');
+      if (dateStr) {
+        setHoveredDate(new Date(dateStr).toDateString());
+        return;
+      }
     }
-  };
+    setHoveredDate(null);
+  }, []);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -110,10 +142,20 @@ export const PlannerPage = () => {
   };
 
   const handleDayClick = (date: Date, taskCount: number) => {
-    if (taskCount > 0) {
-      setIsDateModalOpen(true);
-      setSelectedDate(date);
-    }
+    // Switch to daily view for this date
+    setDailyDate(date);
+    setViewMode('day');
+  };
+
+  const handleSwitchToDay = (date: Date) => {
+    setDailyDate(date);
+    setViewMode('day');
+  };
+
+  const handleCreateTaskForTime = (date: Date, time: string) => {
+    setSelectedTask(null);
+    setIsEditSheetOpen(true);
+    // The TaskEditSheet will open in create mode
   };
 
   const handleToggleComplete = async (taskId: string) => {
@@ -214,244 +256,184 @@ export const PlannerPage = () => {
                 Planner
               </h1>
               <p className="text-sm" style={{ color: 'var(--warm-gray)' }}>
-                Schedule your tasks visually
+                {viewMode === 'month' ? 'Schedule your tasks visually' : 'Plan your day'}
               </p>
+            </div>
+
+            {/* View Toggle */}
+            <div
+              className="flex rounded-xl p-0.5 gap-0.5"
+              style={{
+                background: 'rgba(255, 140, 66, 0.08)',
+                border: '1px solid var(--card-border)',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('month')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: viewMode === 'month' ? 'var(--gradient-primary)' : 'transparent',
+                  color: viewMode === 'month' ? 'white' : 'var(--warm-gray)',
+                  boxShadow: viewMode === 'month' ? '0 2px 8px rgba(255, 140, 66, 0.3)' : 'none',
+                }}
+              >
+                <CalendarDays size={14} />
+                Month
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('day');
+                  setDailyDate(new Date());
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background: viewMode === 'day' ? 'var(--gradient-primary)' : 'transparent',
+                  color: viewMode === 'day' ? 'white' : 'var(--warm-gray)',
+                  boxShadow: viewMode === 'day' ? '0 2px 8px rgba(255, 140, 66, 0.3)' : 'none',
+                }}
+              >
+                <Clock size={14} />
+                Day
+              </button>
             </div>
           </div>
 
-          {/* Unscheduled Tasks Floating Bar - Mobile Only */}
-          {isMobile && unscheduledTasks.length > 0 && (
-            <div className="mb-4 -mx-4">
-              <div className="flex items-center gap-2 mb-2 px-4">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--warm-gray)' }}>
-                  Unscheduled ({unscheduledTasks.length})
-                </h3>
-              </div>
-              <div
-                className="flex gap-2 overflow-x-auto pb-2 px-4 scrollbar-thin scrollbar-thumb-orange-300 scrollbar-track-transparent"
-                style={{ overflow: 'visible' }}
-              >
-                <AnimatePresence mode="popLayout">
-                  {unscheduledTasks.map((task) => (
-                    <motion.div
-                      key={`${task.id}-${resetKeys[task.id] ?? 0}`}
-                      className="flex-shrink-0 px-3 py-1.5 rounded-full cursor-grab active:cursor-grabbing text-sm font-medium max-w-[200px] truncate"
-                      style={{
-                        background: 'var(--gradient-subtle)',
-                        border: '1px solid var(--card-border)',
-                        color: 'var(--energizing-orange)',
-                        touchAction: 'none',
-                      }}
-                      drag
-                      dragElastic={0}
-                      dragMomentum={false}
-                      dragConstraints={false}
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: dragPositions[task.id]?.x ?? 0,
-                        y: dragPositions[task.id]?.y ?? 0,
-                      }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 500,
-                        damping: 30,
-                      }}
-                      onDragStart={(event, info) => {
-                        setDraggedTask(task);
-                      }}
-                      onDrag={(event, info) => {
-                        // Check what's under the cursor during drag
-                        const { x, y } = info.point;
-                        const elements = document.elementsFromPoint(x, y);
-                        const dayElement = elements.find((el) =>
-                          el.hasAttribute('data-calendar-day')
-                        );
-
-                        if (dayElement && dayElement.getAttribute('data-date')) {
-                          const dateStr = dayElement.getAttribute('data-date');
-                          if (dateStr) {
-                            const date = new Date(dateStr);
-                            setHoveredDate(date.toDateString());
-                          }
-                        } else {
-                          setHoveredDate(null);
-                        }
-                      }}
-                      onDragEnd={async (event, info) => {
-                        // Get the drop position
-                        const { x, y } = info.point;
-
-                        // Find which calendar day element is at this position
-                        const elements = document.elementsFromPoint(x, y);
-
-                        const dayElement = elements.find((el) =>
-                          el.hasAttribute('data-calendar-day')
-                        );
-
-                        if (dayElement) {
-                          const dateStr = dayElement.getAttribute('data-date');
-                          if (dateStr) {
-                            const date = new Date(dateStr);
-                            await handleDrop(date);
-                          }
-                        } else {
-                          // Force remount by changing key to reset Framer Motion's internal state
-                          setResetKeys((prev) => ({
-                            ...prev,
-                            [task.id]: (prev[task.id] ?? 0) + 1,
-                          }));
-                          // Also reset position state
-                          setDragPositions((prev) => ({
-                            ...prev,
-                            [task.id]: { x: 0, y: 0 },
-                          }));
-                        }
-
-                        setDraggedTask(null);
-                        setHoveredDate(null);
-                      }}
-                      onClick={(e) => {
-                        if (!draggedTask) {
-                          handleTaskClick(task);
-                        }
-                      }}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.5,
-                        y: -20,
-                        transition: { duration: 0.3, ease: 'easeOut' },
-                      }}
-                      whileHover={{
-                        scale: 1.05,
-                        boxShadow: '0 2px 8px rgba(255, 140, 66, 0.2)',
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      whileDrag={{
-                        scale: 1.1,
-                        zIndex: 9999,
-                        boxShadow: '0 8px 24px rgba(255, 140, 66, 0.5)',
-                        rotate: 5,
-                        cursor: 'grabbing',
-                      }}
-                      title={task.title}
-                    >
-                      {task.title}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+          {/* Daily View */}
+          {viewMode === 'day' && (
+            <div className="flex-1 min-h-0">
+              <DailyTimelineView
+                date={dailyDate}
+                onDateChange={setDailyDate}
+                onTaskClick={handleTaskClick}
+                onCreateTask={handleCreateTaskForTime}
+                unscheduledTasks={unscheduledTasks}
+              />
             </div>
           )}
 
-          {/* Month Navigation */}
-          <SquircleCard className="mb-3">
-            <div className="flex items-center justify-between px-3 py-2">
-              <button
-                onClick={() => navigateMonth('prev')}
-                className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
-                style={{ color: 'var(--energizing-orange)' }}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <h2
-                className="text-base font-bold font-display"
-                style={{ color: 'var(--deep-charcoal)' }}
-              >
-                {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
-              </h2>
-              <button
-                onClick={() => navigateMonth('next')}
-                className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
-                style={{ color: 'var(--energizing-orange)' }}
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </SquircleCard>
+          {/* Unscheduled Tasks Floating Bar - Mobile Only (Month view) */}
+          {viewMode === 'month' && isMobile && unscheduledTasks.length > 0 && (
+            <DraggableTaskStrip
+              className="mb-4 -mx-4 px-4"
+              tasks={unscheduledTasks}
+              dropTargetAttributes={['data-calendar-day']}
+              onDrop={handleStripDrop}
+              onDragOverTarget={handleStripDragOver}
+              onTaskClick={handleTaskClick}
+            />
+          )}
 
-          {/* Calendar Grid */}
-          <SquircleCard className="flex-shrink-0">
-            <div className="p-1 md:p-2 h-full flex flex-col">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-2 mb-1">
-                {DAYS_SHORT.map((day) => (
-                  <div
-                    key={day}
-                    className="text-center text-xs font-semibold py-1"
-                    style={{ color: 'var(--warm-gray)' }}
-                  >
-                    {day}
-                  </div>
-                ))}
+          {/* Month Navigation (Month view only) */}
+          {viewMode === 'month' && (
+            <SquircleCard className="mb-3">
+              <div className="flex items-center justify-between px-3 py-2">
+                <button
+                  onClick={() => navigateMonth('prev')}
+                  className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
+                  style={{ color: 'var(--energizing-orange)' }}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <h2
+                  className="text-base font-bold font-display"
+                  style={{ color: 'var(--deep-charcoal)' }}
+                >
+                  {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+                </h2>
+                <button
+                  onClick={() => navigateMonth('next')}
+                  className="p-1.5 rounded-lg hover:bg-orange-50 transition-colors"
+                  style={{ color: 'var(--energizing-orange)' }}
+                >
+                  <ChevronRight size={20} />
+                </button>
               </div>
+            </SquircleCard>
+          )}
 
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-2 auto-rows-fr">
-                {calendarDays.map((day, idx) => (
-                  <motion.div
-                    key={idx}
-                    data-calendar-day
-                    data-date={day.date?.toISOString()}
-                    className={`
+          {/* Calendar Grid (Month view only) */}
+          {viewMode === 'month' && (
+            <SquircleCard className="flex-shrink-0">
+              <div className="p-1 md:p-2 h-full flex flex-col">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-2 mb-1">
+                  {DAYS_SHORT.map((day) => (
+                    <div
+                      key={day}
+                      className="text-center text-xs font-semibold py-1"
+                      style={{ color: 'var(--warm-gray)' }}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Days */}
+                <div className="grid grid-cols-7 gap-2 auto-rows-fr">
+                  {calendarDays.map((day, idx) => (
+                    <motion.div
+                      key={idx}
+                      data-calendar-day
+                      data-date={day.date?.toISOString()}
+                      className={`
                     relative rounded-xl p-1 md:p-2 flex flex-col items-center justify-center overflow-hidden
                     ${day.isCurrentMonth ? 'cursor-pointer' : 'opacity-30'}
                     ${day.isToday ? 'ring-2' : ''}
                   `}
-                    style={
-                      {
-                        background: day.isCurrentMonth
-                          ? hoveredDate === day.date?.toDateString()
-                            ? 'rgba(255, 140, 66, 0.15)'
-                            : 'rgba(255, 255, 255, 0.5)'
-                          : 'transparent',
-                        '--tw-ring-color': day.isToday ? 'var(--energizing-orange)' : undefined,
-                        border: '2px solid var(--card-border)',
-                        minHeight: '40px',
-                      } as React.CSSProperties
-                    }
-                    onClick={() =>
-                      day.date && day.isCurrentMonth && handleDayClick(day.date, day.tasks.length)
-                    }
-                    whileHover={day.isCurrentMonth ? { scale: 1.05 } : undefined}
-                    whileTap={day.isCurrentMonth ? { scale: 0.98 } : undefined}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  >
-                    {day.date && (
-                      <>
-                        <div
-                          className={`text-sm md:text-base font-bold mb-1 ${day.isToday ? 'font-extrabold' : ''}`}
-                          style={{
-                            color: day.isToday
-                              ? 'var(--energizing-orange)'
-                              : 'var(--deep-charcoal)',
-                          }}
-                        >
-                          {day.date.getDate()}
-                        </div>
-                        {day.tasks.length > 0 && (
-                          <motion.div
-                            className="px-2 py-0.5 rounded-full font-bold text-xs"
+                      style={
+                        {
+                          background: day.isCurrentMonth
+                            ? hoveredDate === day.date?.toDateString()
+                              ? 'rgba(255, 140, 66, 0.15)'
+                              : 'rgba(255, 255, 255, 0.5)'
+                            : 'transparent',
+                          '--tw-ring-color': day.isToday ? 'var(--energizing-orange)' : undefined,
+                          border: '2px solid var(--card-border)',
+                          minHeight: '40px',
+                        } as React.CSSProperties
+                      }
+                      onClick={() =>
+                        day.date && day.isCurrentMonth && handleDayClick(day.date, day.tasks.length)
+                      }
+                      whileHover={day.isCurrentMonth ? { scale: 1.05 } : undefined}
+                      whileTap={day.isCurrentMonth ? { scale: 0.98 } : undefined}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    >
+                      {day.date && (
+                        <>
+                          <div
+                            className={`text-sm md:text-base font-bold mb-1 ${day.isToday ? 'font-extrabold' : ''}`}
                             style={{
-                              background: 'var(--gradient-primary)',
-                              color: 'white',
-                              boxShadow: '0 2px 8px rgba(255, 140, 66, 0.3)',
+                              color: day.isToday
+                                ? 'var(--energizing-orange)'
+                                : 'var(--deep-charcoal)',
                             }}
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 300, damping: 15 }}
                           >
-                            {day.tasks.length}
-                          </motion.div>
-                        )}
-                      </>
-                    )}
-                  </motion.div>
-                ))}
+                            {day.date.getDate()}
+                          </div>
+                          {day.tasks.length > 0 && (
+                            <motion.div
+                              className="px-2 py-0.5 rounded-full font-bold text-xs"
+                              style={{
+                                background: 'var(--gradient-primary)',
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(255, 140, 66, 0.3)',
+                              }}
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                            >
+                              {day.tasks.length}
+                            </motion.div>
+                          )}
+                        </>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </SquircleCard>
+            </SquircleCard>
+          )}
         </div>
 
         {/* Desktop Sidebar - Unscheduled Tasks */}
@@ -501,8 +483,9 @@ export const PlannerPage = () => {
                             boxShadow: '0 2px 8px rgba(255, 140, 66, 0.08)',
                           }}
                           draggable
-                          onDragStart={() => setDraggedTask(task)}
-                          onDragEnd={() => setDraggedTask(null)}
+                          onDragStart={(e) => {
+                            (e as any).dataTransfer?.setData('text/taskId', task.id);
+                          }}
                           whileHover={{
                             scale: 1.02,
                             boxShadow: '0 4px 16px rgba(255, 140, 66, 0.15)',
@@ -564,8 +547,7 @@ export const PlannerPage = () => {
           onClose={() => setIsDateModalOpen(false)}
           date={selectedDate}
           tasks={tasksForSelectedDate}
-          onTaskClick={handleTaskClick}
-          onToggleComplete={handleToggleComplete}
+          onTaskUpdated={fetchTasks}
           onAddTask={handleAddTaskForDate}
         />
 

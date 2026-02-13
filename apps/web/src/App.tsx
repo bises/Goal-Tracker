@@ -1,13 +1,13 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { LogOut, Plus, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { setAuthTokenProvider } from './api';
 import { BottomNav } from './components-2/BottomNav';
+import { TaskEditSheet } from './components-2/TaskEditSheet';
 import { TopNavBar } from './components-2/TopNavBar';
 import { GoalCard } from './components/Goals/GoalCard';
 import { AddGoalModal } from './components/modals/AddGoalModal';
-import AddTaskModal from './components/modals/AddTaskModal';
 import { ProtectedRoute } from './components/shared/ProtectedRoute';
 import { TaskListComponent } from './components/Tasks/TaskListComponent';
 import { useGoalContext } from './contexts/GoalContext';
@@ -30,8 +30,10 @@ function AppContent() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const hasFetchedRef = useRef(false);
 
   const handleAddTask = () => {
+    console.log('Add task button clicked, opening sheet...');
     setIsTaskModalOpen(true);
   };
 
@@ -49,11 +51,12 @@ function AppContent() {
   }, [getAccessTokenSilently]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchGoals();
       fetchTasks();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchGoals, fetchTasks]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);
@@ -311,22 +314,26 @@ function AppContent() {
                   {isGoalModalOpen && (
                     <AddGoalModal onClose={() => setIsGoalModalOpen(false)} onAdded={fetchGoals} />
                   )}
-                  {isTaskModalOpen && (
-                    <AddTaskModal
-                      isOpen={isTaskModalOpen}
-                      onClose={handleCloseTaskModal}
-                      onTaskAdded={() => {
-                        fetchTasks();
-                        fetchGoals(); // Refresh goals to show updated task counts
-                      }}
-                    />
-                  )}
                 </>
               </ProtectedRoute>
             }
           />
         </Routes>
       </div>
+
+      {/* Global Task Edit Sheet - shown on all authenticated pages */}
+      {isAuthenticated && !isAuthPage && isTaskModalOpen && (
+        <TaskEditSheet
+          isOpen={isTaskModalOpen}
+          onClose={handleCloseTaskModal}
+          onSave={() => {
+            fetchTasks();
+            fetchGoals(); // Refresh goals to show updated task counts
+            handleCloseTaskModal();
+          }}
+          availableGoals={goals}
+        />
+      )}
 
       {/* Bottom Navigation - shown on all authenticated pages */}
       {isAuthenticated && !isAuthPage && <BottomNav onAddClick={handleAddTask} />}

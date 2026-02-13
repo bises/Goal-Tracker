@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
-import { ensureUser, getUser } from '../services/userService';
+import { ensureUser } from '../services/userService';
 
 const router = Router();
 
@@ -40,13 +40,7 @@ const taskWithGoals = {
 // GET /api/tasks - Get all tasks with optional filtering and pagination
 router.get('/', async (req, res) => {
   try {
-    const user = await getUser(req);
-
-    if (!user) {
-      return res
-        .status(403)
-        .json({ error: 'User profile not found. Please complete registration.' });
-    }
+    const user = await ensureUser(req);
 
     // Extract query parameters
     const {

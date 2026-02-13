@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Search, ServerOff, SlidersHorizontal } from 'lucide-react';
+import { Plus, RefreshCw, ServerOff, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { GoalCard } from '../components-2/GoalCard';
 import { GoalEditSheet } from '../components-2/GoalEditSheet';
@@ -143,17 +143,12 @@ export const GoalsPage = () => {
         <div className="flex gap-2">
           {/* Search */}
           <div className="flex-1 relative">
-            <Search
-              size={18}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2"
-              style={{ color: 'var(--warm-gray)' }}
-            />
             <input
               type="text"
               placeholder="Search goals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm font-medium outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-2xl text-sm font-medium outline-none transition-all"
               style={{
                 background: 'rgba(255, 255, 255, 0.7)',
                 border: '2px solid rgba(255, 140, 66, 0.15)',

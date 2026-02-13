@@ -1,5 +1,5 @@
 import { getTodayString } from '@goal-tracker/shared';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accordion,
@@ -9,33 +9,16 @@ import {
 } from '../components/ui/accordion';
 import { Badge } from '../components/ui/badge';
 
-import { api } from '../api';
 import { Spinner } from '../components/ui/spinner';
+import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
-import { Goal } from '../types';
 import { SquircleCard } from './SquircleCard';
 import { TaskCard } from './TaskCard';
-import { TaskEditSheet } from './TaskEditSheet';
 
 export const DailyFocusList = () => {
   const navigate = useNavigate();
-  const { tasks, loading, toggleComplete, refreshTasks } = useTaskContext();
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [goals, setGoals] = useState<Goal[]>([]);
-
-  useEffect(() => {
-    fetchGoals();
-  }, []);
-
-  const fetchGoals = async () => {
-    try {
-      const goalsData = await api.fetchGoals();
-      setGoals(goalsData);
-    } catch (error) {
-      console.error('Error fetching goals:', error);
-    }
-  };
+  const { tasks, loading, refreshTasks } = useTaskContext();
+  const { goals } = useGoalContext();
 
   const todayTasks = useMemo(() => {
     const today = getTodayString();
@@ -60,32 +43,6 @@ export const DailyFocusList = () => {
 
   const incompleteTasks = todayTasks.filter((task) => !task.isCompleted);
   const completedTasks = todayTasks.filter((task) => task.isCompleted);
-
-  const handleToggle = async (taskId: string) => {
-    try {
-      await toggleComplete(taskId);
-    } catch (err) {
-      console.error('Failed to toggle task:', err);
-    }
-  };
-
-  const handleDelete = async (taskId: string) => {
-    // TODO: Implement delete functionality
-    // For now, just log - we'll implement the actual API call later
-  };
-
-  const handleReschedule = (taskId: string) => {
-    // TODO: Open date picker modal
-    // For now, just log - we'll implement the date picker modal later
-  };
-
-  const handleEdit = (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (task) {
-      setSelectedTask(task);
-      setIsEditSheetOpen(true);
-    }
-  };
 
   if (loading) {
     return (
@@ -145,9 +102,8 @@ export const DailyFocusList = () => {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    onToggle={handleToggle}
-                    onReschedule={handleReschedule}
-                    onEdit={handleEdit}
+                    availableGoals={goals}
+                    onTaskUpdated={refreshTasks}
                   />
                 ))}
               </div>
@@ -199,9 +155,8 @@ export const DailyFocusList = () => {
               <TaskCard
                 key={task.id}
                 task={task}
-                onToggle={handleToggle}
-                onReschedule={handleReschedule}
-                onEdit={handleEdit}
+                availableGoals={goals}
+                onTaskUpdated={refreshTasks}
               />
             ))}
           </div>
@@ -220,18 +175,6 @@ export const DailyFocusList = () => {
           </p>
         </SquircleCard>
       )}
-
-      {/* Task Edit Sheet */}
-      <TaskEditSheet
-        isOpen={isEditSheetOpen}
-        onClose={() => {
-          setIsEditSheetOpen(false);
-          setSelectedTask(null);
-        }}
-        task={selectedTask}
-        onSave={refreshTasks}
-        availableGoals={goals}
-      />
     </div>
   );
 };

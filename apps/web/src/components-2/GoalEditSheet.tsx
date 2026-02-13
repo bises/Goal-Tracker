@@ -204,8 +204,8 @@ export const GoalEditSheet = ({
             style={{ clip: 'rect(0, 0, 0, 0)' }}
           >
             {isEditMode
-              ? 'Edit goal details including title, description, scope, type, and target.'
-              : 'Create a new goal with title, description, scope, type, and target.'}
+              ? 'Edit goal details including title, description, scope, and target.'
+              : 'Create a new goal with title, description, scope, and target.'}
           </Drawer.Description>
 
           {/* Form Content - Scrollable */}
@@ -234,86 +234,56 @@ export const GoalEditSheet = ({
                 />
               </div>
 
-              {/* Scope & Type */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Scope */}
-                <div>
-                  <label
-                    className="block text-sm font-semibold mb-2"
-                    style={{ color: 'var(--deep-charcoal)' }}
+              {/* Scope */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: 'var(--deep-charcoal)' }}
+                >
+                  Scope
+                </label>
+                <Select value={scope} onValueChange={(value) => setScope(value as GoalScope)}>
+                  <SelectTrigger
+                    className="w-full h-12 px-4 rounded-xl border text-base"
+                    style={{ borderColor: 'var(--card-border)', color: 'var(--deep-charcoal)' }}
                   >
-                    Scope
-                  </label>
-                  <Select value={scope} onValueChange={(value) => setScope(value as GoalScope)}>
-                    <SelectTrigger
-                      className="w-full h-12 px-4 rounded-xl border text-base"
-                      style={{ borderColor: 'var(--card-border)', color: 'var(--deep-charcoal)' }}
-                    >
-                      <SelectValue placeholder="Select scope" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SCOPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.icon} {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Goal Type */}
-                <div>
-                  <label
-                    className="block text-sm font-semibold mb-2"
-                    style={{ color: 'var(--deep-charcoal)' }}
-                  >
-                    Type
-                  </label>
-                  <Select
-                    value={type}
-                    onValueChange={(value) => setType(value as 'TOTAL_TARGET' | 'FREQUENCY')}
-                  >
-                    <SelectTrigger
-                      className="w-full h-12 px-4 rounded-xl border text-base"
-                      style={{ borderColor: 'var(--card-border)', color: 'var(--deep-charcoal)' }}
-                    >
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="TOTAL_TARGET">🎯 Total Target</SelectItem>
-                      <SelectItem value="FREQUENCY">🔄 Frequency</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <SelectValue placeholder="Select scope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCOPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.icon} {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Target Value (only for TOTAL_TARGET) */}
-              {type === 'TOTAL_TARGET' && (
-                <div>
-                  <label
-                    className="block text-sm font-semibold mb-2"
-                    style={{ color: 'var(--deep-charcoal)' }}
-                  >
-                    Target Value
-                  </label>
-                  <input
-                    type="number"
-                    value={targetValue}
-                    onChange={(e) => setTargetValue(e.target.value)}
-                    placeholder="e.g. 12"
-                    min="0"
-                    className="w-full px-4 py-3 rounded-xl border text-base"
-                    style={{
-                      borderColor: 'var(--card-border)',
-                      color: 'var(--deep-charcoal)',
-                      background: 'white',
-                    }}
-                  />
-                  <p className="text-xs mt-1.5" style={{ color: 'var(--warm-gray)' }}>
-                    Leave blank for open-ended tracking
-                  </p>
-                </div>
-              )}
+              {/* Target Value */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: 'var(--deep-charcoal)' }}
+                >
+                  Target Value
+                </label>
+                <input
+                  type="number"
+                  value={targetValue}
+                  onChange={(e) => setTargetValue(e.target.value)}
+                  placeholder="e.g. 12"
+                  min="0"
+                  className="w-full px-4 py-3 rounded-xl border text-base"
+                  style={{
+                    borderColor: 'var(--card-border)',
+                    color: 'var(--deep-charcoal)',
+                    background: 'white',
+                  }}
+                />
+                <p className="text-xs mt-1.5" style={{ color: 'var(--warm-gray)' }}>
+                  Leave blank for open-ended tracking
+                </p>
+              </div>
 
               {/* Parent Goal (for non-standalone, non-yearly scopes) */}
               {!isEditMode &&

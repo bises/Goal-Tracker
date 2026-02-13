@@ -26,19 +26,17 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, taskApi } from '../api';
+import { api } from '../api';
 import { GoalCard } from '../components-2/GoalCard';
 import { GoalEditSheet } from '../components-2/GoalEditSheet';
 import { SquircleCard } from '../components-2/SquircleCard';
 import { TaskCard } from '../components-2/TaskCard';
-import { TaskEditSheet } from '../components-2/TaskEditSheet';
 import { ActivitiesListComponent } from '../components/Goals/ActivitiesListComponent';
 import { AddProgressModal } from '../components/modals/AddProgressModal';
 import { BulkTaskModal } from '../components/modals/BulkTaskModal';
 import { ConfirmDialog } from '../components/modals/ConfirmDialog';
 import LinkTasksModal from '../components/modals/LinkTasksModal';
 import { Spinner } from '../components/ui/spinner';
-import { useTaskContext } from '../contexts/TaskContext';
 import { Goal, GoalTasksResponse, Task } from '../types';
 
 const getScopeConfig = (scope: string) => {
@@ -62,7 +60,6 @@ const getTypeConfig = (type: string) => {
 export const GoalDetailsPage = () => {
   const { goalId } = useParams<{ goalId: string }>();
   const navigate = useNavigate();
-  const { updateTaskFields } = useTaskContext();
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [tasksData, setTasksData] = useState<GoalTasksResponse | null>(null);
@@ -74,12 +71,8 @@ export const GoalDetailsPage = () => {
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [isLinkingTasks, setIsLinkingTasks] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
-  const [taskToUnlink, setTaskToUnlink] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activitiesExpanded, setActivitiesExpanded] = useState(false);
   const [showAllTasks, setShowAllTasks] = useState(false);
 
@@ -105,18 +98,6 @@ export const GoalDetailsPage = () => {
     if (!goal) return;
     await api.deleteGoal(goal.id);
     navigate('/goals');
-  };
-
-  const handleUnlinkTask = async () => {
-    if (taskToUnlink) {
-      try {
-        await updateTaskFields(taskToUnlink, { goalIds: [] });
-        fetchGoalData();
-      } catch (e) {
-        console.error('Failed to unlink task', e);
-      }
-      setTaskToUnlink(null);
-    }
   };
 
   const handleCompleteGoal = async () => {
@@ -674,34 +655,7 @@ export const GoalDetailsPage = () => {
                         {displayTasks.map((gt) => {
                           const task = gt.task as Task;
                           return (
-                            <div key={task.id} className="relative group">
-                              <TaskCard
-                                task={task}
-                                onToggle={async (taskId) => {
-                                  await taskApi.toggleComplete(taskId);
-                                  fetchGoalData();
-                                }}
-                                onEdit={(taskId) => {
-                                  setSelectedTask(task);
-                                  setIsEditSheetOpen(true);
-                                }}
-                              />
-                              <button
-                                onClick={() => {
-                                  setTaskToUnlink(task.id);
-                                  setShowUnlinkConfirm(true);
-                                }}
-                                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.15)',
-                                  color: '#ef4444',
-                                  border: '2px solid rgba(239, 68, 68, 0.3)',
-                                }}
-                                title="Unlink task"
-                              >
-                                ✕
-                              </button>
-                            </div>
+                            <TaskCard key={task.id} task={task} onTaskUpdated={fetchGoalData} />
                           );
                         })}
                         <div className="flex gap-2">
@@ -903,20 +857,6 @@ export const GoalDetailsPage = () => {
         />
       )}
 
-      <TaskEditSheet
-        isOpen={isEditSheetOpen}
-        onClose={() => {
-          setIsEditSheetOpen(false);
-          setSelectedTask(null);
-        }}
-        task={selectedTask}
-        onSave={() => {
-          fetchGoalData();
-          setIsEditSheetOpen(false);
-          setSelectedTask(null);
-        }}
-      />
-
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -926,20 +866,6 @@ export const GoalDetailsPage = () => {
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
-      />
-
-      <ConfirmDialog
-        isOpen={showUnlinkConfirm}
-        onClose={() => {
-          setShowUnlinkConfirm(false);
-          setTaskToUnlink(null);
-        }}
-        onConfirm={handleUnlinkTask}
-        title="Unlink Task"
-        description="Unlink this task from the goal? The task will not be deleted."
-        confirmText="Unlink"
-        cancelText="Cancel"
-        variant="default"
       />
     </div>
   );
