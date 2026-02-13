@@ -26,16 +26,16 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, taskApi } from '../api';
+import { AddProgressSheet } from '../components-2/AddProgressSheet';
+import { BulkTaskSheet } from '../components-2/BulkTaskSheet';
 import { GoalCard } from '../components-2/GoalCard';
 import { GoalEditSheet } from '../components-2/GoalEditSheet';
+import { LinkTasksSheet } from '../components-2/LinkTasksSheet';
 import { SquircleCard } from '../components-2/SquircleCard';
 import { TaskCard } from '../components-2/TaskCard';
 import { ActivitiesListComponent } from '../components/Goals/ActivitiesListComponent';
-import { AddProgressModal } from '../components/modals/AddProgressModal';
-import { BulkTaskModal } from '../components/modals/BulkTaskModal';
 import { ConfirmDialog } from '../components/modals/ConfirmDialog';
-import LinkTasksModal from '../components/modals/LinkTasksModal';
 import { Spinner } from '../components/ui/spinner';
 import { Goal, GoalTasksResponse, Task } from '../types';
 
@@ -655,7 +655,19 @@ export const GoalDetailsPage = () => {
                         {displayTasks.map((gt) => {
                           const task = gt.task as Task;
                           return (
-                            <TaskCard key={task.id} task={task} onTaskUpdated={fetchGoalData} />
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onTaskUpdated={fetchGoalData}
+                              onUnlink={async () => {
+                                try {
+                                  await taskApi.unlinkGoal(task.id, goalId!);
+                                  fetchGoalData();
+                                } catch (err) {
+                                  console.error('Failed to unlink task:', err);
+                                }
+                              }}
+                            />
                           );
                         })}
                         <div className="flex gap-2">
@@ -826,36 +838,32 @@ export const GoalDetailsPage = () => {
         }}
       />
 
-      {isLogging && (
-        <AddProgressModal
-          goal={goal}
-          onClose={() => setIsLogging(false)}
-          onUpdated={() => {
-            fetchGoalData();
-          }}
-        />
-      )}
+      <AddProgressSheet
+        isOpen={isLogging}
+        onClose={() => setIsLogging(false)}
+        goal={goal}
+        onUpdated={() => {
+          fetchGoalData();
+        }}
+      />
 
-      {isCreatingTasks && (
-        <BulkTaskModal
-          parentGoal={goal}
-          onClose={() => setIsCreatingTasks(false)}
-          onCreated={() => {
-            fetchGoalData();
-          }}
-        />
-      )}
+      <BulkTaskSheet
+        isOpen={isCreatingTasks}
+        onClose={() => setIsCreatingTasks(false)}
+        parentGoal={goal}
+        onCreated={() => {
+          fetchGoalData();
+        }}
+      />
 
-      {isLinkingTasks && (
-        <LinkTasksModal
-          isOpen={isLinkingTasks}
-          onClose={() => setIsLinkingTasks(false)}
-          goal={goal}
-          onTasksLinked={() => {
-            fetchGoalData();
-          }}
-        />
-      )}
+      <LinkTasksSheet
+        isOpen={isLinkingTasks}
+        onClose={() => setIsLinkingTasks(false)}
+        goal={goal}
+        onTasksLinked={() => {
+          fetchGoalData();
+        }}
+      />
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

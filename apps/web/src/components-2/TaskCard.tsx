@@ -27,6 +27,8 @@ interface TaskCardProps {
   availableGoals?: Goal[];
   showActions?: boolean;
   onTaskUpdated?: () => void;
+  /** When provided, shows an "Unlink" option in the menu (useful when goalTasks isn't populated on the task). */
+  onUnlink?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -78,6 +80,7 @@ export const TaskCard = ({
   availableGoals = [],
   showActions = true,
   onTaskUpdated,
+  onUnlink,
 }: TaskCardProps) => {
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -315,6 +318,16 @@ export const TaskCard = ({
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                   )}
+                </>
+              )}
+
+              {linkedGoals.length === 0 && onUnlink && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onUnlink} className="text-amber-600">
+                    <LinkIcon size={14} />
+                    <span>Unlink from goal</span>
+                  </DropdownMenuItem>
                 </>
               )}
 

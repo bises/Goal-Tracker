@@ -9,17 +9,18 @@ import { Edit2, Eye, Link, MoreVertical, Plus, Target, Trash2 } from 'lucide-rea
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { AddProgressModal } from '../components/modals/AddProgressModal';
-import { BulkTaskModal } from '../components/modals/BulkTaskModal';
 import { ConfirmDialog } from '../components/modals/ConfirmDialog';
-import LinkTasksModal from '../components/modals/LinkTasksModal';
 import { Goal } from '../types';
+import { AddProgressSheet } from './AddProgressSheet';
+import { BulkTaskSheet } from './BulkTaskSheet';
 import { GoalEditSheet } from './GoalEditSheet';
+import { LinkTasksSheet } from './LinkTasksSheet';
 import { SquircleCard } from './SquircleCard';
 
 interface GoalCardProps {
   goal: Goal;
   onUpdate: () => void;
+  variant?: 'default' | 'compact';
 }
 
 const getGoalTypeIcon = (type: 'TOTAL_TARGET' | 'FREQUENCY'): string => {
@@ -63,7 +64,7 @@ const getScopeColor = (
   return colors[scope as keyof typeof colors] || colors.STANDALONE;
 };
 
-export const GoalCard = ({ goal, onUpdate }: GoalCardProps) => {
+export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps) => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
@@ -88,6 +89,166 @@ export const GoalCard = ({ goal, onUpdate }: GoalCardProps) => {
   const linkedTasksCount = goal.goalTasks?.length || 0;
   const childrenCount = goal.children?.length || 0;
 
+  const getScopeLabel = (scope: string): string => {
+    switch (scope) {
+      case 'YEARLY':
+        return 'This Year';
+      case 'MONTHLY':
+        return 'This Month';
+      case 'WEEKLY':
+        return 'This Week';
+      default:
+        return scope;
+    }
+  };
+
+  // ── Compact variant ──────────────────────────────────────────
+  if (variant === 'compact') {
+    return (
+      <>
+        <SquircleCard
+          className="p-3 transition-all hover:shadow-lg cursor-pointer group"
+          style={{
+            background: scopeColor.gradient,
+            borderColor: scopeColor.border,
+          }}
+          onClick={() => navigate(`/goals/${goal.id}`)}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1 min-w-0 mr-3">
+              <div
+                className="font-semibold text-sm truncate"
+                style={{ color: 'var(--deep-charcoal)' }}
+              >
+                {goal.title}
+              </div>
+              {goal.description && (
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--warm-gray)' }}>
+                  {goal.description}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                style={{
+                  background: scopeColor.bg,
+                  color: scopeColor.text,
+                  border: `1px solid ${scopeColor.border}`,
+                }}
+              >
+                {getScopeLabel(goal.scope)}
+              </span>
+              {/* Compact Actions */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1 rounded-lg hover:bg-white/50 transition-colors outline-none opacity-0 group-hover:opacity-100"
+                  style={{ color: 'var(--warm-gray)' }}
+                >
+                  <MoreVertical size={14} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsLogging(true);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Log Progress
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditing(true);
+                    }}
+                  >
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Edit Goal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/goals/${goal.id}`);
+                    }}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Goal
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium" style={{ color: 'var(--warm-gray)' }}>
+                {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
+              </span>
+              <span className="text-xs font-bold" style={{ color: scopeColor.text }}>
+                {percent.toFixed(0)}%
+              </span>
+            </div>
+            <div
+              className="w-full h-2 rounded-full overflow-hidden"
+              style={{ background: 'rgba(255, 255, 255, 0.6)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${percent}%`,
+                  background: `linear-gradient(90deg, ${scopeColor.text}99, ${scopeColor.text})`,
+                }}
+              />
+            </div>
+          </div>
+        </SquircleCard>
+
+        {/* Modals (shared with default variant) */}
+        <GoalEditSheet
+          isOpen={isEditing}
+          onClose={() => setIsEditing(false)}
+          goal={goal}
+          onSave={() => {
+            onUpdate();
+            setIsEditing(false);
+          }}
+        />
+        <AddProgressSheet
+          isOpen={isLogging}
+          onClose={() => setIsLogging(false)}
+          goal={goal}
+          onUpdated={onUpdate}
+        />
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title="Delete Goal"
+          description="Are you sure you want to delete this goal? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+        />
+      </>
+    );
+  }
+
+  // ── Default variant ──────────────────────────────────────────
   return (
     <>
       <SquircleCard
@@ -327,26 +488,26 @@ export const GoalCard = ({ goal, onUpdate }: GoalCardProps) => {
         }}
       />
 
-      {isLogging && (
-        <AddProgressModal goal={goal} onClose={() => setIsLogging(false)} onUpdated={onUpdate} />
-      )}
+      <AddProgressSheet
+        isOpen={isLogging}
+        onClose={() => setIsLogging(false)}
+        goal={goal}
+        onUpdated={onUpdate}
+      />
 
-      {isCreatingTasks && (
-        <BulkTaskModal
-          parentGoal={goal}
-          onClose={() => setIsCreatingTasks(false)}
-          onCreated={onUpdate}
-        />
-      )}
+      <BulkTaskSheet
+        isOpen={isCreatingTasks}
+        onClose={() => setIsCreatingTasks(false)}
+        parentGoal={goal}
+        onCreated={onUpdate}
+      />
 
-      {isLinkingTasks && (
-        <LinkTasksModal
-          isOpen={isLinkingTasks}
-          onClose={() => setIsLinkingTasks(false)}
-          goal={goal}
-          onTasksLinked={onUpdate}
-        />
-      )}
+      <LinkTasksSheet
+        isOpen={isLinkingTasks}
+        onClose={() => setIsLinkingTasks(false)}
+        goal={goal}
+        onTasksLinked={onUpdate}
+      />
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
