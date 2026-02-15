@@ -32,9 +32,6 @@ RUN pnpm build
 # Ensure production dependencies are available locally
 RUN CI=true pnpm prune --prod
 
-# Regenerate Prisma client after pruning
-RUN npx prisma generate
-
 # Rebuild after pruning to ensure dist directory exists
 # RUN pnpm build
 
