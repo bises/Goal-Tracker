@@ -34,26 +34,50 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}): Promi
         headers['Authorization'] = `Bearer ${token}`;
       }
     } catch (e) {
-      console.error('Failed to get auth token:', e);
+      console.error('❌ Failed to get auth token:', e);
     }
   }
 
   // Make the request with injected headers
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
+
+  // Handle 401 Unauthorized - token likely expired
+  if (response.status === 401) {
+    console.warn('⚠️ Received 401 Unauthorized - token may have expired');
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = response.headers.get('content-type');
+    if (contentType?.includes('text/html')) {
+      console.error('❌ Got HTML error page instead of JSON - possible authentication issue');
+      throw new Error('Authentication failed - received error page from server');
+    }
+  }
+
+  return response;
 };
 
 export const api = {
   fetchGoals: async (): Promise<Goal[]> => {
-    const res = await authenticatedFetch(`${API_URL}/goals`);
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    try {
+      const res = await authenticatedFetch(`${API_URL}/goals`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch goals: ${res.status}`);
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('❌ Error loading goals:', error);
+      throw error;
+    }
   },
 
   getGoal: async (goalId: string): Promise<Goal> => {
     const res = await authenticatedFetch(`${API_URL}/goals/${goalId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch goal: ${res.status}`);
+    }
     return res.json();
   },
 

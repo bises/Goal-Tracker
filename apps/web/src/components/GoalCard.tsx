@@ -434,9 +434,10 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
               e.stopPropagation();
               setIsLogging(true);
             }}
-            className="flex-1 px-3 py-2 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-1.5 transition-all hover:shadow-lg"
+            className="px-3 py-2 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-1.5 transition-all hover:shadow-lg"
             style={{
               background: 'var(--gradient-primary)',
+              boxShadow: '0 4px 16px rgba(255, 140, 66, 0.3)',
             }}
           >
             <Plus size={16} />
