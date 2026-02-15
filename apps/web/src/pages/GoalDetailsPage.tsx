@@ -455,31 +455,6 @@ export const GoalDetailsPage = () => {
                     />
                   </div>
                 </div>
-
-                {/* Effort Progress */}
-                <div>
-                  <div
-                    className="flex justify-between text-xs mb-1.5"
-                    style={{ color: 'var(--warm-gray)' }}
-                  >
-                    <span className="font-medium">Effort Points</span>
-                    <span className="font-semibold">
-                      {summary.taskTotals.completedSize}/{summary.taskTotals.totalSize}
-                    </span>
-                  </div>
-                  <div
-                    className="w-full h-2.5 rounded-full overflow-hidden"
-                    style={{ background: 'rgba(147, 51, 234, 0.1)' }}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        background: 'linear-gradient(135deg, #9333ea 0%, #a855f7 100%)',
-                        width: `${summary.taskTotals.totalSize > 0 ? (summary.taskTotals.completedSize / summary.taskTotals.totalSize) * 100 : 0}%`,
-                      }}
-                    />
-                  </div>
-                </div>
               </div>
 
               {/* Overall Percentage */}
