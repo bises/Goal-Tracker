@@ -1,6 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { setAuthTokenProvider } from './api';
 import { BottomNav } from './components/BottomNav';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -17,15 +17,56 @@ import { PlannerPage } from './pages/PlannerPage';
 import { TasksPage } from './pages/TasksPage';
 
 function AppContent() {
-  const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, getAccessTokenSilently, loginWithRedirect, isLoading } = useAuth0();
+  const navigate = useNavigate();
   const { goals, fetchGoals } = useGoalContext();
   const { fetchTasks } = useTaskContext();
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const hasFetchedRef = useRef(false);
+  const silentAuthAttemptedRef = useRef(false);
 
   const handleAddTask = () => {
     setIsTaskModalOpen(true);
   };
+
+  // Attempt silent authentication on app load
+  useEffect(() => {
+    const attemptSilentAuth = async () => {
+      // Only attempt once per app load
+      if (silentAuthAttemptedRef.current || isLoading) {
+        return;
+      }
+
+      silentAuthAttemptedRef.current = true;
+
+      // Skip if already authenticated or if on auth pages
+      const location = window.location.pathname;
+      if (isAuthenticated || location === '/login' || location === '/callback') {
+        return;
+      }
+
+      try {
+        // Try to get an access token silently (uses refresh token if available)
+        const token = await getAccessTokenSilently();
+        if (token) {
+          console.log('✅ Silent authentication successful - refresh token valid');
+        }
+      } catch (error: any) {
+        // If silent auth fails, redirect to login
+        console.warn('⚠️ Silent authentication failed:', error?.error || error?.message);
+        console.log('Redirecting to login...');
+
+        // Only redirect to login if not already on a public page
+        if (location !== '/login' && location !== '/callback') {
+          loginWithRedirect({
+            appState: { returnTo: location },
+          });
+        }
+      }
+    };
+
+    attemptSilentAuth();
+  }, [isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect]);
 
   // Setup Auth0 token provider for API calls
   useEffect(() => {
@@ -34,11 +75,13 @@ function AppContent() {
         const token = await getAccessTokenSilently();
         return token;
       } catch (error) {
-        console.error('Error getting access token:', error);
+        console.error('❌ Error getting access token:', error);
+        // On token error, redirect to login
+        navigate('/login');
         return '';
       }
     });
-  }, [getAccessTokenSilently]);
+  }, [getAccessTokenSilently, navigate]);
 
   useEffect(() => {
     if (isAuthenticated && !hasFetchedRef.current) {

@@ -51,6 +51,8 @@ ReactDOM.createRoot(rootElement).render(
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}
+      leeway={60}
+      sessionCheckExpiryDays={1}
     >
       <GoalProvider>
         <TaskProvider>
