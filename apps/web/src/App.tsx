@@ -84,12 +84,10 @@ function AppContent() {
   }, [getAccessTokenSilently, navigate]);
 
   useEffect(() => {
-    if (isAuthenticated && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
+    if (isAuthenticated && isTaskModalOpen) {
       fetchGoals();
-      fetchTasks();
     }
-  }, [isAuthenticated, fetchGoals, fetchTasks]);
+  }, [isAuthenticated, isTaskModalOpen, fetchGoals]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);

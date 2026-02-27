@@ -1,5 +1,5 @@
 import { Plus, RefreshCw, ServerOff, SlidersHorizontal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { GoalCard } from '../components/GoalCard';
 import { GoalEditSheet } from '../components/GoalEditSheet';
 import { SquircleCard } from '../components/SquircleCard';
@@ -26,6 +26,10 @@ export const GoalsPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+
+  useEffect(() => {
+    fetchGoals();
+  }, [fetchGoals]);
 
   const handleRetry = async () => {
     setIsRetrying(true);

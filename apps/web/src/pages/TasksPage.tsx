@@ -26,7 +26,7 @@ type TaskStatus = 'pending' | 'completed';
 
 export const TasksPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { goals } = useGoalContext();
+  const { goals, fetchGoals } = useGoalContext();
   const tabParam = searchParams.get('tab') as TaskStatus | null;
   const dateParam = searchParams.get('date');
   const [activeTab, setActiveTab] = useState<TaskStatus>(
@@ -59,6 +59,10 @@ export const TasksPage = () => {
       setSelectedDate(dateParam);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    fetchGoals();
+  }, [fetchGoals]);
 
   useEffect(() => {
     fetchTasks();

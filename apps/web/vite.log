@@ -1,0 +1,16 @@
+
+> web@1.0.0 dev /app/apps/web
+> vite
+
+
+  VITE v4.5.14  ready in 675 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+
+PWA v1.2.0
+mode      generateSW
+precache  2 entries (0.12 KiB)
+files generated
+  dev-dist/sw.js
+  dev-dist/workbox-ebf8facd.js

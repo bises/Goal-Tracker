@@ -8,7 +8,7 @@ import {
   RefreshCw,
   ServerOff,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { taskApi } from '../api';
 import { DailyTimelineView } from '../components/DailyTimelineView';
 import { RescheduleSheet } from '../components/RescheduleSheet';
@@ -78,6 +78,11 @@ export const PlannerPage = () => {
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
 
   const error = taskError || goalError;
+
+  useEffect(() => {
+    fetchTasks();
+    fetchGoals();
+  }, [fetchTasks, fetchGoals]);
 
   const handleRetry = async () => {
     setIsRetrying(true);
