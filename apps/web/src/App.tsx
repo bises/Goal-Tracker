@@ -22,7 +22,6 @@ function AppContent() {
   const { goals, fetchGoals } = useGoalContext();
   const { fetchTasks } = useTaskContext();
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const hasFetchedRef = useRef(false);
   const silentAuthAttemptedRef = useRef(false);
 
   const handleAddTask = () => {
@@ -84,10 +83,10 @@ function AppContent() {
   }, [getAccessTokenSilently, navigate]);
 
   useEffect(() => {
-    if (isAuthenticated && isTaskModalOpen) {
+    if (isAuthenticated && isTaskModalOpen && goals.length === 0) {
       fetchGoals();
     }
-  }, [isAuthenticated, isTaskModalOpen, fetchGoals]);
+  }, [isAuthenticated, isTaskModalOpen, fetchGoals, goals.length]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);
