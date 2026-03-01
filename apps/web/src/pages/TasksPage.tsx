@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { CalendarIcon, RefreshCw, ServerOff, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PaginatedTasksResponse, taskApi } from '../api';
 import { SquircleCard } from '../components/SquircleCard';
@@ -64,11 +64,7 @@ export const TasksPage = () => {
     fetchGoals();
   }, [fetchGoals]);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [activeTab, page, selectedDate]);
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       const params: any = {
@@ -96,7 +92,11 @@ export const TasksPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, page, selectedDate]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   const handleTabChange = (tab: TaskStatus) => {
     setActiveTab(tab);

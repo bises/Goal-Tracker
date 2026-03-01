@@ -7,7 +7,10 @@ interface TaskContextType {
   tasks: Task[];
   loading: boolean;
   error: string | null;
+  /** Lazy fetch — skips if tasks are already loaded. Use on page mount. */
   fetchTasks: () => Promise<void>;
+  /** Force fetch — always hits the API. Use after mutations. */
+  refreshTasks: () => Promise<void>;
   updateTask: (task: Task) => Promise<void>;
   updateTaskFields: (id: string, updates: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
   deleteTask: (taskId: string) => Promise<void>;
@@ -15,7 +18,6 @@ interface TaskContextType {
   upsertTask: (task: Task) => void;
   createTask: (payload: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
   addTask: (task: Task) => void;
-  refreshTasks: () => Promise<void>;
   toggleComplete: (id: string) => Promise<Task>;
 }
 
@@ -26,7 +28,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTasks = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -39,6 +41,21 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  /** Lazy — only fetches when the tasks array is empty (page mount guard). */
+  const fetchTasks = useCallback(async () => {
+    setTasks((current) => {
+      if (current.length === 0) {
+        doFetch();
+      }
+      return current;
+    });
+  }, [doFetch]);
+
+  /** Force — always hits the API. Call after any mutation or on retry. */
+  const refreshTasks = useCallback(async () => {
+    await doFetch();
+  }, [doFetch]);
 
   const addTask = useCallback((task: Task) => {
     if (!task || !task.id) {
@@ -68,11 +85,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         upsertTask(saved);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update task');
-        await fetchTasks();
+        await doFetch();
         throw err;
       }
     },
-    [fetchTasks, upsertTask]
+    [doFetch, upsertTask]
   );
 
   const updateTaskFields = useCallback(
@@ -83,11 +100,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         return saved;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update task');
-        await fetchTasks();
+        await doFetch();
         throw err;
       }
     },
-    [fetchTasks, upsertTask]
+    [doFetch, upsertTask]
   );
 
   const deleteTask = useCallback(
@@ -100,11 +117,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete task');
         // Revert on error
-        await fetchTasks();
+        await doFetch();
         throw err;
       }
     },
-    [fetchTasks]
+    [doFetch]
   );
 
   const scheduleTask = useCallback(
@@ -116,17 +133,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         upsertTask(saved);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to schedule task');
-        await fetchTasks();
+        await doFetch();
         throw err;
       }
     },
-    [fetchTasks, upsertTask]
+    [doFetch, upsertTask]
   );
-
-  const refreshTasks = useCallback(async () => {
-    // Force refresh from API
-    await fetchTasks();
-  }, [fetchTasks]);
 
   const createTask = useCallback(
     async (payload: Partial<Task> & { goalIds?: string[] }) => {

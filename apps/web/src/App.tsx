@@ -19,8 +19,8 @@ import { TasksPage } from './pages/TasksPage';
 function AppContent() {
   const { isAuthenticated, getAccessTokenSilently, loginWithRedirect, isLoading } = useAuth0();
   const navigate = useNavigate();
-  const { goals, fetchGoals } = useGoalContext();
-  const { fetchTasks } = useTaskContext();
+  const { goals, fetchGoals, refreshGoals } = useGoalContext();
+  const { refreshTasks } = useTaskContext();
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const silentAuthAttemptedRef = useRef(false);
 
@@ -159,8 +159,8 @@ function AppContent() {
           isOpen={isTaskModalOpen}
           onClose={handleCloseTaskModal}
           onSave={() => {
-            fetchTasks();
-            fetchGoals();
+            refreshTasks();
+            refreshGoals();
             handleCloseTaskModal();
           }}
           availableGoals={goals}
