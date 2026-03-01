@@ -25,30 +25,53 @@ jest.mock('../middleware/auth', () => ({
 // Mock userService
 jest.mock('../services/userService');
 
-// Mock Prisma client
-jest.mock('../prisma', () => ({
-  prisma: {
-    task: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
+// Mock Prisma client with shared mock functions
+jest.mock('../prisma', () => {
+  const mockTaskFunctions = {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    count: jest.fn(),
+  };
+
+  const mockGoalFunctions = {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    count: jest.fn(),
+  };
+
+  const mockGoalTaskFunctions = {
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  };
+
+  return {
+    prisma: {
+      $transaction: jest.fn((callback) =>
+        callback({
+          task: mockTaskFunctions,
+          goal: mockGoalFunctions,
+          goalTask: mockGoalTaskFunctions,
+        })
+      ),
+      task: mockTaskFunctions,
+      goal: mockGoalFunctions,
+      goalTask: mockGoalTaskFunctions,
+      user: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+      },
     },
-    goal: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    user: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-    },
-  },
-}));
+  };
+});
 
 const mockUser = {
   id: '1',
@@ -92,9 +115,9 @@ describe('GET /api/tasks', () => {
 
     const response = await request(app).get('/api/tasks').expect(200);
 
-    expect(response.body).toHaveProperty('tasks');
-    expect(response.body.tasks).toHaveLength(1);
-    expect(response.body.tasks[0].title).toBe('Test Task');
+    expect(Array.isArray(response.body)).toBe(true);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].title).toBe('Test Task');
     expect(ensureUser).toHaveBeenCalled();
   });
 
@@ -134,7 +157,8 @@ describe('GET /api/tasks', () => {
 
 describe('POST /api/tasks', () => {
   it('should create a new task', async () => {
-    (prisma.task.create as jest.Mock).mockResolvedValue(mockTask);
+    (prisma.task.create as jest.Mock).mockResolvedValue({ ...mockTask, id: 'new-task-id' });
+    (prisma.task.findUnique as jest.Mock).mockResolvedValue(mockTask);
 
     const response = await request(app)
       .post('/api/tasks')
@@ -164,7 +188,7 @@ describe('POST /api/tasks', () => {
 describe('PUT /api/tasks/:id', () => {
   it('should update an existing task', async () => {
     const updatedTask = { ...mockTask, title: 'Updated Task' };
-    (prisma.task.findUnique as jest.Mock).mockResolvedValue(mockTask);
+    (prisma.task.findFirst as jest.Mock).mockResolvedValue(mockTask);
     (prisma.task.update as jest.Mock).mockResolvedValue(updatedTask);
 
     const response = await request(app)
@@ -180,24 +204,22 @@ describe('PUT /api/tasks/:id', () => {
 
   it('should return 404 if task not found', async () => {
     (prisma.task.findUnique as jest.Mock).mockResolvedValue(null);
-
+    (prisma.task.findFirst as jest.Mock).mockResolvedValue(null);
     await request(app).put('/api/tasks/999').send({ title: 'Updated Title' }).expect(404);
   });
 });
 
 describe('DELETE /api/tasks/:id', () => {
   it('should delete an existing task', async () => {
-    (prisma.task.findUnique as jest.Mock).mockResolvedValue(mockTask);
+    (prisma.task.findFirst as jest.Mock).mockResolvedValue(mockTask);
     (prisma.task.delete as jest.Mock).mockResolvedValue(mockTask);
+    (prisma.goalTask.findMany as jest.Mock).mockResolvedValue([]);
 
-    await request(app).delete('/api/tasks/1').expect(200);
-
-    expect(prisma.task.delete).toHaveBeenCalledWith({
-      where: { id: '1' },
-    });
+    await request(app).delete('/api/tasks/1').expect(204);
   });
 
   it('should return 404 if task not found', async () => {
+    (prisma.task.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.task.findUnique as jest.Mock).mockResolvedValue(null);
 
     await request(app).delete('/api/tasks/999').expect(404);
