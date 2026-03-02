@@ -2,6 +2,7 @@ import { Check, Link2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Drawer } from 'vaul';
 import { taskApi } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal, Task } from '../types';
 import { Button } from './ui/button';
 
@@ -19,6 +20,7 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (isOpen) {
@@ -112,7 +114,7 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[85vh] overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[85dvh] overflow-hidden"
           style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
           aria-describedby="link-tasks-description"
         >
@@ -147,7 +149,10 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
           </Drawer.Description>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          <div
+            className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
+            style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : undefined }}
+          >
             {/* Goal info */}
             <div
               className="p-4 rounded-2xl mb-4"
