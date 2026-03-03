@@ -19,10 +19,9 @@ import { TasksPage } from './pages/TasksPage';
 function AppContent() {
   const { isAuthenticated, getAccessTokenSilently, loginWithRedirect, isLoading } = useAuth0();
   const navigate = useNavigate();
-  const { goals, fetchGoals } = useGoalContext();
-  const { fetchTasks } = useTaskContext();
+  const { goals, fetchGoals, refreshGoals } = useGoalContext();
+  const { refreshTasks } = useTaskContext();
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const hasFetchedRef = useRef(false);
   const silentAuthAttemptedRef = useRef(false);
 
   const handleAddTask = () => {
@@ -84,12 +83,10 @@ function AppContent() {
   }, [getAccessTokenSilently, navigate]);
 
   useEffect(() => {
-    if (isAuthenticated && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
+    if (isAuthenticated && isTaskModalOpen && goals.length === 0) {
       fetchGoals();
-      fetchTasks();
     }
-  }, [isAuthenticated, fetchGoals, fetchTasks]);
+  }, [isAuthenticated, isTaskModalOpen, fetchGoals, goals.length]);
 
   const handleCloseTaskModal = () => {
     setIsTaskModalOpen(false);
@@ -162,8 +159,8 @@ function AppContent() {
           isOpen={isTaskModalOpen}
           onClose={handleCloseTaskModal}
           onSave={() => {
-            fetchTasks();
-            fetchGoals();
+            refreshTasks();
+            refreshGoals();
             handleCloseTaskModal();
           }}
           availableGoals={goals}

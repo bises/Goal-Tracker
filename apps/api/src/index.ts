@@ -1,35 +1,10 @@
-import cors from 'cors';
-import express from 'express';
 import fs from 'fs';
 import http from 'http';
 import https from 'https';
-import authRoutes from './routes/auth';
-import calendarRoutes from './routes/calendar';
-import goalRoutes from './routes/goals';
-import taskRoutes from './routes/tasks';
+import app from './app';
 
-// Get version from environment variable or default to 1.0.0
-const version = process.env.APP_VERSION?.trim() || '1.0.0';
-
-const app = express();
 const port = process.env.PORT || 3000;
 const useHttps = process.env.USE_HTTPS === 'true';
-
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/auth', authRoutes);
-app.use('/api/goals', goalRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/calendar', calendarRoutes);
-
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    version: version,
-    timestamp: new Date().toISOString(),
-  });
-});
 
 if (useHttps) {
   // HTTPS configuration with Tailscale certificates

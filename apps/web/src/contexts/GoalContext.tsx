@@ -6,11 +6,13 @@ interface GoalContextType {
   goals: Goal[];
   loading: boolean;
   error: string | null;
+  /** Lazy fetch — skips if goals are already loaded. Use on page mount. */
   fetchGoals: () => Promise<void>;
+  /** Force fetch — always hits the API. Use after mutations. */
+  refreshGoals: () => Promise<void>;
   updateGoal: (goal: Goal) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
   addGoal: (goal: Goal) => void;
-  refreshGoals: () => Promise<void>;
 }
 
 const GoalContext = createContext<GoalContextType | undefined>(undefined);
@@ -20,7 +22,7 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGoals = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -33,6 +35,21 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  /** Lazy — only fetches when the goals array is empty (page mount guard). */
+  const fetchGoals = useCallback(async () => {
+    setGoals((current) => {
+      if (current.length === 0) {
+        doFetch();
+      }
+      return current;
+    });
+  }, [doFetch]);
+
+  /** Force — always hits the API. Call after any mutation or on retry. */
+  const refreshGoals = useCallback(async () => {
+    await doFetch();
+  }, [doFetch]);
 
   const addGoal = useCallback((goal: Goal) => {
     setGoals((prev) => [...prev, goal]);
@@ -47,12 +64,12 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
         await api.updateGoal(updatedGoal.id, updatedGoal);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update goal');
-        // Revert cache on error
-        await fetchGoals();
+        // Revert cache on error with a force refresh
+        await doFetch();
         throw err;
       }
     },
-    [fetchGoals]
+    [doFetch]
   );
 
   const deleteGoal = useCallback(
@@ -64,28 +81,23 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
         await api.deleteGoal(goalId);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete goal');
-        // Revert on error
-        await fetchGoals();
+        // Revert on error with a force refresh
+        await doFetch();
         throw err;
       }
     },
-    [fetchGoals]
+    [doFetch]
   );
-
-  const refreshGoals = useCallback(async () => {
-    // Force refresh from API
-    await fetchGoals();
-  }, [fetchGoals]);
 
   const value: GoalContextType = {
     goals,
     loading,
     error,
     fetchGoals,
+    refreshGoals,
     updateGoal,
     deleteGoal,
     addGoal,
-    refreshGoals,
   };
 
   return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;

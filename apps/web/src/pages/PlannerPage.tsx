@@ -8,8 +8,7 @@ import {
   RefreshCw,
   ServerOff,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
-import { taskApi } from '../api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DailyTimelineView } from '../components/DailyTimelineView';
 import { RescheduleSheet } from '../components/RescheduleSheet';
 import { SquircleCard } from '../components/SquircleCard';
@@ -61,10 +60,12 @@ export const PlannerPage = () => {
     tasks: allTasks,
     scheduleTask,
     updateTaskFields,
+    toggleComplete,
     error: taskError,
     fetchTasks,
+    refreshTasks,
   } = useTaskContext();
-  const { goals, error: goalError, fetchGoals } = useGoalContext();
+  const { goals, error: goalError, fetchGoals, refreshGoals } = useGoalContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -79,9 +80,14 @@ export const PlannerPage = () => {
 
   const error = taskError || goalError;
 
+  useEffect(() => {
+    fetchTasks();
+    fetchGoals();
+  }, [fetchTasks, fetchGoals]);
+
   const handleRetry = async () => {
     setIsRetrying(true);
-    await Promise.all([fetchTasks(), fetchGoals()]);
+    await Promise.all([refreshTasks(), refreshGoals()]);
     setIsRetrying(false);
   };
 
@@ -161,8 +167,7 @@ export const PlannerPage = () => {
 
   const handleToggleComplete = async (taskId: string) => {
     try {
-      await taskApi.toggleComplete(taskId);
-      await fetchTasks();
+      await toggleComplete(taskId);
     } catch (error) {
       console.error('Failed to toggle task:', error);
     }
@@ -554,7 +559,7 @@ export const PlannerPage = () => {
         onClose={() => setIsDateModalOpen(false)}
         date={selectedDate}
         tasks={tasksForSelectedDate}
-        onTaskUpdated={fetchTasks}
+        onTaskUpdated={refreshTasks}
         onAddTask={handleAddTaskForDate}
       />
 
@@ -567,7 +572,7 @@ export const PlannerPage = () => {
         }}
         task={selectedTask}
         onSave={async () => {
-          await fetchTasks();
+          await refreshTasks();
           setIsEditSheetOpen(false);
           setSelectedTask(null);
           setIsDateModalOpen(false);

@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { CalendarDays, Clock, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Drawer } from 'vaul';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Task } from '../types';
 import { Button } from './ui/button';
 import { CustomCalendar } from './ui/custom-calendar';
@@ -40,6 +41,7 @@ export const RescheduleSheet = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   // Reset state when sheet opens with a new task
   const taskId = task?.id;
@@ -102,7 +104,7 @@ export const RescheduleSheet = ({
           style={{
             zIndex: 1400,
             background: 'var(--peach-cream)',
-            maxHeight: '90vh',
+            maxHeight: '90dvh',
           }}
         >
           <Drawer.Title className="sr-only">Schedule Task</Drawer.Title>
@@ -115,7 +117,7 @@ export const RescheduleSheet = ({
           {/* Header */}
           <div className="flex items-center justify-between px-5 pb-3">
             <div className="flex items-center gap-2">
-              <CalendarDays size={18} style={{ color: 'var(--energizing-orange)' }} />
+              <CalendarDays size={18} className="text-[var(--energizing-orange)]" />
               <h2
                 className="text-lg font-bold font-display"
                 style={{ color: 'var(--deep-charcoal)' }}
@@ -128,7 +130,7 @@ export const RescheduleSheet = ({
               onClick={onClose}
               className="p-1.5 rounded-xl hover:bg-black/5 transition-colors"
             >
-              <X size={20} style={{ color: 'var(--warm-gray)' }} />
+              <X size={20} className="text-[var(--warm-gray)]" />
             </button>
           </div>
 
@@ -163,7 +165,10 @@ export const RescheduleSheet = ({
           {/* Calendar */}
           <div
             className="px-5 overflow-y-auto"
-            style={{ maxHeight: showTimePicker ? 'calc(90vh - 300px)' : 'calc(90vh - 200px)' }}
+            style={{
+              maxHeight: showTimePicker ? 'calc(90dvh - 300px)' : 'calc(90dvh - 200px)',
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : undefined,
+            }}
           >
             <div
               className="rounded-2xl overflow-hidden"
@@ -183,7 +188,7 @@ export const RescheduleSheet = ({
             {showTimePicker && selectedDate && (
               <div className="mt-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <Clock size={14} style={{ color: 'var(--energizing-orange)' }} />
+                  <Clock size={14} className="text-[var(--energizing-orange)]" />
                   <span
                     className="text-xs font-bold font-display"
                     style={{ color: 'var(--deep-charcoal)' }}

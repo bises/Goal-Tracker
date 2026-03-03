@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { CalendarIcon, RefreshCw, ServerOff, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PaginatedTasksResponse, taskApi } from '../api';
 import { SquircleCard } from '../components/SquircleCard';
@@ -26,7 +26,7 @@ type TaskStatus = 'pending' | 'completed';
 
 export const TasksPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { goals } = useGoalContext();
+  const { goals, fetchGoals } = useGoalContext();
   const tabParam = searchParams.get('tab') as TaskStatus | null;
   const dateParam = searchParams.get('date');
   const [activeTab, setActiveTab] = useState<TaskStatus>(
@@ -61,10 +61,10 @@ export const TasksPage = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [activeTab, page, selectedDate]);
+    fetchGoals();
+  }, [fetchGoals]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       const params: any = {
@@ -92,7 +92,11 @@ export const TasksPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, page, selectedDate]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   const handleTabChange = (tab: TaskStatus) => {
     setActiveTab(tab);

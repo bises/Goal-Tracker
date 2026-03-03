@@ -2,6 +2,7 @@ import { Eye, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal } from '../types';
 import { Button } from './ui/button';
 
@@ -17,6 +18,7 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
   const [count, setCount] = useState(10);
   const [preview, setPreview] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   const generatePreview = () => {
     const tasks: string[] = [];
@@ -70,7 +72,7 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[85vh] overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[85dvh] overflow-hidden"
           style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
           aria-describedby="bulk-task-description"
         >
@@ -110,7 +112,11 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
           </Drawer.Description>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
+            style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : undefined }}
+          >
             <div className="space-y-4 pb-6">
               {/* Goal Info */}
               <div

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
 import { taskApi } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal, Task, TaskCategory, TaskPriority } from '../types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Button } from './ui/button';
@@ -39,6 +40,7 @@ export const TaskEditSheet = ({
   const [estimatedCompletionDate, setEstimatedCompletionDate] = useState('');
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   // Populate form when task changes
   useEffect(() => {
@@ -180,7 +182,7 @@ export const TaskEditSheet = ({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] h-[90vh] max-h-[90vh] overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[90dvh] overflow-hidden"
           style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
           aria-describedby="task-edit-description"
         >
@@ -222,7 +224,11 @@ export const TaskEditSheet = ({
           </Drawer.Description>
 
           {/* Form Content - Scrollable */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
+            style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : undefined }}
+          >
             <div className="space-y-4 pb-6">
               {/* Title */}
               <div>
