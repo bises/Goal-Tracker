@@ -13,7 +13,7 @@
 
 ## 📖 Overview
 
-Goal Tracker is a comprehensive personal productivity system that combines goal management with task planning. Track yearly, monthly, and weekly goals while managing daily tasks in an integrated calendar view. Built as a monorepo with separate API and web applications, it's designed for easy self-hosting via Docker.
+Goal Tracker is a comprehensive personal productivity system that combines goal management with task planning. Track yearly, monthly, and weekly goals while managing daily tasks in an integrated calendar view. Built as a monorepo with separate API and web applications, designed for easy self-hosting via Docker.
 
 ### ✨ Key Features
 
@@ -23,8 +23,9 @@ Goal Tracker is a comprehensive personal productivity system that combines goal 
 - **📊 Progress Tracking**: Multiple modes (task-based, manual, habit tracking)
 - **🔗 Goal-Task Linking**: Many-to-many relationships between goals and tasks
 - **📱 PWA Support**: Install as a standalone app on any device
+- **⌨️ Keyboard Accessibility**: Optimized keyboard navigation and mobile keyboard handling
 - **🐳 Docker Deployment**: Complete containerized stack with GitHub Actions CI/CD
-- **🌐 Network Flexible**: Works with shared PostgreSQL or dedicated instances
+- **⚡ Performance Optimized**: Efficient API calls with server-side data fetching
 
 ---
 
@@ -237,6 +238,9 @@ pnpm prisma studio
 - [x] Docker deployment
 - [x] GitHub Actions CI/CD
 - [x] PWA support
+- [x] Keyboard accessibility (useKeyboardHeight hook)
+- [x] API performance optimization
+- [x] TypeScript & Prisma fixes
 
 ### 🚧 Planned
 - [ ] React Query migration
