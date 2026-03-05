@@ -35,5 +35,26 @@ export const useKeyboardHeight = (): number => {
     };
   }, []);
 
+  // After keyboard height changes and React re-renders with new padding,
+  // scroll the focused input into view. Debounced so it fires once the
+  // keyboard animation settles (height stops changing for 150ms).
+  useEffect(() => {
+    if (keyboardHeight <= 0) return;
+
+    const timer = setTimeout(() => {
+      const activeEl = document.activeElement as HTMLElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable)
+      ) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [keyboardHeight]);
+
   return keyboardHeight;
 };
