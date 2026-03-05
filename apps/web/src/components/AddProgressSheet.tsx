@@ -2,7 +2,6 @@ import { Minus, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal } from '../types';
 import { Button } from './ui/button';
 
@@ -19,7 +18,6 @@ export const AddProgressSheet = ({ isOpen, onClose, goal, onUpdated }: AddProgre
   const [customData, setCustomData] = useState('');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const keyboardHeight = useKeyboardHeight();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +73,7 @@ export const AddProgressSheet = ({ isOpen, onClose, goal, onUpdated }: AddProgre
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[80dvh] overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[80vh] overflow-hidden"
           style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
           aria-describedby="progress-sheet-description"
         >
@@ -115,11 +113,7 @@ export const AddProgressSheet = ({ isOpen, onClose, goal, onUpdated }: AddProgre
           </Drawer.Description>
 
           {/* Content */}
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
-            style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : undefined }}
-          >
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
             <div className="space-y-5 pb-6">
               {/* Goal Info */}
               <div
