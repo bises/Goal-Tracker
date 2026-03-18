@@ -95,6 +95,10 @@ export interface Goal {
   progress: Progress[];
 
   progressSummary?: ProgressSummary;
+
+  isMarkedComplete: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Progress {

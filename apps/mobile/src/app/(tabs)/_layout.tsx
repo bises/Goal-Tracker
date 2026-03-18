@@ -1,48 +1,47 @@
-import { Tabs } from "expo-router";
-import React from "react";
-import { Platform } from "react-native";
+import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#FF8C42",
-        tabBarInactiveTintColor: "#888",
+        tabBarActiveTintColor: '#FF8C42',
+        tabBarInactiveTintColor: '#888',
         tabBarStyle: Platform.select({
-          ios: { position: "absolute" },
+          ios: { position: 'absolute' },
           default: {},
         }),
         headerStyle: {
-          backgroundColor: "#1a1a2e",
+          backgroundColor: '#1a1a2e',
         },
-        headerTintColor: "#fff",
+        headerTintColor: '#fff',
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
+          title: 'Dashboard',
           tabBarIcon: ({ color }) => <TabBarIcon name="grid" color={color} />,
         }}
       />
       <Tabs.Screen
         name="goals"
         options={{
-          title: "Goals",
+          title: 'Goals',
           tabBarIcon: ({ color }) => <TabBarIcon name="target" color={color} />,
         }}
       />
       <Tabs.Screen
         name="tasks"
         options={{
-          title: "Tasks",
+          title: 'Tasks',
           tabBarIcon: ({ color }) => <TabBarIcon name="check" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: 'Settings',
           tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />,
         }}
       />
@@ -50,15 +49,15 @@ export default function TabLayout() {
   );
 }
 
-import { Text } from "react-native";
+import { Text } from 'react-native';
 
 const ICONS: Record<string, string> = {
-  grid: "▦",
-  target: "◎",
-  check: "✓",
-  cog: "⚙",
+  grid: '▦',
+  target: '◎',
+  check: '✓',
+  cog: '⚙',
 };
 
 const TabBarIcon = ({ name, color }: { name: string; color: string }) => (
-  <Text style={{ color, fontSize: 20 }}>{ICONS[name] ?? "?"}</Text>
+  <Text style={{ color, fontSize: 20 }}>{ICONS[name] ?? '?'}</Text>
 );
