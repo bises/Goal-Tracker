@@ -1,4 +1,4 @@
-import { Goal, GoalTasksResponse, Task } from './types';
+import { Goal, GoalTasksResponse, PaginatedTasksResponse, Task } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -172,15 +172,7 @@ export const api = {
   },
 };
 
-export interface PaginatedTasksResponse {
-  tasks: Task[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+export type { PaginatedTasksResponse };
 
 export const taskApi = {
   fetchTasks: async (params?: {

@@ -111,13 +111,32 @@ Use the Skill tool for specialized workflows:
 
 ### MCP Servers
 
-The following MCP servers are configured in `.vscode/mcp.json`:
+The following MCP servers are configured in `.mcp.json` (Claude Code) and `.vscode/mcp.json` (VS Code):
 
-- **github**: GitHub integration — PRs, issues, branches, code search via `mcp__github`
-- **chrome-devtools**: Browser debugging — screenshots, DOM inspection, network, console, performance via `mcp__chrome-devtools`
-- **shadcn**: Generate and add shadcn/ui components to the project via `mcp__shadcn`
-- **context7**: Fetch up-to-date documentation for any library (React, Prisma, Express, Tailwind, etc.) via `mcp__context7`
-- **playwright**: E2E browser testing — navigate, click, fill forms, screenshot, assert via `mcp__playwright`
+- **github** (`mcp__github`): GitHub integration — PRs, issues, branches, code search
+  - Type: HTTP
+  - URL: https://api.githubcopilot.com/mcp/
+
+- **chrome-devtools** (`mcp__chrome-devtools`): Browser debugging — screenshots, DOM inspection, network, console, performance
+  - Type: stdio
+  - Command: `npx -y chrome-devtools-mcp@latest`
+
+- **shadcn** (`mcp__shadcn`): Generate and add shadcn/ui components to the project
+  - Type: stdio
+  - Command: `npx shadcn@latest mcp`
+
+- **context7** (`mcp__context7`): Fetch up-to-date documentation for any library (React, Prisma, Express, Tailwind, etc.)
+  - Type: stdio
+  - Command: `npx -y @upstash/context7-mcp@latest`
+
+- **playwright** (`mcp__playwright`): E2E browser testing — navigate, click, fill forms, screenshot, assert
+  - Type: stdio
+  - Command: `npx -y @playwright/mcp@latest`
+
+**Configuration:**
+- MCP servers are enabled via `enableAllProjectMcpServers: true` in `.claude/settings.local.json`
+- Permissions are pre-configured for all MCP servers in the Claude Code settings
+- Restart Claude Code after modifying MCP server configurations
 
 ### Safety Rules
 
