@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGoalContext } from '@/contexts/GoalContext';
 import type { Goal, GoalScope } from '@goal-tracker/shared';
 
-const SCOPES: Array<{ label: string; value: GoalScope | 'ALL' }> = [
+const SCOPES: { label: string; value: GoalScope | 'ALL' }[] = [
   { label: 'All', value: 'ALL' },
   { label: 'Yearly', value: 'YEARLY' },
   { label: 'Monthly', value: 'MONTHLY' },

@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 export default function TabLayout() {
   return (
@@ -48,8 +48,6 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-import { Text } from 'react-native';
 
 const ICONS: Record<string, string> = {
   grid: '▦',
