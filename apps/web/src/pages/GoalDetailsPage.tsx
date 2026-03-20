@@ -27,15 +27,15 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, taskApi } from '../api';
+import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
 import { AddProgressSheet } from '../components/AddProgressSheet';
 import { BulkTaskSheet } from '../components/BulkTaskSheet';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { GoalCard } from '../components/GoalCard';
 import { GoalEditSheet } from '../components/GoalEditSheet';
 import { LinkTasksSheet } from '../components/LinkTasksSheet';
 import { SquircleCard } from '../components/SquircleCard';
 import { TaskCard } from '../components/TaskCard';
-import { ActivitiesListComponent } from '../components/ActivitiesListComponent';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Spinner } from '../components/ui/spinner';
 import { Goal, GoalTasksResponse, Task } from '../types';
 
@@ -717,6 +717,9 @@ export const GoalDetailsPage = () => {
                         startDate: child.createdAt,
                         parentId: child.parentId ?? undefined,
                         progress: [],
+                        isMarkedComplete: child.isMarkedComplete,
+                        createdAt: child.createdAt,
+                        updatedAt: child.updatedAt,
                       }}
                       onUpdate={fetchGoalData}
                     />

@@ -1,0 +1,117 @@
+name: Deploy Mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-mobile.yml'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS profile to use'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+
+concurrency:
+  group: deploy-mobile
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      - name: Run Mobile linting
+        run: pnpm --filter mobile lint
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish Update (OTA)
+        run: |
+          cd apps/mobile
+          eas update --auto --non-interactive --branch ${{ github.event.inputs.profile || 'production' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        platform: [ios, android]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build app for ${{ matrix.platform }}
+        run: |
+          cd apps/mobile
+          eas build --platform ${{ matrix.platform }} --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
