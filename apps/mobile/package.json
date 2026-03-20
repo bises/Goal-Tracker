@@ -47,7 +47,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@types/react": "~19.2.2",
-    "babel-preset-expo": "~11.0.16",
+    "babel-preset-expo": "~55.0.12",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~55.0.0",
     "prettier-plugin-tailwindcss": "^0.5.11",
