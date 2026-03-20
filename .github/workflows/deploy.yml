@@ -39,6 +39,9 @@ jobs:
       - name: Run Web tests
         run: cd apps/web && pnpm test
 
+      - name: Run Mobile linting
+        run: cd apps/mobile && pnpm lint
+
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
@@ -87,8 +90,43 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
+        -mobile:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish Mobile Update (OTA)
+        run: |
+          cd apps/mobile
+          eas update --auto --non-interactive --branch production
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  deploy:
+    needs: [build-and-push, deploy-mobile]registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
 
   deploy:
     needs: build-and-push
