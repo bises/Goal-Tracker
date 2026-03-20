@@ -34,13 +34,13 @@ jobs:
         run: cd apps/api && npx prisma generate
 
       - name: Run API tests
-        run: cd apps/api && pnpm test
+        run: pnpm --filter api test
 
       - name: Run Web tests
-        run: cd apps/web && pnpm test
+        run: pnpm --filter web test
 
       - name: Run Mobile linting
-        run: cd apps/mobile && pnpm lint
+        run: pnpm --filter mobile lint
 
   build-and-push:
     needs: test
