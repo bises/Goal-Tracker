@@ -1,11 +1,13 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   pull_request:
-    branches: [main]
+    branches: ['**']  # Run on PRs to any branch
+  push:
+    branches: [main]  # Also run on direct pushes to main
 
 concurrency:
-  group: ci-${{ github.head_ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,42 +42,24 @@ jobs:
             shared:
               - 'packages/shared/**'
 
-  # ---------------------------------------------------
-  # Shared package — build + validate
-  # ---------------------------------------------------
-  shared:
-    needs: changes
-    if: needs.changes.outputs.shared == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared package
-        run: pnpm --filter @goal-tracker/shared build
-
-  # ---------------------------------------------------
-  # API — lint, typecheck, test
-  # ---------------------------------------------------
+  # =====================================================
+  # API JOB: Test → Approve → Deploy
+  # =====================================================
   api:
+    name: API Pipeline
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/test
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      # --- BUILD & TEST PHASE (automatic, no approval) ---
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -97,17 +81,98 @@ jobs:
       - name: Run API tests
         run: pnpm --filter api test
 
-  # ---------------------------------------------------
-  # Web — lint, typecheck, test, build
-  # ---------------------------------------------------
+  api-deploy:
+    name: Deploy API
+    needs: [changes, api]
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'api-preview' || 'api-production' }}
+      url: ${{ github.event_name == 'pull_request' && format('https://api-preview-pr-{0}.goaltracker.app', github.event.number) || 'https://api.goaltracker.app' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Preview deployment (PR branches)
+      - name: Deploy API Preview
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "🚀 Deploying API preview for PR #${{ github.event.number }}"
+          echo "Would build and deploy API to preview environment"
+          # Add your preview deployment commands here
+
+      # Production deployment (main branch)
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/goal-tracker-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/goal-tracker-api:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-api:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-api:buildcache,mode=max
+
+      - name: Connect to Tailscale
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy API to Production Server
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/goal-tracker
+            echo "🔑 Logging into GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "📥 Pulling latest API image..."
+            docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-api:latest
+            echo "🔄 Restarting API service..."
+            docker compose up -d api
+            echo "✅ API deployment completed!"
+
+  # =====================================================
+  # WEB JOB: Test → Approve → Deploy
+  # =====================================================
   web:
+    name: Web Pipeline
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      # --- BUILD & TEST PHASE (automatic, no approval) ---
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -129,17 +194,103 @@ jobs:
       - name: Build Web
         run: pnpm --filter web build
 
-  # ---------------------------------------------------
-  # Mobile — lint, typecheck
-  # ---------------------------------------------------
+  web-deploy:
+    name: Deploy Web
+    needs: [changes, web]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'web-preview' || 'web-production' }}
+      url: ${{ github.event_name == 'pull_request' && format('https://web-preview-pr-{0}.goaltracker.app', github.event.number) || 'https://goaltracker.app' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Preview deployment (PR branches)
+      - name: Deploy Web Preview
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "🚀 Deploying Web preview for PR #${{ github.event.number }}"
+          pnpm install --frozen-lockfile
+          pnpm --filter @goal-tracker/shared build
+          pnpm --filter web build
+          echo "Would deploy Web to preview environment"
+          # Add your preview deployment commands here
+
+      # Production deployment (main branch)
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Web image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/goal-tracker-web:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
+
+      - name: Connect to Tailscale
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy Web to Production Server
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/goal-tracker
+            echo "🔑 Logging into GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "📥 Pulling latest Web image..."
+            docker pull ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
+            echo "🔄 Restarting Web service..."
+            docker compose up -d web
+            echo "✅ Web deployment completed!"
+
+  # =====================================================
+  # MOBILE JOB: Test → Approve → Deploy
+  # =====================================================
   mobile:
+    name: Mobile Pipeline
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      # --- BUILD & TEST PHASE (automatic, no approval) ---
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -157,3 +308,48 @@ jobs:
 
       - name: Run Mobile linting
         run: pnpm --filter mobile lint
+
+  mobile-deploy:
+    name: Deploy Mobile
+    needs: [changes, mobile]
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'mobile-preview' || 'mobile-production' }}
+      url: https://expo.dev/@bacharya/goal-tracker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      # Preview deployment (PR branches)
+      - name: Deploy Mobile Preview (OTA)
+        if: github.event_name == 'pull_request'
+        run: |
+          cd apps/mobile
+          pnpm dlx eas-cli update --branch preview-pr-${{ github.event.number }} --message "Preview for PR #${{ github.event.number }}"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # Production deployment (main branch)
+      - name: Deploy Mobile to Production (OTA)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd apps/mobile
+          pnpm dlx eas-cli update --branch production --message "Production deployment from ${{ github.sha }}"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
