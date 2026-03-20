@@ -69,7 +69,7 @@ const GoalCard = ({ goal }: { goal: Goal }) => {
 export default function DashboardScreen() {
   const { isAuthenticated, login, isLoading: authLoading } = useAuth();
   const { todayTasks, fetchTodayTasks } = useTaskContext();
-  const { goals, fetchGoals, loading: goalsLoading } = useGoalContext();
+  const { goals, fetchGoals } = useGoalContext();
   const { toggleComplete } = useTaskContext();
 
   useEffect(() => {

@@ -90,7 +90,10 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/goal-tracker-web:latest
-        -mobile:
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
+
+  deploy-mobile:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -126,10 +129,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
   deploy:
-    needs: [build-and-push, deploy-mobile]registry,ref=ghcr.io/${{ github.repository_owner }}/goal-tracker-web:buildcache,mode=max
-
-  deploy:
-    needs: build-and-push
+    needs: [build-and-push, deploy-mobile]
     runs-on: ubuntu-latest
 
     steps:
