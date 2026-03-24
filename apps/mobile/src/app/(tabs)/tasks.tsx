@@ -77,7 +77,8 @@ export default function TasksScreen() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchTasks({ status, limit: '50' });
+      console.log('[Tasks] Fetching tasks after login');
+      fetchTasks({ status, page: '1', limit: '50' });
     }
   }, [isAuthenticated, status, fetchTasks]);
 

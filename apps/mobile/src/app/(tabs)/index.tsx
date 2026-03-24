@@ -74,6 +74,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('[Dashboard] Fetching data after login');
       fetchTodayTasks();
       fetchGoals();
     }

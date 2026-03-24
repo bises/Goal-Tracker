@@ -1,13 +1,8 @@
 import type { Goal, PaginatedTasksResponse, Task } from '@goal-tracker/shared';
+import { auth0Client } from './auth0';
 
-// TODO: Replace with actual API URL from environment/config
-const API_URL = 'http://localhost:3001/api';
-
-let getAccessToken: (() => Promise<string | null>) | null = null;
-
-export const setAuthTokenProvider = (provider: () => Promise<string | null>) => {
-  getAccessToken = provider;
-};
+// API URL - using Tailscale for cross-device access
+const API_URL = 'https://jbhouse.tail6c5f41.ts.net:3001/api';
 
 const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const headers: Record<string, string> = {
@@ -21,25 +16,30 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}): Promi
     });
   }
 
-  if (getAccessToken) {
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-    } catch (e) {
-      console.error('Failed to get auth token:', e);
+  try {
+    // getCredentials auto-refreshes the access token via refresh token if expired
+    const credentials = await auth0Client.credentialsManager.getCredentials();
+    if (credentials?.accessToken) {
+      headers['Authorization'] = `Bearer ${credentials.accessToken}`;
     }
+  } catch (e) {
+    console.error('[API] Failed to get credentials:', e);
   }
 
-  const response = await fetch(url, { ...options, headers });
+  try {
+    const response = await fetch(url, { ...options, headers });
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed with status ${response.status}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      console.error('[API] Request failed:', response.status, body);
+      throw new Error(body.error ?? `Request failed with status ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('[API] Fetch error for', url, ':', error);
+    throw error;
   }
-
-  return response;
 };
 
 // --- Goals API ---
@@ -48,13 +48,14 @@ export const goalsApi = {
   async fetchGoals(): Promise<Goal[]> {
     const res = await authenticatedFetch(`${API_URL}/goals`);
     const json = await res.json();
-    return json.data;
+    // Backend returns goals directly as an array, not wrapped in {data: ...}
+    return Array.isArray(json) ? json : json.data || [];
   },
 
   async getGoal(id: string): Promise<Goal> {
     const res = await authenticatedFetch(`${API_URL}/goals/${encodeURIComponent(id)}`);
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async createGoal(data: Partial<Goal>): Promise<Goal> {
@@ -63,7 +64,7 @@ export const goalsApi = {
       body: JSON.stringify(data),
     });
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async updateGoal(id: string, data: Partial<Goal>): Promise<Goal> {
@@ -72,7 +73,7 @@ export const goalsApi = {
       body: JSON.stringify(data),
     });
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async deleteGoal(id: string): Promise<void> {
@@ -86,7 +87,7 @@ export const goalsApi = {
       method: 'POST',
     });
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async updateProgress(id: string, value: number, note?: string): Promise<void> {
@@ -104,13 +105,14 @@ export const tasksApi = {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     const res = await authenticatedFetch(`${API_URL}/tasks${query}`);
     const json = await res.json();
-    return json.data;
+    // Backend returns { tasks, pagination } directly when page/limit are provided
+    return json;
   },
 
   async getTask(id: string): Promise<Task> {
     const res = await authenticatedFetch(`${API_URL}/tasks/${encodeURIComponent(id)}`);
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async createTask(data: Partial<Task> & { goalIds?: string[] }): Promise<Task> {
@@ -119,7 +121,7 @@ export const tasksApi = {
       body: JSON.stringify(data),
     });
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async updateTask(id: string, data: Partial<Task>): Promise<Task> {
@@ -128,7 +130,7 @@ export const tasksApi = {
       body: JSON.stringify(data),
     });
     const json = await res.json();
-    return json.data;
+    return json;
   },
 
   async deleteTask(id: string): Promise<void> {
@@ -142,18 +144,21 @@ export const tasksApi = {
       method: 'POST',
     });
     const json = await res.json();
-    return json.data;
+    // Backend returns the task directly, not wrapped in {data: ...}
+    return json;
   },
 
   async getScheduledTasks(date: string): Promise<Task[]> {
     const res = await authenticatedFetch(`${API_URL}/tasks/scheduled/${encodeURIComponent(date)}`);
     const json = await res.json();
-    return json.data;
+    // Backend returns tasks directly as an array, not wrapped in {data: ...}
+    return Array.isArray(json) ? json : json.data || [];
   },
 
   async getUnscheduledTasks(): Promise<Task[]> {
     const res = await authenticatedFetch(`${API_URL}/tasks/unscheduled/list`);
     const json = await res.json();
-    return json.data;
+    // Backend returns tasks directly as an array, not wrapped in {data: ...}
+    return Array.isArray(json) ? json : json.data || [];
   },
 };

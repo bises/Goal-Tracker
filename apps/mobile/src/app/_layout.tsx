@@ -9,16 +9,11 @@ import { useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { GoalProvider } from '@/contexts/GoalContext';
 import { TaskProvider } from '@/contexts/TaskContext';
-import { setAuthTokenProvider } from '@/lib/api';
 
 SplashScreen.preventAutoHideAsync();
 
 const AppInner = () => {
-  const { getAccessToken, isLoading } = useAuth();
-
-  useEffect(() => {
-    setAuthTokenProvider(getAccessToken);
-  }, [getAccessToken]);
+  const { isLoading, user } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
@@ -26,9 +21,13 @@ const AppInner = () => {
     }
   }, [isLoading]);
 
+  // Keying providers on the user's sub ensures state is fully reset on logout/re-login,
+  // preventing stale goals/tasks from a previous session from being shown
+  const userKey = user?.sub ?? 'guest';
+
   return (
-    <GoalProvider>
-      <TaskProvider>
+    <GoalProvider key={userKey}>
+      <TaskProvider key={userKey}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
         </Stack>

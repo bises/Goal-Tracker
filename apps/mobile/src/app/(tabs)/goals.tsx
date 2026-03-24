@@ -70,21 +70,26 @@ const GoalCard = ({ goal }: { goal: Goal }) => {
 };
 
 export default function GoalsScreen() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, accessToken } = useAuth();
   const { goals, loading, error, fetchGoals, refreshGoals } = useGoalContext();
   const [scopeFilter, setScopeFilter] = useState<GoalScope | 'ALL'>('ALL');
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && accessToken) {
+      console.log('[Goals] Fetching goals after login');
       fetchGoals();
     }
-  }, [isAuthenticated, fetchGoals]);
+  }, [isAuthenticated, accessToken, fetchGoals]);
 
   const filteredGoals = useMemo(() => {
     const active = goals.filter((g) => !g.isMarkedComplete);
     if (scopeFilter === 'ALL') return active;
     return active.filter((g) => g.scope === scopeFilter);
   }, [goals, scopeFilter]);
+
+  useEffect(() => {
+    console.log('[GoalsScreen] Goals:', goals.length, 'Filtered:', filteredGoals.length, 'Filter:', scopeFilter);
+  }, [goals, filteredGoals, scopeFilter]);
 
   const scopeCounts = useMemo(() => {
     const active = goals.filter((g) => !g.isMarkedComplete);
