@@ -1,5 +1,5 @@
 import { formatLocalDate } from '@goal-tracker/shared';
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { taskApi } from '../api';
 import { Task } from '../types';
 
@@ -11,13 +11,10 @@ interface TaskContextType {
   fetchTasks: () => Promise<void>;
   /** Force fetch — always hits the API. Use after mutations. */
   refreshTasks: () => Promise<void>;
-  updateTask: (task: Task) => Promise<void>;
   updateTaskFields: (id: string, updates: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
   deleteTask: (taskId: string) => Promise<void>;
   scheduleTask: (taskId: string, date: Date | null) => Promise<void>;
-  upsertTask: (task: Task) => void;
   createTask: (payload: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
-  addTask: (task: Task) => void;
   toggleComplete: (id: string) => Promise<Task>;
 }
 
@@ -27,14 +24,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
-  const doFetch = useCallback(async () => {
+  const refreshTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await taskApi.fetchTasks();
-      const validTasks = Array.isArray(data) ? data.filter((task) => task && task.id) : [];
-      setTasks(validTasks);
+      setTasks(Array.isArray(data) ? data.filter((task) => task && task.id) : []);
+      hasFetchedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
     } finally {
@@ -42,34 +40,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /** Lazy — only fetches when the tasks array is empty (page mount guard). */
+  /** Lazy — only fetches when tasks haven't been loaded yet. */
   const fetchTasks = useCallback(async () => {
-    setTasks((current) => {
-      if (current.length === 0) {
-        doFetch();
-      }
-      return current;
-    });
-  }, [doFetch]);
-
-  /** Force — always hits the API. Call after any mutation or on retry. */
-  const refreshTasks = useCallback(async () => {
-    await doFetch();
-  }, [doFetch]);
-
-  const addTask = useCallback((task: Task) => {
-    if (!task || !task.id) {
-      return;
-    }
-    setTasks((prev) => [...prev, task]);
-  }, []);
+    if (hasFetchedRef.current) return;
+    await refreshTasks();
+  }, [refreshTasks]);
 
   const upsertTask = useCallback((task: Task) => {
-    if (!task || !task.id) {
-      return;
-    }
     setTasks((prev) => {
-      const idx = prev.findIndex((t) => t && t.id === task.id);
+      const idx = prev.findIndex((t) => t.id === task.id);
       if (idx === -1) return [...prev, task];
       const copy = [...prev];
       copy[idx] = task;
@@ -77,112 +56,115 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateTask = useCallback(
-    async (updatedTask: Task) => {
-      // Send to API and then upsert returned canonical task
-      try {
-        const saved = await taskApi.updateTask(updatedTask.id, updatedTask);
-        upsertTask(saved);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update task');
-        await doFetch();
-        throw err;
-      }
-    },
-    [doFetch, upsertTask]
-  );
-
   const updateTaskFields = useCallback(
     async (id: string, updates: Partial<Task> & { goalIds?: string[] }) => {
+      // Optimistic update
+      const snapshot = tasks;
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
       try {
         const saved = await taskApi.updateTask(id, updates);
         upsertTask(saved);
         return saved;
       } catch (err) {
+        setTasks(snapshot);
         setError(err instanceof Error ? err.message : 'Failed to update task');
-        await doFetch();
         throw err;
       }
     },
-    [doFetch, upsertTask]
+    [tasks, upsertTask]
   );
 
   const deleteTask = useCallback(
     async (taskId: string) => {
-      // Optimistically remove from cache
+      const snapshot = tasks;
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
-
       try {
         await taskApi.deleteTask(taskId);
       } catch (err) {
+        setTasks(snapshot);
         setError(err instanceof Error ? err.message : 'Failed to delete task');
-        // Revert on error
-        await doFetch();
         throw err;
       }
     },
-    [doFetch]
+    [tasks]
   );
 
   const scheduleTask = useCallback(
     async (taskId: string, date: Date | null) => {
+      const dateStr = date ? formatLocalDate(date) : null;
+      const snapshot = tasks;
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, scheduledDate: dateStr ?? undefined } : t))
+      );
       try {
-        // Convert to YYYY-MM-DD string in local time
-        const dateStr = date ? formatLocalDate(date) : null;
         const saved = await taskApi.scheduleTask(taskId, dateStr);
         upsertTask(saved);
       } catch (err) {
+        setTasks(snapshot);
         setError(err instanceof Error ? err.message : 'Failed to schedule task');
-        await doFetch();
         throw err;
       }
     },
-    [doFetch, upsertTask]
+    [tasks, upsertTask]
   );
 
-  const createTask = useCallback(
-    async (payload: Partial<Task> & { goalIds?: string[] }) => {
-      try {
-        const created = await taskApi.createTask(payload);
-        addTask(created);
-        return created;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create task');
-        throw err;
-      }
-    },
-    [addTask]
-  );
+  const createTask = useCallback(async (payload: Partial<Task> & { goalIds?: string[] }) => {
+    try {
+      const created = await taskApi.createTask(payload);
+      setTasks((prev) => [...prev, created]);
+      return created;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create task');
+      throw err;
+    }
+  }, []);
 
   const toggleComplete = useCallback(
     async (id: string) => {
+      // Optimistic toggle
+      const snapshot = tasks;
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t))
+      );
       try {
         const saved = await taskApi.toggleComplete(id);
         upsertTask(saved);
         return saved;
       } catch (err) {
+        setTasks(snapshot);
         setError(err instanceof Error ? err.message : 'Failed to toggle task');
         throw err;
       }
     },
-    [upsertTask]
+    [tasks, upsertTask]
   );
 
-  const value: TaskContextType = {
-    tasks,
-    loading,
-    error,
-    fetchTasks,
-    updateTask,
-    updateTaskFields,
-    deleteTask,
-    scheduleTask,
-    upsertTask,
-    createTask,
-    addTask,
-    refreshTasks,
-    toggleComplete,
-  };
+  const value = useMemo<TaskContextType>(
+    () => ({
+      tasks,
+      loading,
+      error,
+      fetchTasks,
+      refreshTasks,
+      updateTaskFields,
+      deleteTask,
+      scheduleTask,
+      createTask,
+      toggleComplete,
+    }),
+    [
+      tasks,
+      loading,
+      error,
+      fetchTasks,
+      refreshTasks,
+      updateTaskFields,
+      deleteTask,
+      scheduleTask,
+      createTask,
+      toggleComplete,
+    ]
+  );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
 }

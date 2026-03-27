@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { Goal } from '../types';
 
@@ -8,11 +8,14 @@ interface GoalContextType {
   error: string | null;
   /** Lazy fetch — skips if goals are already loaded. Use on page mount. */
   fetchGoals: () => Promise<void>;
-  /** Force fetch — always hits the API. Use after mutations. */
+  /** Force fetch — always hits the API. Use after mutations or retry. */
   refreshGoals: () => Promise<void>;
-  updateGoal: (goal: Goal) => Promise<void>;
+  /** Create a goal via API and add to local state. */
+  createGoal: (data: Partial<Goal>) => Promise<Goal>;
+  /** Update a goal via API with optimistic local update. */
+  updateGoal: (goalId: string, data: Partial<Goal>) => Promise<Goal>;
+  /** Delete a goal via API with optimistic local removal. */
   deleteGoal: (goalId: string) => Promise<void>;
-  addGoal: (goal: Goal) => void;
 }
 
 const GoalContext = createContext<GoalContextType | undefined>(undefined);
@@ -21,13 +24,15 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
-  const doFetch = useCallback(async () => {
+  const refreshGoals = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await api.fetchGoals();
       setGoals(Array.isArray(data) ? data : []);
+      hasFetchedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch goals');
       console.error('Error loading goals:', err);
@@ -36,69 +41,55 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /** Lazy — only fetches when the goals array is empty (page mount guard). */
   const fetchGoals = useCallback(async () => {
-    setGoals((current) => {
-      if (current.length === 0) {
-        doFetch();
-      }
-      return current;
-    });
-  }, [doFetch]);
+    if (hasFetchedRef.current) return;
+    await refreshGoals();
+  }, [refreshGoals]);
 
-  /** Force — always hits the API. Call after any mutation or on retry. */
-  const refreshGoals = useCallback(async () => {
-    await doFetch();
-  }, [doFetch]);
-
-  const addGoal = useCallback((goal: Goal) => {
-    setGoals((prev) => [...prev, goal]);
+  const createGoal = useCallback(async (data: Partial<Goal>): Promise<Goal> => {
+    const created = await api.createGoal(data);
+    setGoals((prev) => [...prev, created]);
+    return created;
   }, []);
 
   const updateGoal = useCallback(
-    async (updatedGoal: Goal) => {
-      // Optimistically update local cache
-      setGoals((prev) => prev.map((g) => (g.id === updatedGoal.id ? updatedGoal : g)));
-
+    async (goalId: string, data: Partial<Goal>): Promise<Goal> => {
+      // Snapshot for rollback
+      const snapshot = goals;
+      // Optimistic update
+      setGoals((prev) => prev.map((g) => (g.id === goalId ? { ...g, ...data } : g)));
       try {
-        await api.updateGoal(updatedGoal.id, updatedGoal);
+        const updated = await api.updateGoal(goalId, data);
+        // Replace with server response
+        setGoals((prev) => prev.map((g) => (g.id === goalId ? updated : g)));
+        return updated;
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update goal');
-        // Revert cache on error with a force refresh
-        await doFetch();
+        // Revert on failure
+        setGoals(snapshot);
         throw err;
       }
     },
-    [doFetch]
+    [goals]
   );
 
   const deleteGoal = useCallback(
-    async (goalId: string) => {
-      // Optimistically remove from cache
+    async (goalId: string): Promise<void> => {
+      const snapshot = goals;
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
-
       try {
         await api.deleteGoal(goalId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete goal');
-        // Revert on error with a force refresh
-        await doFetch();
+        setGoals(snapshot);
         throw err;
       }
     },
-    [doFetch]
+    [goals]
   );
 
-  const value: GoalContextType = {
-    goals,
-    loading,
-    error,
-    fetchGoals,
-    refreshGoals,
-    updateGoal,
-    deleteGoal,
-    addGoal,
-  };
+  const value = useMemo<GoalContextType>(
+    () => ({ goals, loading, error, fetchGoals, refreshGoals, createGoal, updateGoal, deleteGoal }),
+    [goals, loading, error, fetchGoals, refreshGoals, createGoal, updateGoal, deleteGoal]
+  );
 
   return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;
 }

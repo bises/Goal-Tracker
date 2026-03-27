@@ -261,7 +261,7 @@ export const TasksPage = () => {
       )}
 
       {/* Empty State */}
-      {!loading && tasks.length === 0 && (
+      {!loading && !error && tasks.length === 0 && (
         <SquircleCard className="p-8 text-center">
           <div className="text-5xl mb-4">{activeTab === 'pending' ? '📝' : '✅'}</div>
           <div className="text-lg font-semibold mb-2" style={{ color: 'var(--deep-charcoal)' }}>
@@ -278,7 +278,7 @@ export const TasksPage = () => {
       )}
 
       {/* Pagination */}
-      {!loading && totalPages > 1 && (
+      {!loading && !error && totalPages > 1 && (
         <div className="pb-4">
           <Pagination>
             <PaginationContent>

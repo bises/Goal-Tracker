@@ -10,6 +10,11 @@ apps/api/.env
 .pnpm-store
 **/.pnpm-store
 
+# Expo generated native folders (should only exist inside apps/mobile/, never at repo root)
+/android
+/ios
+/app.json
+
 # Keep VS Code workspace settings
 !.vscode/settings.json
 !.vscode/extensions.json

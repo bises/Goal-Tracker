@@ -16,7 +16,7 @@ export const TopNavBar = () => {
   const handleLogout = () => {
     logout({
       logoutParams: {
-        returnTo: window.location.origin + '/login',
+        returnTo: window.location.origin,
       },
     });
   };

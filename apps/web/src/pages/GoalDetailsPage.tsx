@@ -37,6 +37,7 @@ import { LinkTasksSheet } from '../components/LinkTasksSheet';
 import { SquircleCard } from '../components/SquircleCard';
 import { TaskCard } from '../components/TaskCard';
 import { Spinner } from '../components/ui/spinner';
+import { useGoalContext } from '../contexts/GoalContext';
 import { Goal, GoalTasksResponse, Task } from '../types';
 
 const getScopeConfig = (scope: string) => {
@@ -60,6 +61,7 @@ const getTypeConfig = (type: string) => {
 export const GoalDetailsPage = () => {
   const { goalId } = useParams<{ goalId: string }>();
   const navigate = useNavigate();
+  const { deleteGoal } = useGoalContext();
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [tasksData, setTasksData] = useState<GoalTasksResponse | null>(null);
@@ -96,7 +98,7 @@ export const GoalDetailsPage = () => {
 
   const handleDelete = async () => {
     if (!goal) return;
-    await api.deleteGoal(goal.id);
+    await deleteGoal(goal.id);
     navigate('/goals');
   };
 
