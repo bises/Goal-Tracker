@@ -17,7 +17,6 @@ jobs:
     outputs:
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
-      mobile: ${{ steps.filter.outputs.mobile }}
       shared: ${{ steps.filter.outputs.shared }}
     steps:
       - uses: actions/checkout@v4
@@ -31,10 +30,6 @@ jobs:
               - 'pnpm-lock.yaml'
             web:
               - 'apps/web/**'
-              - 'packages/shared/**'
-              - 'pnpm-lock.yaml'
-            mobile:
-              - 'apps/mobile/**'
               - 'packages/shared/**'
               - 'pnpm-lock.yaml'
             shared:
@@ -129,31 +124,4 @@ jobs:
       - name: Build Web
         run: pnpm --filter web build
 
-  # ---------------------------------------------------
-  # Mobile — lint, typecheck
-  # ---------------------------------------------------
-  mobile:
-    needs: changes
-    if: needs.changes.outputs.mobile == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared package
-        run: pnpm --filter @goal-tracker/shared build
-
-      - name: TypeScript check
-        run: cd apps/mobile && npx tsc --noEmit
-
-      - name: Run Mobile linting
-        run: pnpm --filter mobile lint
