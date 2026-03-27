@@ -1,46 +1,20 @@
 import { Auth0Provider } from '@auth0/auth0-react';
-import React from 'react';
+import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 import App from './App';
 import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
 import './styles/design-system.css';
 
-// TODO: Make Auth0 configuration environment-specific
-// For now, hardcoded to simplify deployment
-const DEFAULT_AUTH0_DOMAIN = 'bises.auth0.com';
-const DEFAULT_AUTH0_CLIENT_ID = 'izygI8zTKeFDiyME5JETirr288UDMr7q';
-const DEFAULT_AUTH0_AUDIENCE = 'https://goal-tracker-api';
+const domain = import.meta.env.VITE_AUTH0_DOMAIN || 'bises.auth0.com';
+const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || 'izygI8zTKeFDiyME5JETirr288UDMr7q';
+const audience = import.meta.env.VITE_AUTH0_AUDIENCE || 'https://goal-tracker-api';
 
-const domain = import.meta.env.VITE_AUTH0_DOMAIN || DEFAULT_AUTH0_DOMAIN;
-const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || DEFAULT_AUTH0_CLIENT_ID;
-const audience = import.meta.env.VITE_AUTH0_AUDIENCE || DEFAULT_AUTH0_AUDIENCE;
+const Auth0ProviderWithNavigate = ({ children }: { children: ReactNode }) => {
+  const navigate = useNavigate();
 
-// Validate Auth0 configuration
-if (!domain || !clientId) {
-  console.error('Auth0 configuration missing.');
-  throw new Error('Auth0 domain and client ID must be configured');
-}
-
-// Validate domain format
-if (
-  !domain.includes('.auth0.com') &&
-  !domain.includes('.us.auth0.com') &&
-  !domain.includes('.eu.auth0.com') &&
-  !domain.includes('.au.auth0.com')
-) {
-  console.warn('Auth0 domain format might be incorrect. Expected format: your-domain.auth0.com');
-}
-
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error(
-    'Root element with id "root" not found in DOM. Ensure your HTML includes <div id="root"></div>.'
-  );
-}
-
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
+  return (
     <Auth0Provider
       domain={domain}
       clientId={clientId}
@@ -51,14 +25,25 @@ ReactDOM.createRoot(rootElement).render(
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}
-      leeway={60}
-      sessionCheckExpiryDays={1}
+      onRedirectCallback={(appState) => {
+        navigate(appState?.returnTo || '/', { replace: true });
+      }}
     >
-      <GoalProvider>
-        <TaskProvider>
-          <App />
-        </TaskProvider>
-      </GoalProvider>
+      {children}
     </Auth0Provider>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <Auth0ProviderWithNavigate>
+        <GoalProvider>
+          <TaskProvider>
+            <App />
+          </TaskProvider>
+        </GoalProvider>
+      </Auth0ProviderWithNavigate>
+    </BrowserRouter>
   </React.StrictMode>
 );

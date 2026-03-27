@@ -116,24 +116,27 @@ describe('GoalContext', () => {
     expect(apiModule.api.fetchGoals).toHaveBeenCalledTimes(2);
   });
 
-  it('should add a goal to state (no API call)', async () => {
+  it('should create a goal and add to local state', async () => {
     const newGoal = { ...mockGoal, id: '2', title: 'New Goal' };
+    vi.mocked(apiModule.api.createGoal).mockResolvedValue(newGoal);
 
     const { result } = renderHook(() => useGoalContext(), {
       wrapper: GoalProvider,
     });
 
-    act(() => {
-      result.current.addGoal(newGoal);
+    await act(async () => {
+      await result.current.createGoal({ title: 'New Goal', type: 'TOTAL_TARGET', scope: 'YEARLY' });
     });
 
     await waitFor(() => {
       expect(result.current.goals).toHaveLength(1);
       expect(result.current.goals[0].title).toBe('New Goal');
     });
+
+    expect(apiModule.api.createGoal).toHaveBeenCalledTimes(1);
   });
 
-  it('should update an existing goal', async () => {
+  it('should update a goal with optimistic update', async () => {
     const updatedGoal = { ...mockGoal, title: 'Updated Goal' };
     vi.mocked(apiModule.api.fetchGoals).mockResolvedValue([mockGoal]);
     vi.mocked(apiModule.api.updateGoal).mockResolvedValue(updatedGoal);
@@ -142,7 +145,6 @@ describe('GoalContext', () => {
       wrapper: GoalProvider,
     });
 
-    // Load initial goals
     await act(async () => {
       await result.current.fetchGoals();
     });
@@ -151,17 +153,18 @@ describe('GoalContext', () => {
       expect(result.current.goals).toHaveLength(1);
     });
 
-    // Update goal
     await act(async () => {
-      await result.current.updateGoal(updatedGoal);
+      await result.current.updateGoal('1', { title: 'Updated Goal' });
     });
 
     await waitFor(() => {
       expect(result.current.goals[0].title).toBe('Updated Goal');
     });
+
+    expect(apiModule.api.updateGoal).toHaveBeenCalledWith('1', { title: 'Updated Goal' });
   });
 
-  it('should delete a goal', async () => {
+  it('should delete a goal with optimistic removal', async () => {
     vi.mocked(apiModule.api.fetchGoals).mockResolvedValue([mockGoal]);
     vi.mocked(apiModule.api.deleteGoal).mockResolvedValue(undefined);
 
@@ -169,7 +172,6 @@ describe('GoalContext', () => {
       wrapper: GoalProvider,
     });
 
-    // Load initial goals
     await act(async () => {
       await result.current.fetchGoals();
     });
@@ -178,7 +180,6 @@ describe('GoalContext', () => {
       expect(result.current.goals).toHaveLength(1);
     });
 
-    // Delete goal
     await act(async () => {
       await result.current.deleteGoal('1');
     });
@@ -186,6 +187,8 @@ describe('GoalContext', () => {
     await waitFor(() => {
       expect(result.current.goals).toHaveLength(0);
     });
+
+    expect(apiModule.api.deleteGoal).toHaveBeenCalledWith('1');
   });
 
   it('should handle errors gracefully', async () => {

@@ -8,7 +8,7 @@ import {
 import { Edit2, Eye, Link, MoreVertical, Plus, Target, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { useGoalContext } from '../contexts/GoalContext';
 import { Goal } from '../types';
 import { AddProgressSheet } from './AddProgressSheet';
 import { BulkTaskSheet } from './BulkTaskSheet';
@@ -66,6 +66,7 @@ const getScopeColor = (
 
 export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps) => {
   const navigate = useNavigate();
+  const { deleteGoal } = useGoalContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
@@ -73,7 +74,7 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDelete = async () => {
-    await api.deleteGoal(goal.id);
+    await deleteGoal(goal.id);
     onUpdate();
   };
 

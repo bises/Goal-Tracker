@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
+import { useGoalContext } from '../contexts/GoalContext';
 import { Goal, GoalScope } from '../types';
 import { Button } from './ui/button';
 import { CalendarDialog } from './ui/calendar-dialog';
@@ -32,6 +33,7 @@ export const GoalEditSheet = ({
   parentGoal,
 }: GoalEditSheetProps) => {
   const isEditMode = !!goal;
+  const { createGoal, updateGoal } = useGoalContext();
 
   // Form state
   const [title, setTitle] = useState('');
@@ -131,11 +133,11 @@ export const GoalEditSheet = ({
       };
 
       if (isEditMode && goal) {
-        await api.updateGoal(goal.id, goalData);
+        await updateGoal(goal.id, goalData);
       } else {
         goalData.currentValue = 0;
         goalData.parentId = parentId || undefined;
-        await api.createGoal(goalData);
+        await createGoal(goalData);
       }
 
       onSave?.();

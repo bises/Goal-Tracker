@@ -12,6 +12,19 @@ description: Use this skill for writing and running tests across the Goal Tracke
 | apps/api/ | Jest      | `jest.config.ts` | `src/__tests__/` | `pnpm --filter api test` |
 | apps/web/ | Vitest    | `vite.config.ts` | `src/__tests__/` | `pnpm --filter web test` |
 
+## Prerequisites
+
+**Before running API tests:** Run `pnpm --filter api prisma generate` to generate the Prisma client. Without this, `@prisma/client` exports nothing and all tests fail with `TS2305: Module has no exported member 'PrismaClient'`.
+
+**Before running web tests:** Ensure `.npmrc` has `resolve-peers-from-workspace-root=false`. This monorepo has React 18 (web) and React 19 (mobile) — without this setting, pnpm creates duplicate React instances causing `TypeError: Cannot read properties of null (reading 'useState')` in every test that uses React hooks.
+
+## Running All Tests
+
+```bash
+# Full test suite (from root)
+pnpm --filter api prisma generate && pnpm run test
+```
+
 ## Backend Test Pattern (Jest)
 
 ```typescript
