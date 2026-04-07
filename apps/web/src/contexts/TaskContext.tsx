@@ -1,15 +1,16 @@
-import { formatLocalDate } from '@goal-tracker/shared';
+import { extractDateOnly, formatLocalDate, getTodayString } from '@goal-tracker/shared';
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { taskApi } from '../api';
 import { Task } from '../types';
 
 interface TaskContextType {
+  /** Today's tasks only — used by dashboard widgets (TodayProgressCard, DailyFocusList). */
   tasks: Task[];
   loading: boolean;
   error: string | null;
-  /** Lazy fetch — skips if tasks are already loaded. Use on page mount. */
+  /** Lazy fetch of today's tasks — skips if already loaded. */
   fetchTasks: () => Promise<void>;
-  /** Force fetch — always hits the API. Use after mutations. */
+  /** Force re-fetch of today's tasks. */
   refreshTasks: () => Promise<void>;
   updateTaskFields: (id: string, updates: Partial<Task> & { goalIds?: string[] }) => Promise<Task>;
   deleteTask: (taskId: string) => Promise<void>;
@@ -29,11 +30,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const refreshTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
+    hasFetchedRef.current = true;
     try {
-      const data = await taskApi.fetchTasks();
+      const today = getTodayString();
+      const data = await taskApi.fetchTasks({ date: today });
       setTasks(Array.isArray(data) ? data.filter((task) => task && task.id) : []);
-      hasFetchedRef.current = true;
     } catch (err) {
+      hasFetchedRef.current = false;
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
     } finally {
       setLoading(false);
@@ -47,8 +50,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, [refreshTasks]);
 
   const upsertTask = useCallback((task: Task) => {
+    const today = getTodayString();
+    const taskDate = task.scheduledDate ? extractDateOnly(task.scheduledDate) : undefined;
+    const isForToday = taskDate === today;
+
     setTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === task.id);
+      // Task moved away from today — remove it
+      if (!isForToday) return prev.filter((t) => t.id !== task.id);
+      // Task is for today — upsert
       if (idx === -1) return [...prev, task];
       const copy = [...prev];
       copy[idx] = task;
@@ -93,8 +103,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     async (taskId: string, date: Date | null) => {
       const dateStr = date ? formatLocalDate(date) : null;
       const snapshot = tasks;
+      const today = getTodayString();
+      const isForToday = dateStr === today;
+      // Optimistic: update if moving to today, remove if moving away
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, scheduledDate: dateStr ?? undefined } : t))
+        isForToday
+          ? prev.map((t) => (t.id === taskId ? { ...t, scheduledDate: dateStr ?? undefined } : t))
+          : prev.filter((t) => t.id !== taskId)
       );
       try {
         const saved = await taskApi.scheduleTask(taskId, dateStr);
@@ -111,7 +126,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const createTask = useCallback(async (payload: Partial<Task> & { goalIds?: string[] }) => {
     try {
       const created = await taskApi.createTask(payload);
-      setTasks((prev) => [...prev, created]);
+      // Only add to dashboard list if it's scheduled for today
+      const today = getTodayString();
+      const taskDate = created.scheduledDate ? extractDateOnly(created.scheduledDate) : undefined;
+      if (taskDate === today) {
+        setTasks((prev) => [...prev, created]);
+      }
       return created;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');

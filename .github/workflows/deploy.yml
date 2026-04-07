@@ -5,7 +5,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   test:
@@ -31,7 +30,7 @@ jobs:
         run: pnpm --filter @goal-tracker/shared build
 
       - name: Generate Prisma Client
-        run: cd apps/api && npx prisma generate
+        run: pnpm --filter api exec prisma generate
 
       - name: Run API tests
         run: pnpm --filter api test
@@ -123,8 +122,7 @@ jobs:
             docker compose stop api web || true
             docker compose rm -f api web || true
 
-
-            echo "�🚀 Starting all services..."
+            echo "🚀 Starting all services..."
             docker compose up -d
 
             echo "🧹 Cleaning up old images..."
@@ -136,7 +134,7 @@ jobs:
       - name: Notify deployment status
         if: always()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "${{ job.status }}" = "success" ]; then
             echo "✅ Deployment successful!"
           else
             echo "❌ Deployment failed!"

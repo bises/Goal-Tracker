@@ -9,6 +9,7 @@ import {
   ServerOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { taskApi } from '../api';
 import { DailyTimelineView } from '../components/DailyTimelineView';
 import { RescheduleSheet } from '../components/RescheduleSheet';
 import { SquircleCard } from '../components/SquircleCard';
@@ -21,7 +22,7 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import { useGoalContext } from '../contexts/GoalContext';
 import { useTaskContext } from '../contexts/TaskContext';
 import { Task } from '../types';
-import { parseLocalDate } from '../utils/dateUtils';
+import { formatLocalDate, parseLocalDate } from '../utils/dateUtils';
 
 type PlannerView = 'month' | 'day';
 
@@ -56,17 +57,13 @@ const MONTHS = [
 ];
 
 export const PlannerPage = () => {
-  const {
-    tasks: allTasks,
-    scheduleTask,
-    updateTaskFields,
-    toggleComplete,
-    error: taskError,
-    fetchTasks,
-    refreshTasks,
-  } = useTaskContext();
+  const { scheduleTask, updateTaskFields, toggleComplete } = useTaskContext();
   const { goals, error: goalError, fetchGoals, refreshGoals } = useGoalContext();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([]);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -80,21 +77,42 @@ export const PlannerPage = () => {
 
   const error = taskError || goalError;
 
+  const fetchMonthTasks = useCallback(async (date: Date) => {
+    const month = formatLocalDate(date).slice(0, 7);
+    setTaskLoading(true);
+    setTaskError(null);
+    try {
+      const [monthData, unscheduledData] = await Promise.all([
+        taskApi.fetchTasks({ month }),
+        taskApi.fetchTasks({ unscheduled: true, status: 'pending' }),
+      ]);
+      setAllTasks(Array.isArray(monthData) ? monthData : []);
+      setUnscheduledTasks(Array.isArray(unscheduledData) ? unscheduledData : []);
+    } catch (err) {
+      setTaskError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+    } finally {
+      setTaskLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchTasks();
     fetchGoals();
-  }, [fetchTasks, fetchGoals]);
+  }, [fetchGoals]);
+
+  useEffect(() => {
+    fetchMonthTasks(currentDate);
+  }, [fetchMonthTasks, currentDate]);
+
+  const refreshLocalTasks = useCallback(
+    () => fetchMonthTasks(currentDate),
+    [fetchMonthTasks, currentDate]
+  );
 
   const handleRetry = async () => {
     setIsRetrying(true);
-    await Promise.all([refreshTasks(), refreshGoals()]);
+    await Promise.all([refreshLocalTasks(), refreshGoals()]);
     setIsRetrying(false);
   };
-
-  // Unscheduled tasks
-  const unscheduledTasks = useMemo(() => {
-    return allTasks.filter((t) => !t.scheduledDate && !t.isCompleted);
-  }, [allTasks]);
 
   // Tasks organized by date
   const tasksByDate = useMemo(() => {
@@ -133,14 +151,15 @@ export const PlannerPage = () => {
       // date of epoch 0 means "unschedule"
       if (date.getTime() === 0) {
         await scheduleTask(taskId, null);
-        return;
+      } else {
+        await scheduleTask(taskId, date);
+        if (time) {
+          await updateTaskFields(taskId, { scheduledTime: time });
+        }
       }
-      await scheduleTask(taskId, date);
-      if (time) {
-        await updateTaskFields(taskId, { scheduledTime: time });
-      }
+      await refreshLocalTasks();
     },
-    [scheduleTask, updateTaskFields]
+    [scheduleTask, updateTaskFields, refreshLocalTasks]
   );
 
   const handleTaskClick = (task: Task) => {
@@ -168,6 +187,7 @@ export const PlannerPage = () => {
   const handleToggleComplete = async (taskId: string) => {
     try {
       await toggleComplete(taskId);
+      await refreshLocalTasks();
     } catch (error) {
       console.error('Failed to toggle task:', error);
     }
@@ -313,6 +333,7 @@ export const PlannerPage = () => {
                 onTaskClick={handleTaskClick}
                 onCreateTask={handleCreateTaskForTime}
                 unscheduledTasks={unscheduledTasks}
+                tasks={allTasks}
               />
             </div>
           )}
@@ -559,7 +580,7 @@ export const PlannerPage = () => {
         onClose={() => setIsDateModalOpen(false)}
         date={selectedDate}
         tasks={tasksForSelectedDate}
-        onTaskUpdated={refreshTasks}
+        onTaskUpdated={refreshLocalTasks}
         onAddTask={handleAddTaskForDate}
       />
 
@@ -572,7 +593,7 @@ export const PlannerPage = () => {
         }}
         task={selectedTask}
         onSave={async () => {
-          await refreshTasks();
+          await refreshLocalTasks();
           setIsEditSheetOpen(false);
           setSelectedTask(null);
           setIsDateModalOpen(false);

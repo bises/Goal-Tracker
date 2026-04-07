@@ -29,11 +29,12 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
   const refreshGoals = useCallback(async () => {
     setLoading(true);
     setError(null);
+    hasFetchedRef.current = true;
     try {
       const data = await api.fetchGoals();
       setGoals(Array.isArray(data) ? data : []);
-      hasFetchedRef.current = true;
     } catch (err) {
+      hasFetchedRef.current = false;
       setError(err instanceof Error ? err.message : 'Failed to fetch goals');
       console.error('Error loading goals:', err);
     } finally {
