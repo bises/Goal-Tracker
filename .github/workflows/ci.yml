@@ -93,6 +93,30 @@ jobs:
         run: pnpm --filter api test
 
   # ---------------------------------------------------
+  # API — Docker build validation (catches issues that
+  # only appear inside the Docker build environment,
+  # e.g. --shamefully-hoist type conflicts)
+  # ---------------------------------------------------
+  api-docker-build:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build API Docker image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: false
+          tags: goal-tracker-api:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------
   # Web — lint, typecheck, test, build
   # ---------------------------------------------------
   web:

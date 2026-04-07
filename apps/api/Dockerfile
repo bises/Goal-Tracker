@@ -5,18 +5,20 @@ WORKDIR /app
 # Copy root config
 COPY package.json .
 COPY pnpm-workspace.yaml .
+COPY pnpm-lock.yaml .
 COPY tsconfig.base.json .
 
 # Copy shared packages
 COPY packages ./packages
 
-# Copy app source
+# Copy app source (and stub web package.json so pnpm workspace resolution works)
 COPY apps/api ./apps/api
+COPY apps/web/package.json ./apps/web/package.json
 
 # Install dependencies (including workspace)
 RUN apk add --no-cache openssl curl
 RUN npm install -g pnpm
-RUN pnpm install --shamefully-hoist
+RUN pnpm install --shamefully-hoist --frozen-lockfile
 
 # Build shared packages first
 WORKDIR /app/packages/shared
