@@ -9,6 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './
 import { Button } from './ui/button';
 import { CalendarDialog } from './ui/calendar-dialog';
 import { Checkbox } from './ui/checkbox';
+import { TimePickerDialog } from './ui/time-picker-dialog';
 
 // ─── Segmented Control ──────────────────────────────────────────────────────
 interface SegmentOption<T extends string> {
@@ -406,23 +407,15 @@ export const TaskEditSheet = ({
                   {/* Scheduled Time */}
                   <div>
                     <label
-                      htmlFor="task-time"
                       className="block text-sm font-semibold mb-1.5"
                       style={{ color: 'var(--deep-charcoal)' }}
                     >
                       Time
                     </label>
-                    <input
-                      id="task-time"
-                      type="time"
+                    <TimePickerDialog
                       value={scheduledTime}
-                      onChange={(e) => setScheduledTime(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border text-base"
-                      style={{
-                        borderColor: 'var(--card-border)',
-                        color: scheduledTime ? 'var(--deep-charcoal)' : 'var(--warm-gray)',
-                        background: 'white',
-                      }}
+                      onChange={(t) => setScheduledTime(t)}
+                      placeholder="Set time"
                     />
                   </div>
 
