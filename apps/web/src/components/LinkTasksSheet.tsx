@@ -120,23 +120,23 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Handle */}
-          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-4" />
+          <div className={`mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 ${keyboardHeight > 0 ? 'mt-2 mb-1' : 'mt-4 mb-4'}`} />
 
           {/* Header */}
           <div
-            className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0"
+            className={`flex items-center justify-between px-6 border-b flex-shrink-0 ${keyboardHeight > 0 ? 'py-1.5' : 'py-3'}`}
             style={{ borderColor: 'var(--card-border)' }}
           >
             <Drawer.Title asChild>
               <h2
-                className="text-xl font-bold font-display"
+                className={`font-bold font-display ${keyboardHeight > 0 ? 'text-base' : 'text-xl'}`}
                 style={{ color: 'var(--deep-charcoal)' }}
               >
                 Link Tasks
               </h2>
             </Drawer.Title>
-            <Button variant="ghost" size="icon" onClick={onClose} className="w-10 h-10 rounded-xl">
-              <X size={24} />
+            <Button variant="ghost" size="icon" onClick={onClose} className={`rounded-xl ${keyboardHeight > 0 ? 'w-8 h-8' : 'w-10 h-10'}`}>
+              <X size={keyboardHeight > 0 ? 20 : 24} />
             </Button>
           </div>
 
@@ -265,22 +265,37 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
 
           {/* Footer */}
           <div
-            className={`px-6 py-4 border-t flex items-center gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'pb-4' : 'pb-20'}`}
+            className={`px-6 border-t flex items-center gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'py-2' : 'py-4 pb-20'}`}
             style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
           >
             {/* Selected count */}
-            <div
-              className="text-sm font-medium flex-shrink-0"
-              style={{ color: 'var(--warm-gray)' }}
+            {keyboardHeight === 0 && (
+              <>
+                <div
+                  className="text-sm font-medium flex-shrink-0"
+                  style={{ color: 'var(--warm-gray)' }}
+                >
+                  {selectedTaskIds.size} selected
+                </div>
+                <div className="flex-1" />
+              </>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={`${keyboardHeight > 0 ? 'flex-1 h-9 text-sm' : ''}`}
+              disabled={submitting}
             >
-              {selectedTaskIds.size} selected
-            </div>
-            <div className="flex-1" />
-            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSave} disabled={submitting || !hasChanges}>
-              <Link2 size={16} className="mr-1" />
+            <Button
+              type="button"
+              onClick={handleSave}
+              className={`${keyboardHeight > 0 ? 'flex-1 h-9 text-sm' : ''}`}
+              disabled={submitting || !hasChanges}
+            >
+              <Link2 size={keyboardHeight > 0 ? 14 : 16} className="mr-1" />
               {submitting ? 'Saving...' : 'Save Links'}
             </Button>
           </div>

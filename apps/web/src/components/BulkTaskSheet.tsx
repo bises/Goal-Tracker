@@ -78,16 +78,16 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Handle */}
-          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-4" />
+          <div className={`mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 ${keyboardHeight > 0 ? 'mt-2 mb-1' : 'mt-4 mb-4'}`} />
 
           {/* Header */}
           <div
-            className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0"
+            className={`flex items-center justify-between px-6 border-b flex-shrink-0 ${keyboardHeight > 0 ? 'py-1.5' : 'py-3'}`}
             style={{ borderColor: 'var(--card-border)' }}
           >
             <Drawer.Title asChild>
               <h2
-                className="text-xl font-bold font-display"
+                className={`font-bold font-display ${keyboardHeight > 0 ? 'text-base' : 'text-xl'}`}
                 style={{ color: 'var(--deep-charcoal)' }}
               >
                 Create Tasks
@@ -97,9 +97,9 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="w-10 h-10 rounded-xl"
+              className={`rounded-xl ${keyboardHeight > 0 ? 'w-8 h-8' : 'w-10 h-10'}`}
             >
-              <X size={24} />
+              <X size={keyboardHeight > 0 ? 20 : 24} />
             </Button>
           </div>
 
@@ -254,14 +254,14 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
 
           {/* Footer */}
           <div
-            className={`px-6 py-4 border-t flex gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'pb-4' : 'pb-20'}`}
+            className={`px-6 border-t flex gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'py-2' : 'py-4 pb-20'}`}
             style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
           >
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="flex-1"
+              className={`flex-1 ${keyboardHeight > 0 ? 'h-9 text-sm' : ''}`}
               disabled={isSubmitting}
             >
               Cancel
@@ -269,10 +269,10 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
             <Button
               type="button"
               onClick={handleSubmit}
-              className="flex-1"
+              className={`flex-1 ${keyboardHeight > 0 ? 'h-9 text-sm' : ''}`}
               disabled={isSubmitting || preview.length === 0}
             >
-              <Plus size={16} className="mr-1" />
+              <Plus size={keyboardHeight > 0 ? 14 : 16} className="mr-1" />
               {isSubmitting
                 ? 'Creating...'
                 : `Create ${preview.length > 0 ? preview.length : count} Tasks`}
