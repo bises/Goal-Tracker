@@ -40,7 +40,7 @@ export const TaskEditSheet = ({
   const [estimatedCompletionDate, setEstimatedCompletionDate] = useState('');
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { keyboardHeight, drawerStyle } = useKeyboardHeight();
+  const { keyboardHeight, isKeyboardOpen, drawerStyle } = useKeyboardHeight();
 
   // Populate form when task changes
   useEffect(() => {
@@ -187,31 +187,39 @@ export const TaskEditSheet = ({
           aria-describedby="task-edit-description"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          {/* Handle */}
-          <div
-            className={`mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 ${keyboardHeight > 0 ? 'mt-2 mb-1' : 'mt-4 mb-4'}`}
-          />
+          {/* Handle — hidden when keyboard is up to save space */}
+          {!isKeyboardOpen && (
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-4" />
+          )}
 
-          {/* Header */}
+          {/* Header — ultra-compact when keyboard is up */}
           <div
-            className={`flex items-center justify-between px-6 border-b flex-shrink-0 ${keyboardHeight > 0 ? 'py-1.5' : 'py-3'}`}
+            className={`flex items-center border-b flex-shrink-0 ${isKeyboardOpen ? 'justify-end px-3 py-1' : 'justify-between px-6 py-3'}`}
             style={{ borderColor: 'var(--card-border)' }}
           >
-            <Drawer.Title asChild>
-              <h2
-                className={`font-bold font-display ${keyboardHeight > 0 ? 'text-lg' : 'text-2xl'}`}
-                style={{ color: 'var(--deep-charcoal)' }}
-              >
+            {!isKeyboardOpen && (
+              <Drawer.Title asChild>
+                <h2
+                  className="text-2xl font-bold font-display"
+                  style={{ color: 'var(--deep-charcoal)' }}
+                >
+                  {isEditMode ? 'Edit Task' : 'New Task'}
+                </h2>
+              </Drawer.Title>
+            )}
+            {isKeyboardOpen && (
+              <Drawer.Title className="sr-only">
                 {isEditMode ? 'Edit Task' : 'New Task'}
-              </h2>
-            </Drawer.Title>
+              </Drawer.Title>
+            )}
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Close"
               onClick={handleClose}
-              className={`rounded-xl ${keyboardHeight > 0 ? 'w-8 h-8' : 'w-10 h-10'}`}
+              className={`rounded-xl flex-shrink-0 ${isKeyboardOpen ? 'w-8 h-8' : 'w-10 h-10'}`}
             >
-              <X size={keyboardHeight > 0 ? 20 : 24} />
+              <X size={isKeyboardOpen ? 18 : 24} />
             </Button>
           </div>
 
@@ -489,14 +497,14 @@ export const TaskEditSheet = ({
 
           {/* Footer Actions */}
           <div
-            className={`px-6 border-t flex gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'py-2' : 'py-4 pb-20'}`}
+            className={`px-6 border-t flex gap-3 flex-shrink-0 ${isKeyboardOpen ? 'py-2' : 'py-4 pb-20'}`}
             style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
           >
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
-              className={`flex-1 ${keyboardHeight > 0 ? 'h-9 text-sm' : ''}`}
+              className={`flex-1 ${isKeyboardOpen ? 'h-9 text-sm' : ''}`}
               disabled={isSubmitting}
             >
               Cancel
@@ -504,7 +512,7 @@ export const TaskEditSheet = ({
             <Button
               type="button"
               onClick={handleSubmit}
-              className={`flex-1 ${keyboardHeight > 0 ? 'h-9 text-sm' : ''}`}
+              className={`flex-1 ${isKeyboardOpen ? 'h-9 text-sm' : ''}`}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Task'}

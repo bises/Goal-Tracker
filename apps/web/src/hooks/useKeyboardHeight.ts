@@ -1,78 +1,108 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Returns the current on-screen keyboard height and a helper that
- * produces `bottom` / `maxHeight` styles for a fixed-bottom drawer so it
- * stays above the virtual keyboard on mobile.
+ * Detects the on-screen keyboard and returns styles to make a fixed-bottom
+ * drawer fill the visible area above the keyboard.
  *
- * Works on:
- * - Android Chrome (keyboard shrinks visualViewport.height)
- * - iOS Safari (keyboard shrinks visualViewport.height)
- * - Desktop (always returns 0)
+ * Handles two browser behaviors:
+ * - iOS Safari: window.innerHeight stays fixed, visualViewport.height shrinks.
+ *   keyboardHeight > 0, need to push drawer up by that amount.
+ * - Android Chrome (Galaxy S24): window.innerHeight AND visualViewport.height
+ *   both shrink together, so keyboardHeight ≈ 0. We detect keyboard open by
+ *   comparing current viewport height against the initial (pre-keyboard) height.
  */
 interface UseKeyboardHeightResult {
   keyboardHeight: number;
-  /** Merge into the Drawer.Content `style` prop. */
+  isKeyboardOpen: boolean;
   drawerStyle: (baseMaxHeight: string) => React.CSSProperties;
 }
 
 export const useKeyboardHeight = (): UseKeyboardHeightResult => {
+  // iOS: gap between layout viewport and visual viewport
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // true on both iOS (keyboardHeight > 0) and Android (viewport shrank)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  // The visible viewport height when keyboard is open (used for drawer sizing)
+  const [visibleHeight, setVisibleHeight] = useState(0);
+
+  // Capture the "resting" viewport height before any keyboard appears
+  const initialHeightRef = useRef<number>(0);
   const rafRef = useRef<number>();
 
   useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    // Store the baseline height (no keyboard) on mount
+    initialHeightRef.current = vv.height;
 
     const handleViewportChange = () => {
-      // Use rAF to batch rapid resize events during keyboard animation
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
-        const newHeight = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-        setKeyboardHeight(newHeight);
+        // iOS: window.innerHeight fixed, vv.height shrinks → gap = keyboard height
+        const iosKeyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+
+        // Android: both window.innerHeight and vv.height shrink together,
+        // so iosKeyboard ≈ 0. Detect via significant drop from initial height.
+        const androidKeyboard = iosKeyboard === 0 && vv.height < initialHeightRef.current - 120;
+
+        const open = iosKeyboard > 50 || androidKeyboard;
+
+        setKeyboardHeight(iosKeyboard);
+        setIsKeyboardOpen(open);
+        if (open) setVisibleHeight(vv.height);
       });
     };
 
-    viewport.addEventListener('resize', handleViewportChange);
-    viewport.addEventListener('scroll', handleViewportChange);
+    vv.addEventListener('resize', handleViewportChange);
+    vv.addEventListener('scroll', handleViewportChange);
     handleViewportChange();
 
     return () => {
-      viewport.removeEventListener('resize', handleViewportChange);
-      viewport.removeEventListener('scroll', handleViewportChange);
+      vv.removeEventListener('resize', handleViewportChange);
+      vv.removeEventListener('scroll', handleViewportChange);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
-  // When the keyboard is visible and user focuses an input,
-  // scroll it into view inside its nearest scroll container.
+  // Scroll focused input into view when keyboard opens (user-initiated focus only)
   useEffect(() => {
-    if (keyboardHeight <= 0) return;
+    if (!isKeyboardOpen) return;
 
     const handleFocusIn = (e: FocusEvent) => {
       const el = e.target as HTMLElement;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
-        // Wait for layout to settle after keyboard resize
         setTimeout(() => {
           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
+        }, 150);
       }
     };
 
     document.addEventListener('focusin', handleFocusIn);
     return () => document.removeEventListener('focusin', handleFocusIn);
-  }, [keyboardHeight]);
+  }, [isKeyboardOpen]);
 
   const drawerStyle = useCallback(
     (baseMaxHeight: string): React.CSSProperties => {
-      if (keyboardHeight <= 0) return { maxHeight: baseMaxHeight };
-      return {
-        bottom: keyboardHeight,
-        maxHeight: `calc(${baseMaxHeight} - ${keyboardHeight}px)`,
-      };
+      if (!isKeyboardOpen) return { maxHeight: baseMaxHeight };
+
+      if (keyboardHeight > 50) {
+        // iOS: push drawer up above the keyboard, fill the visual viewport
+        return {
+          bottom: keyboardHeight,
+          maxHeight: `${visibleHeight}px`,
+        };
+      } else {
+        // Android: viewport already shrank to exclude keyboard.
+        // Fill 100% of the now-smaller viewport (= full screen above keyboard).
+        return {
+          bottom: 0,
+          maxHeight: '100dvh',
+        };
+      }
     },
-    [keyboardHeight]
+    [isKeyboardOpen, keyboardHeight, visibleHeight]
   );
 
-  return { keyboardHeight, drawerStyle };
+  return { keyboardHeight, isKeyboardOpen, drawerStyle };
 };
