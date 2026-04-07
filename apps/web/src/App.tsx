@@ -15,15 +15,31 @@ import { PlannerPage } from './pages/PlannerPage';
 import { TasksPage } from './pages/TasksPage';
 
 function App() {
-  const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, getAccessTokenSilently, loginWithRedirect } = useAuth0();
   const { goals, fetchGoals, refreshGoals } = useGoalContext();
   const { refreshTasks } = useTaskContext();
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
-  // Setup Auth0 token provider for API calls
+  // Setup Auth0 token provider for API calls.
+  // Per Auth0 docs: handle refresh token failures by redirecting to login.
   useEffect(() => {
-    setAuthTokenProvider(() => getAccessTokenSilently());
-  }, [getAccessTokenSilently]);
+    setAuthTokenProvider(async () => {
+      try {
+        return await getAccessTokenSilently();
+      } catch (e: unknown) {
+        const err = e as { error?: string };
+        if (
+          err.error === 'login_required' ||
+          err.error === 'consent_required' ||
+          err.error === 'missing_refresh_token' ||
+          err.error === 'invalid_grant'
+        ) {
+          await loginWithRedirect({ appState: { returnTo: window.location.pathname } });
+        }
+        throw e;
+      }
+    });
+  }, [getAccessTokenSilently, loginWithRedirect]);
 
   useEffect(() => {
     if (isAuthenticated && isTaskModalOpen && goals.length === 0) {

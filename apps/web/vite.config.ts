@@ -12,9 +12,7 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icon.svg'],
       devOptions: {
-        enabled: true,
-        type: 'module',
-        navigateFallback: 'index.html',
+        enabled: false,
       },
       manifest: {
         name: 'Goal Tracker',

@@ -49,6 +49,7 @@ router.get('/', async (req, res) => {
       limit,
       month, // Format: YYYY-MM
       date, // Format: YYYY-MM-DD
+      unscheduled, // 'true' — return only tasks with no scheduledDate
     } = req.query;
 
     // Build where clause
@@ -63,8 +64,12 @@ router.get('/', async (req, res) => {
       where.isCompleted = false;
     }
 
+    // Filter unscheduled tasks (no scheduledDate)
+    if (unscheduled === 'true') {
+      where.scheduledDate = null;
+    }
     // Filter by specific date
-    if (date && typeof date === 'string') {
+    else if (date && typeof date === 'string') {
       const [year, monthNum, day] = date.split('-');
       const startDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day)));
       const endDate = new Date(Date.UTC(parseInt(year), parseInt(monthNum) - 1, parseInt(day) + 1));

@@ -76,6 +76,7 @@ interface DailyTimelineViewProps {
   onTaskClick: (task: Task) => void;
   onCreateTask?: (date: Date, time: string) => void;
   unscheduledTasks: Task[];
+  tasks: Task[];
 }
 
 // ── Component ──────────────────────────────────────────────────
@@ -85,8 +86,9 @@ export const DailyTimelineView = ({
   onTaskClick,
   onCreateTask,
   unscheduledTasks,
+  tasks: allTasks,
 }: DailyTimelineViewProps) => {
-  const { tasks: allTasks, updateTaskFields, scheduleTask } = useTaskContext();
+  const { updateTaskFields, scheduleTask } = useTaskContext();
   const timelineRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [untimedPanelOpen, setUntimedPanelOpen] = useState(false);
