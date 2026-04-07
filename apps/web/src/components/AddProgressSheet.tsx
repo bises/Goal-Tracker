@@ -2,6 +2,7 @@ import { Minus, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal } from '../types';
 import { Button } from './ui/button';
 
@@ -18,6 +19,7 @@ export const AddProgressSheet = ({ isOpen, onClose, goal, onUpdated }: AddProgre
   const [customData, setCustomData] = useState('');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { drawerStyle } = useKeyboardHeight();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,8 +75,8 @@ export const AddProgressSheet = ({ isOpen, onClose, goal, onUpdated }: AddProgre
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[80vh] overflow-hidden"
-          style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
+          style={{ background: 'var(--peach-cream)', zIndex: 1400, ...drawerStyle('80dvh') }}
           aria-describedby="progress-sheet-description"
         >
           {/* Handle */}

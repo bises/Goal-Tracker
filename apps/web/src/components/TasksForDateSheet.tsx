@@ -1,5 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { Drawer } from 'vaul';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Task } from '../types';
 import { TaskCard } from './TaskCard';
 import { Button } from './ui/button';
@@ -22,6 +23,7 @@ export const TasksForDateSheet = ({
   onTaskUpdated,
   onAddTask,
 }: TasksForDateSheetProps) => {
+  const { drawerStyle } = useKeyboardHeight();
   const formattedDate = date
     ? date.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -45,8 +47,12 @@ export const TasksForDateSheet = ({
           style={{ zIndex: 'var(--z-modal-backdrop)' }}
         />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 max-h-[90vh] rounded-t-3xl flex flex-col"
-          style={{ background: 'var(--peach-cream)', zIndex: 'var(--z-modal)' }}
+          className="fixed bottom-0 left-0 right-0 rounded-t-3xl flex flex-col"
+          style={{
+            background: 'var(--peach-cream)',
+            zIndex: 'var(--z-modal)',
+            ...drawerStyle('90dvh'),
+          }}
         >
           <Drawer.Title className="sr-only">{formattedDate || 'Tasks'}</Drawer.Title>
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />

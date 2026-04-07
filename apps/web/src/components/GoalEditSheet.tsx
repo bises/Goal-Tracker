@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
 import { useGoalContext } from '../contexts/GoalContext';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal, GoalScope } from '../types';
 import { Button } from './ui/button';
 import { CalendarDialog } from './ui/calendar-dialog';
@@ -47,6 +48,7 @@ export const GoalEditSheet = ({
   const [allowDecimals, setAllowDecimals] = useState(false);
   const [availableParents, setAvailableParents] = useState<Goal[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { drawerStyle } = useKeyboardHeight();
 
   // Populate form when goal changes
   useEffect(() => {
@@ -169,8 +171,8 @@ export const GoalEditSheet = ({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[90vh] overflow-hidden"
-          style={{ background: 'var(--card-bg)' }}
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
+          style={{ background: 'var(--card-bg)', ...drawerStyle('90dvh') }}
           aria-describedby="goal-edit-description"
         >
           {/* Handle */}

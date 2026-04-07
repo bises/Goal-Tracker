@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { CalendarDays, Clock, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Drawer } from 'vaul';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Task } from '../types';
 import { Button } from './ui/button';
 import { CustomCalendar } from './ui/custom-calendar';
@@ -40,6 +41,7 @@ export const RescheduleSheet = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const { drawerStyle } = useKeyboardHeight();
 
   // Reset state when sheet opens with a new task
   const taskId = task?.id;
@@ -102,7 +104,7 @@ export const RescheduleSheet = ({
           style={{
             zIndex: 1400,
             background: 'var(--peach-cream)',
-            maxHeight: '90dvh',
+            ...drawerStyle('90dvh'),
           }}
         >
           <Drawer.Title className="sr-only">Schedule Task</Drawer.Title>

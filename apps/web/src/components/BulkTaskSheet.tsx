@@ -2,6 +2,7 @@ import { Eye, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Drawer } from 'vaul';
 import { api } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal } from '../types';
 import { Button } from './ui/button';
 
@@ -17,6 +18,7 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
   const [count, setCount] = useState(10);
   const [preview, setPreview] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { drawerStyle } = useKeyboardHeight();
 
   const generatePreview = () => {
     const tasks: string[] = [];
@@ -70,8 +72,8 @@ export const BulkTaskSheet = ({ isOpen, onClose, parentGoal, onCreated }: BulkTa
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[85vh] overflow-hidden"
-          style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
+          style={{ background: 'var(--peach-cream)', zIndex: 1400, ...drawerStyle('85dvh') }}
           aria-describedby="bulk-task-description"
         >
           {/* Handle */}

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
 import { taskApi } from '../api';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Goal, Task, TaskCategory, TaskPriority } from '../types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Button } from './ui/button';
@@ -39,6 +40,7 @@ export const TaskEditSheet = ({
   const [estimatedCompletionDate, setEstimatedCompletionDate] = useState('');
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { drawerStyle } = useKeyboardHeight();
 
   // Populate form when task changes
   useEffect(() => {
@@ -180,8 +182,8 @@ export const TaskEditSheet = ({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: 1300 }} />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] max-h-[90vh] overflow-hidden"
-          style={{ background: 'var(--peach-cream)', zIndex: 1400 }}
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
+          style={{ background: 'var(--peach-cream)', zIndex: 1400, ...drawerStyle('90dvh') }}
           aria-describedby="task-edit-description"
         >
           {/* Handle */}
