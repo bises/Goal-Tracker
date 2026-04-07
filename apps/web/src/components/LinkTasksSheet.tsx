@@ -20,7 +20,7 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { drawerStyle } = useKeyboardHeight();
+  const { keyboardHeight, drawerStyle } = useKeyboardHeight();
 
   useEffect(() => {
     if (isOpen) {
@@ -117,6 +117,7 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
           className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
           style={{ background: 'var(--peach-cream)', zIndex: 1400, ...drawerStyle('85dvh') }}
           aria-describedby="link-tasks-description"
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Handle */}
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-4" />
@@ -264,7 +265,7 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
 
           {/* Footer */}
           <div
-            className="px-6 py-4 pb-20 border-t flex items-center gap-3 flex-shrink-0"
+            className={`px-6 py-4 border-t flex items-center gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'pb-4' : 'pb-20'}`}
             style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
           >
             {/* Selected count */}

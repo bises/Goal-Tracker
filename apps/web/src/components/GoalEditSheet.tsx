@@ -48,7 +48,7 @@ export const GoalEditSheet = ({
   const [allowDecimals, setAllowDecimals] = useState(false);
   const [availableParents, setAvailableParents] = useState<Goal[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { drawerStyle } = useKeyboardHeight();
+  const { keyboardHeight, drawerStyle } = useKeyboardHeight();
 
   // Populate form when goal changes
   useEffect(() => {
@@ -174,6 +174,7 @@ export const GoalEditSheet = ({
           className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] overflow-hidden"
           style={{ background: 'var(--card-bg)', ...drawerStyle('90dvh') }}
           aria-describedby="goal-edit-description"
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Handle */}
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-4" />
@@ -412,7 +413,7 @@ export const GoalEditSheet = ({
 
           {/* Footer Actions */}
           <div
-            className="px-6 py-4 pb-20 border-t flex gap-3 flex-shrink-0"
+            className={`px-6 py-4 border-t flex gap-3 flex-shrink-0 ${keyboardHeight > 0 ? 'pb-4' : 'pb-20'}`}
             style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
           >
             <Button

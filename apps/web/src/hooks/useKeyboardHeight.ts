@@ -18,15 +18,19 @@ interface UseKeyboardHeightResult {
 
 export const useKeyboardHeight = (): UseKeyboardHeightResult => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const rafRef = useRef<number>();
 
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
     const handleViewportChange = () => {
-      const newHeight = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      setKeyboardHeight(newHeight);
+      // Use rAF to batch rapid resize events during keyboard animation
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const newHeight = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+        setKeyboardHeight(newHeight);
+      });
     };
 
     viewport.addEventListener('resize', handleViewportChange);
@@ -36,22 +40,27 @@ export const useKeyboardHeight = (): UseKeyboardHeightResult => {
     return () => {
       viewport.removeEventListener('resize', handleViewportChange);
       viewport.removeEventListener('scroll', handleViewportChange);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
-  // Scroll focused input into view when keyboard appears / height changes
+  // When the keyboard is visible and user focuses an input,
+  // scroll it into view inside its nearest scroll container.
   useEffect(() => {
     if (keyboardHeight <= 0) return;
 
-    clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(() => {
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const handleFocusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
+        // Wait for layout to settle after keyboard resize
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
       }
-    }, 150);
+    };
 
-    return () => clearTimeout(scrollTimerRef.current);
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
   }, [keyboardHeight]);
 
   const drawerStyle = useCallback(

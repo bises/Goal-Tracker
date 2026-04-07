@@ -106,6 +106,7 @@ export const RescheduleSheet = ({
             background: 'var(--peach-cream)',
             ...drawerStyle('90dvh'),
           }}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Drawer.Title className="sr-only">Schedule Task</Drawer.Title>
 

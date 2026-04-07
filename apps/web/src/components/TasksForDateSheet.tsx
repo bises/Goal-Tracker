@@ -53,6 +53,7 @@ export const TasksForDateSheet = ({
             zIndex: 'var(--z-modal)',
             ...drawerStyle('90dvh'),
           }}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Drawer.Title className="sr-only">{formattedDate || 'Tasks'}</Drawer.Title>
           <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
