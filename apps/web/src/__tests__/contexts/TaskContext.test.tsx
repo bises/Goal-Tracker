@@ -4,6 +4,15 @@ import { taskApi } from '../../api';
 import { TaskProvider, useTaskContext } from '../../contexts/TaskContext';
 import { Task } from '../../types';
 
+// Mock shared utilities so upsertTask treats the mock task's date as today
+vi.mock('@goal-tracker/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@goal-tracker/shared')>();
+  return {
+    ...actual,
+    getTodayString: vi.fn(() => '2024-01-15'),
+  };
+});
+
 // Mock the API
 vi.mock('../../api', () => ({
   taskApi: {
