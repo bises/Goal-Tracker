@@ -120,7 +120,9 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Handle */}
-          <div className={`mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 ${keyboardHeight > 0 ? 'mt-2 mb-1' : 'mt-4 mb-4'}`} />
+          <div
+            className={`mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 ${keyboardHeight > 0 ? 'mt-2 mb-1' : 'mt-4 mb-4'}`}
+          />
 
           {/* Header */}
           <div
@@ -135,7 +137,12 @@ export const LinkTasksSheet = ({ isOpen, onClose, goal, onTasksLinked }: LinkTas
                 Link Tasks
               </h2>
             </Drawer.Title>
-            <Button variant="ghost" size="icon" onClick={onClose} className={`rounded-xl ${keyboardHeight > 0 ? 'w-8 h-8' : 'w-10 h-10'}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className={`rounded-xl ${keyboardHeight > 0 ? 'w-8 h-8' : 'w-10 h-10'}`}
+            >
               <X size={keyboardHeight > 0 ? 20 : 24} />
             </Button>
           </div>
