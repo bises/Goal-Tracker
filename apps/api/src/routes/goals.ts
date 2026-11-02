@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
+import { recalculateGoalProgress } from '../services/goalProgressService';
 import { ensureUser } from '../services/userService';
 
 const router = Router();
@@ -23,32 +24,37 @@ const computeGoalView = (goal: any) => {
   const goalTasks = goal.goalTasks || [];
   const children = goal.children || [];
 
-  // Calculate direct task progress
-  let totalSize = goalTasks.reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
-  let completedSize = goalTasks
-    .filter((gt: any) => gt.task?.isCompleted)
-    .reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
-  let totalCount = goalTasks.length;
-  let completedCount = goalTasks.filter((gt: any) => gt.task?.isCompleted).length;
-
-  // If goal has children, include their task progress (all goals are task-based now)
-  if (children.length > 0) {
-    // Recursively calculate child task totals
-    for (const child of children) {
-      const childTasks = child.goalTasks || [];
-      const childTotalSize = childTasks.reduce(
-        (acc: number, gt: any) => acc + (gt.task?.size || 1),
-        0
-      );
-      const childCompletedSize = childTasks
-        .filter((gt: any) => gt.task?.isCompleted)
-        .reduce((acc: number, gt: any) => acc + (gt.task?.size || 1), 0);
-
-      totalSize += childTotalSize;
-      completedSize += childCompletedSize;
-      totalCount += childTasks.length;
-      completedCount += childTasks.filter((gt: any) => gt.task?.isCompleted).length;
+  // Deduplicate tasks by task.id across direct tasks and children
+  const taskMap = new Map<string, any>();
+  for (const gt of goalTasks) {
+    if (gt?.task?.id) {
+      taskMap.set(gt.task.id, gt.task);
     }
+  }
+
+  for (const child of children) {
+    const childTasks = child.goalTasks || [];
+    for (const gt of childTasks) {
+      if (gt?.task?.id) {
+        taskMap.set(gt.task.id, gt.task);
+      }
+    }
+  }
+
+  const uniqueTasks = Array.from(taskMap.values());
+  let totalCount = uniqueTasks.length;
+  let completedCount = uniqueTasks.filter((t) => t.isCompleted).length;
+  let totalSize = uniqueTasks.reduce((acc: number, t: any) => acc + (t.size || 1), 0);
+  let completedSize = uniqueTasks
+    .filter((t: any) => t.isCompleted)
+    .reduce((acc: number, t: any) => acc + (t.size || 1), 0);
+
+  // If no tasks exist in the hierarchy, but children exist, derive from children counts
+  if (totalCount === 0 && children.length > 0) {
+    totalCount = children.length;
+    completedCount = children.filter((c: any) => c.isMarkedComplete).length;
+    totalSize = totalCount;
+    completedSize = completedCount;
   }
 
   // Task progress is the primary calculation (all goals use tasks)
@@ -160,6 +166,11 @@ router.get('/:id', async (req, res) => {
             isMarkedComplete: true,
             createdAt: true,
             updatedAt: true,
+            goalTasks: {
+              include: {
+                task: true,
+              },
+            },
           },
         },
         goalTasks: {
@@ -231,29 +242,9 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // If this goal has a parent (all goals are task-based now),
-      // then bump the parent's targetValue by 1 to reflect a new sub-goal unit.
+      // If this goal has a parent, atomically recalculate parent's progress
       if (goal.parentId) {
-        // Note: Using a read + set to safely handle null targetValue on parent
-        const parent = await tx.goal.findUnique({
-          where: { id: goal.parentId },
-          select: { targetValue: true },
-        });
-
-        if (parent) {
-          await tx.goal.update({
-            where: { id: goal.parentId },
-            data: {
-              // If parent.targetValue is null, treat as 0 before incrementing
-              targetValue: (parent.targetValue ?? 0) + 1,
-            },
-          });
-        }
-
-        // TODO: For MANUAL_TOTAL, consider whether adding a sub-goal should
-        //       adjust parent's targetValue or remain manual-only.
-        // TODO: For HABIT, define if sub-goals affect parent's target cadence
-        //       or streak metrics before implementing similar adjustments.
+        await recalculateGoalProgress(goal.parentId, tx);
       }
 
       return goal;
@@ -376,20 +367,9 @@ router.delete('/:id', async (req, res) => {
       await tx.progress.deleteMany({ where: { goalId: id } });
       await tx.goal.delete({ where: { id } });
 
-      // If this was a child goal with a parent, decrement parent's targetValue (all goals are task-based now)
+      // If this was a child goal with a parent, atomically recalculate parent's progress
       if (goal?.parentId) {
-        const parent = await tx.goal.findUnique({
-          where: { id: goal.parentId },
-          select: { targetValue: true },
-        });
-
-        if (parent) {
-          const newTarget = Math.max(0, (parent.targetValue ?? 0) - 1);
-          await tx.goal.update({
-            where: { id: goal.parentId },
-            data: { targetValue: newTarget },
-          });
-        }
+        await recalculateGoalProgress(goal.parentId, tx);
       }
     });
     res.json({ message: 'Goal deleted' });
@@ -580,20 +560,8 @@ router.post('/:id/bulk-tasks', async (req, res) => {
         createdTasks.push(created);
       }
 
-      // All goals are task-based now, bump targetValue by the number of tasks created
-      const parentGoal = await tx.goal.findUnique({
-        where: { id },
-        select: { targetValue: true },
-      });
-
-      if (parentGoal) {
-        await tx.goal.update({
-          where: { id },
-          data: {
-            targetValue: (parentGoal.targetValue ?? 0) + createdTasks.length,
-          },
-        });
-      }
+      // Recalculate goal progress atomically (also updates parent if present)
+      await recalculateGoalProgress(id, tx);
 
       return createdTasks;
     });

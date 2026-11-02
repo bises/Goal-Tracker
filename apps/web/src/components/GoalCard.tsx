@@ -78,9 +78,11 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
     onUpdate();
   };
 
-  const percent = goal.targetValue
-    ? Math.min((goal.currentValue / goal.targetValue) * 100, 100)
-    : 0;
+  const displayCurrent = goal.targetValue
+    ? Math.min(goal.currentValue, goal.targetValue)
+    : goal.currentValue;
+
+  const percent = goal.targetValue ? Math.min((displayCurrent / goal.targetValue) * 100, 100) : 0;
 
   const scopeColor = getScopeColor(goal.scope);
   const typeIcon = getGoalTypeIcon(goal.type);
@@ -198,7 +200,7 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium" style={{ color: 'var(--warm-gray)' }}>
-                {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
+                {displayCurrent} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
               </span>
               <span className="text-xs font-bold" style={{ color: scopeColor.text }}>
                 {percent.toFixed(0)}%
@@ -375,7 +377,7 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold" style={{ color: 'var(--deep-charcoal)' }}>
-              {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
+              {displayCurrent} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
             </span>
             <span
               className="text-sm font-bold"

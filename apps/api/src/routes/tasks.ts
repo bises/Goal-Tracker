@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { requireAuth, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { recalculateGoalProgress } from '../services/goalProgressService';
 import { ensureUser } from '../services/userService';
 
 const router = Router();
@@ -365,22 +366,10 @@ router.post('/', async (req, res) => {
         },
       });
 
-      // Update target value for each parent goal (all goals are task-based now)
+      // Update progress for each parent goal atomically
       if (goalIds.length > 0) {
         for (const goalId of goalIds) {
-          const parentGoal = await tx.goal.findUnique({
-            where: { id: goalId },
-            select: { targetValue: true },
-          });
-          if (parentGoal) {
-            await tx.goal.update({
-              where: { id: goalId },
-              data: {
-                targetValue: (parentGoal.targetValue ?? 0) + 1,
-              },
-            });
-          }
-          // TODO: Consider MANUAL_TOTAL & HABIT: should adding a task influence targets?
+          await recalculateGoalProgress(goalId, tx);
         }
       }
 
@@ -492,10 +481,20 @@ router.put('/:id', async (req, res) => {
       updateData.estimatedCompletionDate = parsedDate;
     }
 
-    const task = await prisma.task.update({
-      where: { id: req.params.id },
-      data: updateData,
-      include: taskWithGoals,
+    const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.task.update({
+        where: { id: req.params.id },
+        data: updateData,
+        include: taskWithGoals,
+      });
+
+      if (isCompleted !== undefined && isCompleted !== existingTask.isCompleted) {
+        for (const gt of updated.goalTasks) {
+          await recalculateGoalProgress(gt.goalId, tx);
+        }
+      }
+
+      return updated;
     });
 
     res.json(task);
@@ -524,45 +523,22 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Task not found or access denied' });
     }
 
-    const progressDelta = existingTask.isCompleted ? -1 * (existingTask.size || 1) : 0;
-
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Delete the task
+      // Find linked goals BEFORE deleting the task to prevent cascade delete race condition
+      const links = await tx.goalTask.findMany({
+        where: { taskId: req.params.id },
+        select: { goalId: true },
+      });
+      const effectiveGoalIds = goalIds && goalIds.length > 0 ? goalIds : links.map((l) => l.goalId);
+
+      // Delete the task (cascades to GoalTask)
       await tx.task.delete({
         where: { id: req.params.id },
       });
 
-      // Determine effective goalIds (fallback to DB lookup if not provided)
-      let effectiveGoalIds: string[] = goalIds;
-      if (!effectiveGoalIds || effectiveGoalIds.length === 0) {
-        const links = await tx.goalTask.findMany({
-          where: { taskId: req.params.id },
-          select: { goalId: true },
-        });
-        effectiveGoalIds = links.map((l) => l.goalId);
-      }
-
-      // Adjust parent goals (all goals are task-based now)
+      // Recalculate progress atomically for all affected goals
       for (const goalId of effectiveGoalIds) {
-        const parentGoal = await tx.goal.findUnique({
-          where: { id: goalId },
-          select: { targetValue: true, currentValue: true },
-        });
-        if (!parentGoal) continue;
-
-        const newTarget = Math.max(0, (parentGoal.targetValue ?? 0) - 1);
-        const newCurrent =
-          progressDelta !== 0
-            ? Math.max(0, (parentGoal.currentValue ?? 0) + progressDelta)
-            : (parentGoal.currentValue ?? 0);
-
-        await tx.goal.update({
-          where: { id: goalId },
-          data: {
-            targetValue: newTarget,
-            currentValue: newCurrent,
-          },
-        });
+        await recalculateGoalProgress(goalId, tx);
       }
     });
 
@@ -593,7 +569,6 @@ router.post('/:id/complete', async (req, res) => {
     }
 
     const toggledCompleted = !task.isCompleted;
-    const effortDelta = (toggledCompleted ? 1 : -1) * (task.size || 1);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Update task completion state
@@ -605,84 +580,19 @@ router.post('/:id/complete', async (req, res) => {
         },
       });
 
-      // Apply progress updates to task-based goals only
+      // Atomically recalculate progress for linked goals (also updates parents)
       for (const gt of task.goalTasks) {
-        const goal = await tx.goal.findUnique({
-          where: { id: gt.goalId },
-          select: {
-            title: true,
-            currentValue: true,
-            targetValue: true,
-            parentId: true,
-            goalTasks: {
-              include: { task: true },
-            },
-          },
-        });
-
-        if (!goal) continue;
-
-        const newValue = Math.max(0, (goal.currentValue || 0) + effortDelta);
-
-        await tx.goal.update({
-          where: { id: gt.goalId },
-          data: { currentValue: newValue },
-        });
+        await recalculateGoalProgress(gt.goalId, tx);
 
         // Log a progress entry for traceability
         await tx.progress.create({
           data: {
             goalId: gt.goalId,
-            value: effortDelta,
+            value: toggledCompleted ? 1 : -1,
             note: `Task "${task.title}" ${toggledCompleted ? 'completed' : 'reopened'}`,
             date: new Date(),
           },
         });
-
-        // Check if goal is now completed and has a parent to update
-        if (goal.parentId && toggledCompleted) {
-          // Calculate goal completion percentage
-          const goalTasks = goal.goalTasks || [];
-          const totalSize = goalTasks.reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
-          const completedSize = goalTasks
-            .filter((gt) => {
-              // Count as completed if task was already completed or if it's the current task being marked complete
-              return gt.taskId === req.params.id || gt.task?.isCompleted;
-            })
-            .reduce((acc, gt) => acc + (gt.task?.size || 1), 0);
-
-          const percentComplete = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
-
-          // If goal just reached 100% completion, update parent
-          if (percentComplete >= 100) {
-            const parentGoal = await tx.goal.findUnique({
-              where: { id: goal.parentId },
-              select: { title: true },
-            });
-
-            if (parentGoal) {
-              // Add 1 progress unit to parent when subgoal completes
-              await tx.goal.update({
-                where: { id: goal.parentId },
-                data: {
-                  currentValue: {
-                    increment: 1,
-                  },
-                },
-              });
-
-              // Log progress in parent goal
-              await tx.progress.create({
-                data: {
-                  goalId: goal.parentId,
-                  value: 1,
-                  note: `Subgoal "${goal.title}" completed (all tasks done)`,
-                  date: new Date(),
-                },
-              });
-            }
-          }
-        }
       }
     });
 
@@ -793,11 +703,8 @@ router.post('/:id/link-goal', async (req, res) => {
         data: { goalId, taskId: req.params.id },
       });
 
-      // Increment goal's targetValue (all goals are task-based now)
-      await tx.goal.update({
-        where: { id: goalId },
-        data: { targetValue: (goal.targetValue ?? 0) + 1 },
-      });
+      // Recalculate goal progress atomically
+      await recalculateGoalProgress(goalId, tx);
     });
 
     // Return updated task
@@ -851,23 +758,8 @@ router.post('/:id/unlink-goal', async (req, res) => {
         throw new Error('Task is not linked to this goal');
       }
 
-      // Update goal's targetValue and currentValue (all goals are task-based now)
-      const newTargetValue = Math.max(0, (goal.targetValue ?? 0) - 1);
-
-      // If task was completed, also decrement currentValue
-      let newCurrentValue = goal.currentValue;
-      if (task.isCompleted) {
-        const progressDelta = task.size || 1;
-        newCurrentValue = Math.max(0, newCurrentValue - progressDelta);
-      }
-
-      await tx.goal.update({
-        where: { id: goalId },
-        data: {
-          targetValue: newTargetValue,
-          currentValue: newCurrentValue,
-        },
-      });
+      // Recalculate goal progress atomically
+      await recalculateGoalProgress(goalId, tx);
     });
 
     // Return updated task
