@@ -1,4 +1,5 @@
 import { Goal, Prisma, PrismaClient } from '@prisma/client';
+import { recalculateGoalProgress } from './goalProgressService';
 
 /**
  * Result type for completion service operations
@@ -56,37 +57,19 @@ export class CompletionService {
         },
       });
 
-      // If goal has a parent, update parent's progress atomically (all goals are task-based now)
+      // If goal has a parent, recalculate parent's progress atomically
       if (goal.parentId) {
-        const parentGoal = await tx.goal.findUnique({
-          where: { id: goal.parentId },
-          select: {
-            title: true,
-            currentValue: true,
+        await recalculateGoalProgress(goal.parentId, tx);
+
+        // Log activity in parent goal
+        await tx.progress.create({
+          data: {
+            goalId: goal.parentId,
+            value: 1,
+            note: `Subgoal "${goal.title}" marked as completed`,
+            date: new Date(),
           },
         });
-
-        if (parentGoal) {
-          // Increment parent's currentValue
-          await tx.goal.update({
-            where: { id: goal.parentId },
-            data: {
-              currentValue: {
-                increment: 1,
-              },
-            },
-          });
-
-          // Log activity in parent goal
-          await tx.progress.create({
-            data: {
-              goalId: goal.parentId,
-              value: 1,
-              note: `Subgoal "${goal.title}" marked as completed`,
-              date: new Date(),
-            },
-          });
-        }
       }
 
       return {
@@ -138,37 +121,19 @@ export class CompletionService {
         },
       });
 
-      // If goal has a parent, update parent's progress atomically (all goals are task-based now)
+      // If goal has a parent, recalculate parent's progress atomically
       if (goal.parentId) {
-        const parentGoal = await tx.goal.findUnique({
-          where: { id: goal.parentId },
-          select: {
-            title: true,
-            currentValue: true,
+        await recalculateGoalProgress(goal.parentId, tx);
+
+        // Log activity in parent goal
+        await tx.progress.create({
+          data: {
+            goalId: goal.parentId,
+            value: -1,
+            note: `Subgoal "${goal.title}" marked as incomplete`,
+            date: new Date(),
           },
         });
-
-        if (parentGoal) {
-          // Decrement parent's currentValue, but never go negative
-          const newParentValue = Math.max(0, (parentGoal.currentValue || 0) - 1);
-
-          await tx.goal.update({
-            where: { id: goal.parentId },
-            data: {
-              currentValue: newParentValue,
-            },
-          });
-
-          // Log activity in parent goal
-          await tx.progress.create({
-            data: {
-              goalId: goal.parentId,
-              value: -1,
-              note: `Subgoal "${goal.title}" marked as incomplete`,
-              date: new Date(),
-            },
-          });
-        }
       }
 
       return {
