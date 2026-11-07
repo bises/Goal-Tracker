@@ -25,7 +25,11 @@ function App() {
   useEffect(() => {
     setAuthTokenProvider(async () => {
       try {
-        return await getAccessTokenSilently();
+        const token = await getAccessTokenSilently();
+        if (!token) {
+          throw new Error('No access token available');
+        }
+        return token;
       } catch (e: unknown) {
         const err = e as { error?: string };
         if (

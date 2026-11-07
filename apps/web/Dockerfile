@@ -8,17 +8,23 @@ WORKDIR /app
 # Copy root config
 COPY package.json .
 COPY pnpm-workspace.yaml .
+COPY pnpm-lock.yaml .
 COPY tsconfig.base.json .
 
 # Copy shared packages
 COPY packages ./packages
 
-# Copy app source
+# Copy app source (and stub api package.json so pnpm workspace resolution works)
 COPY apps/web ./apps/web
+COPY apps/api/package.json ./apps/api/package.json
 
 # Install dependencies
 RUN npm install -g pnpm
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
+
+# Build shared packages first
+WORKDIR /app/packages/shared
+RUN pnpm build
 
 # Build with environment variable
 WORKDIR /app/apps/web
