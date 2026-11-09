@@ -98,7 +98,7 @@ router.get('/tasks', async (req, res) => {
 
     res.json(response);
   } catch (error) {
-    console.error('Error fetching calendar tasks:', error);
+    console.error('Error fetching calendar tasks:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch calendar tasks' });
   }
 });
@@ -168,7 +168,7 @@ router.get('/goals', async (req, res) => {
 
     res.json({ goals });
   } catch (error) {
-    console.error('Error fetching calendar goals:', error);
+    console.error('Error fetching calendar goals:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch calendar goals' });
   }
 });

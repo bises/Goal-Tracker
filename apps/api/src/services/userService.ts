@@ -46,7 +46,7 @@ const fetchAuth0UserInfo = async (accessToken: string): Promise<Auth0UserInfo | 
 
     return (await response.json()) as Auth0UserInfo;
   } catch (error) {
-    console.error('Error fetching Auth0 userinfo:', error);
+    console.error('Error fetching Auth0 userinfo:', error instanceof Error ? error.message : 'Unknown error');
     return null;
   }
 };

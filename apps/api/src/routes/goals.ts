@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
 
     res.json(goals);
   } catch (error) {
-    console.error('Failed to fetch goals:', error);
+    console.error('Failed to fetch goals:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch goals' });
   }
 });
@@ -189,7 +189,7 @@ router.get('/:id', async (req, res) => {
     const goalWithView = computeGoalView(goal);
     res.json(goalWithView);
   } catch (error) {
-    console.error('Failed to fetch goal:', error);
+    console.error('Failed to fetch goal:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch goal' });
   }
 });
@@ -252,7 +252,7 @@ router.post('/', async (req, res) => {
 
     res.json(created);
   } catch (error) {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to create goal' });
   }
 });
@@ -300,7 +300,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(goal);
   } catch (error) {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to update goal' });
   }
 });
@@ -374,7 +374,7 @@ router.delete('/:id', async (req, res) => {
     });
     res.json({ message: 'Goal deleted' });
   } catch (error) {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to delete goal' });
   }
 });
@@ -568,7 +568,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to create bulk tasks' });
   }
 });
@@ -594,7 +594,7 @@ router.post('/:id/complete', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error completing goal:', error);
+    console.error('Error completing goal:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to complete goal' });
   }
 });
@@ -620,7 +620,7 @@ router.post('/:id/uncomplete', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error marking goal incomplete:', error);
+    console.error('Error marking goal incomplete:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to mark goal incomplete' });
   }
 });
@@ -676,7 +676,7 @@ router.get('/:id/tasks', async (req, res) => {
 
     res.json(goal);
   } catch (error) {
-    console.error('Failed to fetch goal tasks:', error);
+    console.error('Failed to fetch goal tasks:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch goal tasks' });
   }
 });
@@ -728,7 +728,7 @@ router.get('/:id/activities', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch goal activities:', error);
+    console.error('Failed to fetch goal activities:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch goal activities' });
   }
 });
