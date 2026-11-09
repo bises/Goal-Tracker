@@ -4,7 +4,9 @@ apps/web/dev-dist
 apps/api/dist
 packages/shared/dist
 
+# Environment files with secrets (use .env.example for templates)
 apps/api/.env
+apps/web/.env
 
 # pnpm store
 .pnpm-store

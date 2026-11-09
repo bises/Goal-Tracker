@@ -20,7 +20,7 @@ router.get('/me', validateJWT, requireAuth, async (req, res) => {
       createdAt: user.createdAt,
     });
   } catch (error) {
-    console.error('Error fetching user info:', error);
+    console.error('Error fetching user info:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch user information',

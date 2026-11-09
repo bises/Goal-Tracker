@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node --test tests/dateUtils.test.ts"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

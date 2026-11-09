@@ -218,7 +218,7 @@ router.get('/', async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching tasks:', error);
+    console.error('Error fetching tasks:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
@@ -277,7 +277,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(task);
   } catch (error) {
-    console.error('Error fetching task:', error);
+    console.error('Error fetching task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch task' });
   }
 });
@@ -416,7 +416,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(task);
   } catch (error) {
-    console.error('Error creating task:', error);
+    console.error('Error creating task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to create task' });
   }
 });
@@ -499,7 +499,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(task);
   } catch (error) {
-    console.error('Error updating task:', error);
+    console.error('Error updating task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
@@ -544,7 +544,7 @@ router.delete('/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting task:', error);
+    console.error('Error deleting task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to delete task' });
   }
 });
@@ -603,7 +603,7 @@ router.post('/:id/complete', async (req, res) => {
 
     res.json(updatedTask);
   } catch (error) {
-    console.error('Error toggling task completion:', error);
+    console.error('Error toggling task completion:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to toggle task completion' });
   }
 });
@@ -632,7 +632,7 @@ router.get('/scheduled/:date', async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching scheduled tasks:', error);
+    console.error('Error fetching scheduled tasks:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch scheduled tasks' });
   }
 });
@@ -656,7 +656,7 @@ router.get('/unscheduled/list', async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching unscheduled tasks:', error);
+    console.error('Error fetching unscheduled tasks:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch unscheduled tasks' });
   }
 });
@@ -715,7 +715,7 @@ router.post('/:id/link-goal', async (req, res) => {
 
     res.json(task);
   } catch (error: any) {
-    console.error('Error linking task to goal:', error);
+    console.error('Error linking task to goal:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: error.message || 'Failed to link task to goal' });
   }
 });
@@ -770,7 +770,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
 
     res.json(task);
   } catch (error: any) {
-    console.error('Error unlinking task from goal:', error);
+    console.error('Error unlinking task from goal:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: error.message || 'Failed to unlink task from goal' });
   }
 });
@@ -809,7 +809,7 @@ router.post('/:id/schedule', async (req, res) => {
       task,
     });
   } catch (error) {
-    console.error('Error scheduling task:', error);
+    console.error('Error scheduling task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to schedule task' });
   }
 });
