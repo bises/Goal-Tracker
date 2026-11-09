@@ -7,9 +7,15 @@ import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
 import './styles/design-system.css';
 
-const domain = import.meta.env.VITE_AUTH0_DOMAIN || 'bises.auth0.com';
-const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || 'izygI8zTKeFDiyME5JETirr288UDMr7q';
-const audience = import.meta.env.VITE_AUTH0_AUDIENCE || 'https://goal-tracker-api';
+const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+const audience = import.meta.env.VITE_AUTH0_AUDIENCE;
+
+if (!domain || !clientId) {
+  throw new Error(
+    'Missing required Auth0 environment variables: VITE_AUTH0_DOMAIN and VITE_AUTH0_CLIENT_ID must be set.'
+  );
+}
 
 const Auth0ProviderWithNavigate = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
