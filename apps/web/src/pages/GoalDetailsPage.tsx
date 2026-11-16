@@ -38,6 +38,7 @@ import { SquircleCard } from '../components/SquircleCard';
 import { TaskCard } from '../components/TaskCard';
 import { Spinner } from '../components/ui/spinner';
 import { useGoalContext } from '../contexts/GoalContext';
+import { useToast } from '../contexts/ToastContext';
 import { Goal, GoalTasksResponse, Task } from '../types';
 
 const getScopeConfig = (scope: string) => {
@@ -62,6 +63,7 @@ export const GoalDetailsPage = () => {
   const { goalId } = useParams<{ goalId: string }>();
   const navigate = useNavigate();
   const { deleteGoal } = useGoalContext();
+  const { showToast } = useToast();
 
   const [goal, setGoal] = useState<Goal | null>(null);
   const [tasksData, setTasksData] = useState<GoalTasksResponse | null>(null);
@@ -103,16 +105,26 @@ export const GoalDetailsPage = () => {
   };
 
   const handleCompleteGoal = async () => {
-    if (!goal) return;
+    if (!goal || isCompleting) return;
+    const previousGoal = { ...goal };
+
+    // 1. Optimistic update
+    setGoal((prev) => (prev ? { ...prev, isMarkedComplete: true } : null));
+    setIsCompleting(true);
+    setCompletionMessage('✓ Goal marked as completed!');
+    showToast('✓ Goal marked as completed!', 'success');
+
     try {
-      setIsCompleting(true);
       await api.completeGoal(goal.id);
-      setCompletionMessage('✓ Goal marked as completed!');
       await fetchGoalData();
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
+      // 2. Rollback on failure
+      setGoal(previousGoal);
+      const errMsg = e instanceof Error ? e.message : 'Failed to mark goal as completed';
       console.error('Failed to complete goal', e);
-      setCompletionMessage('✗ Failed to mark goal as completed');
+      setCompletionMessage(`✗ ${errMsg}`);
+      showToast(`✗ ${errMsg}`, 'error');
       setTimeout(() => setCompletionMessage(null), 3000);
     } finally {
       setIsCompleting(false);
@@ -120,16 +132,26 @@ export const GoalDetailsPage = () => {
   };
 
   const handleUncompleteGoal = async () => {
-    if (!goal) return;
+    if (!goal || isCompleting) return;
+    const previousGoal = { ...goal };
+
+    // 1. Optimistic update
+    setGoal((prev) => (prev ? { ...prev, isMarkedComplete: false } : null));
+    setIsCompleting(true);
+    setCompletionMessage('↺ Goal marked as incomplete');
+    showToast('↺ Goal marked as incomplete', 'info');
+
     try {
-      setIsCompleting(true);
       await api.uncompleteGoal(goal.id);
-      setCompletionMessage('↺ Goal marked as incomplete');
       await fetchGoalData();
       setTimeout(() => setCompletionMessage(null), 3000);
     } catch (e) {
+      // 2. Rollback on failure
+      setGoal(previousGoal);
+      const errMsg = e instanceof Error ? e.message : 'Failed to mark goal as incomplete';
       console.error('Failed to mark goal incomplete', e);
-      setCompletionMessage('✗ Failed to mark goal as incomplete');
+      setCompletionMessage(`✗ ${errMsg}`);
+      showToast(`✗ ${errMsg}`, 'error');
       setTimeout(() => setCompletionMessage(null), 3000);
     } finally {
       setIsCompleting(false);
@@ -387,14 +409,22 @@ export const GoalDetailsPage = () => {
               <button
                 onClick={handleUncompleteGoal}
                 disabled={isCompleting}
-                className="px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:shadow-md active:scale-95"
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  isCompleting
+                    ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                    : 'hover:shadow-md active:scale-95'
+                }`}
                 style={{
                   background: 'rgba(100, 116, 139, 0.1)',
                   color: 'var(--warm-gray)',
                   border: '2px solid rgba(100, 116, 139, 0.2)',
                 }}
               >
-                <XCircle size={16} className="inline mr-1.5" />
+                {isCompleting ? (
+                  <Spinner className="inline mr-1.5 w-4 h-4" />
+                ) : (
+                  <XCircle size={16} className="inline mr-1.5" />
+                )}
                 Mark Incomplete
               </button>
               {goal.endDate && (
@@ -567,14 +597,22 @@ export const GoalDetailsPage = () => {
               <button
                 onClick={handleCompleteGoal}
                 disabled={isCompleting}
-                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-md active:scale-95"
+                className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  isCompleting
+                    ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                    : 'hover:shadow-md active:scale-95'
+                }`}
                 style={{
                   background: 'rgba(34, 197, 94, 0.15)',
                   color: '#22c55e',
                   border: '2px solid rgba(34, 197, 94, 0.3)',
                 }}
               >
-                <CheckCircle2 size={16} className="inline mr-1.5" />
+                {isCompleting ? (
+                  <Spinner className="inline mr-1.5 w-4 h-4" />
+                ) : (
+                  <CheckCircle2 size={16} className="inline mr-1.5" />
+                )}
                 Mark Complete
               </button>
             )}

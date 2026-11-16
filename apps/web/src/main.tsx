@@ -5,6 +5,7 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import App from './App';
 import { GoalProvider } from './contexts/GoalContext';
 import { TaskProvider } from './contexts/TaskContext';
+import { ToastProvider } from './contexts/ToastContext';
 import './styles/design-system.css';
 
 const domain = import.meta.env.VITE_AUTH0_DOMAIN;
@@ -46,7 +47,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Auth0ProviderWithNavigate>
         <GoalProvider>
           <TaskProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </TaskProvider>
         </GoalProvider>
       </Auth0ProviderWithNavigate>
