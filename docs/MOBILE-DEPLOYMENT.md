@@ -1,8 +1,9 @@
 # Mobile App Deployment Guide
 
-## Overview
-
-The mobile app uses **Expo Application Services (EAS)** for deployment, which provides:
+> [!NOTE]
+> **Repository Migration Notice:**
+> The mobile app has been extracted from this monorepo into its own repository: [**bises/Goal-Tracker-Android**](https://github.com/bises/Goal-Tracker-Android).
+> For current deployment workflows, EAS configuration, and instructions, please refer to the `Goal-Tracker-Android` repository. The documentation below is retained for historical reference.
 
 - **EAS Update**: Over-the-air (OTA) updates for JavaScript/TypeScript changes
 - **EAS Build**: Cloud-based native builds for iOS and Android app stores
