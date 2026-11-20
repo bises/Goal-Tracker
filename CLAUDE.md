@@ -16,6 +16,7 @@ Full-stack monorepo with a React PWA frontend (`apps/web`), Express.js API backe
 goal-tracker/
 ├── apps/web/          # React 18 + Vite + TailwindCSS v4 + shadcn/ui
 ├── apps/api/          # Express.js + Prisma 7 + PostgreSQL
+├── apps/mcp/          # Model Context Protocol stdio server & Auth0 Device Flow CLI
 ├── packages/shared/   # Shared types and utilities
 ├── docs/              # Project documentation
 └── .claude/           # Claude Code configuration
@@ -59,6 +60,13 @@ pnpm --filter api prisma studio                        # Visual DB browser
 # Build
 pnpm --filter web build
 pnpm --filter api build
+pnpm --filter @goal-tracker/mcp build
+
+# MCP Server & Authentication
+pnpm mcp:login --profile production    # Authenticate MCP CLI via Auth0 Device Flow
+pnpm mcp:status                        # Check MCP authentication and profile status
+pnpm mcp:logout                        # Clear stored local MCP credentials
+pnpm --filter @goal-tracker/mcp test   # Run MCP concurrency & security tests
 
 # Docker
 docker compose up -d           # Start all services
@@ -140,6 +148,11 @@ The following MCP servers are configured in `.mcp.json` (Claude Code) and `.vsco
 - **playwright** (`mcp__playwright`): E2E browser testing — navigate, click, fill forms, screenshot, assert
   - Type: stdio
   - Command: `npx -y @playwright/mcp@latest`
+
+- **goal-tracker** (`mcp__goal-tracker`): Query goals, tasks, calendar agendas, and system status using authenticated user identity
+  - Type: stdio
+  - Command: `node apps/mcp/dist/index.js stdio --profile production`
+  - Read-Only Tools (v1): `list_goals`, `get_goal`, `list_tasks`, `get_task`, `get_calendar_agenda`, `get_system_status`
 
 **Configuration:**
 

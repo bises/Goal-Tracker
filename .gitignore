@@ -5,8 +5,13 @@ apps/api/dist
 packages/shared/dist
 
 # Environment files with secrets (use .env.example for templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
 apps/api/.env
 apps/web/.env
+apps/mcp/.env
 
 # pnpm store
 .pnpm-store

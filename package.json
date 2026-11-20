@@ -7,12 +7,22 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "mcp": "node apps/mcp/dist/index.js stdio",
+    "mcp:login": "node apps/mcp/dist/index.js login",
+    "mcp:logout": "node apps/mcp/dist/index.js logout",
+    "mcp:status": "node apps/mcp/dist/index.js status"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
     "turbo": "latest",
     "typescript": "^5.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "^18.2.0",
+      "@types/react-dom": "^18.2.0"
+    }
   },
   "packageManager": "pnpm@10.29.3"
 }
