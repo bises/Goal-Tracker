@@ -17,6 +17,7 @@ jest.mock('../middleware/auth', () => ({
     next();
   }),
   requireAuth: jest.fn((req, res, next) => next()),
+  requireScope: jest.fn(() => (req: any, res: any, next: any) => next()),
   getUserId: jest.fn((req) => req.auth?.payload?.sub || 'auth0|test-user-id'),
 }));
 
@@ -213,10 +214,10 @@ describe('DELETE /api/goals/:id', () => {
     });
   });
 
-  it('should return 500 if goal not found (delete throws error)', async () => {
+  it('should return 404 if goal not found or access denied', async () => {
     (prisma.goal.findFirst as jest.Mock).mockResolvedValue(null);
-    (prisma.goal.delete as jest.Mock).mockRejectedValue(new Error('Record not found'));
 
-    await request(app).delete('/api/goals/999').expect(500);
+    await request(app).delete('/api/goals/999').expect(404);
+    expect(prisma.goal.delete).not.toHaveBeenCalled();
   });
 });

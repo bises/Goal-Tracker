@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, validateJWT } from '../middleware/auth';
+import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { ensureUser } from '../services/userService';
 
@@ -9,7 +9,7 @@ const router = Router();
 router.use(validateJWT, requireAuth);
 
 // GET /api/calendar/tasks - Fetch tasks for calendar view
-router.get('/tasks', async (req, res) => {
+router.get('/tasks', requireScope(['read:calendar']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { startDate, endDate, includeUnscheduled, parentGoalId } = req.query;
@@ -104,7 +104,7 @@ router.get('/tasks', async (req, res) => {
 });
 
 // GET /api/calendar/goals - Fetch goals for calendar view
-router.get('/goals', async (req, res) => {
+router.get('/goals', requireScope(['read:calendar']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { startDate, endDate, scope } = req.query;
