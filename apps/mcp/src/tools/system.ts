@@ -4,7 +4,7 @@ import { formatErrorResult, formatSuccessResult, sanitizeString } from './saniti
 
 export function registerSystemTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 5: get_system_status
-  server.tool(
+  (server as any).tool(
     'get_system_status',
     'Check API health, active profile, connected backend URL, and authenticated user identity',
     {},

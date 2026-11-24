@@ -64,49 +64,61 @@ export async function validateParentTask(
 
 /**
  * Idempotently sets the completion state of a task.
- * If the task is already in the requested state, it returns the current state without modifying progress.
+ * Performs the check, conditional transition, and progress calculations atomically inside a transaction.
  */
 export async function executeSetTaskCompletion(
   taskId: string,
   userId: number,
   isCompleted: boolean
 ) {
-  const task = await prisma.task.findFirst({
-    where: {
-      id: taskId,
-      userId,
-    },
-    include: {
-      goalTasks: true,
-    },
-  });
-
-  if (!task) {
-    const error = new Error('Task not found or access denied');
-    (error as any).statusCode = 404;
-    throw error;
-  }
-
-  // Idempotency check: if state is already what is requested, return without modifying progress
-  if (task.isCompleted === isCompleted) {
-    return prisma.task.findUnique({
-      where: { id: taskId },
-      include: taskWithGoals,
+  return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const currentTask = await tx.task.findFirst({
+      where: {
+        id: taskId,
+        userId,
+      },
+      include: {
+        goalTasks: true,
+      },
     });
-  }
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Update task completion state
-    await tx.task.update({
-      where: { id: taskId },
+    if (!currentTask) {
+      const error = new Error('Task not found or access denied');
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    // Inside-transaction idempotency check: if state is already what is requested, return without modifying progress
+    if (currentTask.isCompleted === isCompleted) {
+      return tx.task.findUnique({
+        where: { id: taskId },
+        include: taskWithGoals,
+      });
+    }
+
+    // Atomic conditional state transition: update only if state is still opposite
+    const updateResult = await tx.task.updateMany({
+      where: {
+        id: taskId,
+        userId,
+        isCompleted: !isCompleted,
+      },
       data: {
         isCompleted,
         completedAt: isCompleted ? new Date() : null,
       },
     });
 
-    // Atomically recalculate progress for linked goals (also updates parents)
-    for (const gt of task.goalTasks) {
+    // If another concurrent request completed the transition, return current state without creating duplicate progress
+    if (updateResult.count === 0) {
+      return tx.task.findUnique({
+        where: { id: taskId },
+        include: taskWithGoals,
+      });
+    }
+
+    // Atomically recalculate progress for linked goals only when transition actually occurred
+    for (const gt of currentTask.goalTasks) {
       await recalculateGoalProgress(gt.goalId, tx);
 
       // Log a progress entry for traceability
@@ -114,16 +126,16 @@ export async function executeSetTaskCompletion(
         data: {
           goalId: gt.goalId,
           value: isCompleted ? 1 : -1,
-          note: `Task "${task.title}" ${isCompleted ? 'completed' : 'reopened'}`,
+          note: `Task "${currentTask.title}" ${isCompleted ? 'completed' : 'reopened'}`,
           date: new Date(),
         },
       });
     }
-  });
 
-  return prisma.task.findUnique({
-    where: { id: taskId },
-    include: taskWithGoals,
+    return tx.task.findUnique({
+      where: { id: taskId },
+      include: taskWithGoals,
+    });
   });
 }
 

@@ -84,7 +84,7 @@ describe('TokenManager & TokenStore', () => {
       await expect(manager.getValidAccessToken()).rejects.toThrow(AuthRequiredError);
     });
 
-    it('should return cached in-memory token without locking if token is fresh', async () => {
+    it('should immediately observe external logout and throw AuthRequiredError instead of serving stale cache', async () => {
       const tokens: StoredTokens = {
         accessToken: 'cached-fresh-token',
         refreshToken: 'ref',
@@ -99,10 +99,87 @@ describe('TokenManager & TokenStore', () => {
       const token1 = await manager.getValidAccessToken();
       expect(token1).toBe('cached-fresh-token');
 
-      // Now remove the file from disk; subsequent in-memory call should still return cached token
+      // Now simulate a separate CLI logout removing the file from disk
       TokenStore.clearTokens(testConfig.credentialsPath);
-      const token2 = await manager.getValidAccessToken();
-      expect(token2).toBe('cached-fresh-token');
+
+      // Running process MUST observe that credentials are gone and require auth
+      await expect(manager.getValidAccessToken()).rejects.toThrow(AuthRequiredError);
+    });
+
+    it('should immediately observe external account switch and return new account token', async () => {
+      const user1Tokens: StoredTokens = {
+        accessToken: 'user-1-token',
+        refreshToken: 'user-1-ref',
+        expiresAt: Date.now() + 600000,
+        scope: 'read:goals',
+        tokenType: 'Bearer',
+        updatedAt: Date.now(),
+      };
+      TokenStore.writeTokens(testConfig.credentialsPath, user1Tokens);
+
+      const managerA = new TokenManager(testConfig);
+      expect(await managerA.getValidAccessToken()).toBe('user-1-token');
+
+      // Manager B (e.g. CLI login) saves credentials for user 2
+      const user2Tokens: StoredTokens = {
+        accessToken: 'user-2-token',
+        refreshToken: 'user-2-ref',
+        expiresAt: Date.now() + 600000,
+        scope: 'read:goals',
+        tokenType: 'Bearer',
+        updatedAt: Date.now() + 1000,
+      };
+
+      // Slight delay to ensure filesystem mtime difference
+      await new Promise((r) => setTimeout(r, 20));
+      TokenStore.writeTokens(testConfig.credentialsPath, user2Tokens);
+
+      // Running manager A MUST observe external update and return user 2's token
+      expect(await managerA.getValidAccessToken()).toBe('user-2-token');
+    });
+
+    it('should PRESERVE lock exclusivity for live processes even if older than 30s', async () => {
+      // Create a lock file owned by current live process with old timestamp
+      const liveLockPayload = JSON.stringify({
+        pid: process.pid, // Current live process!
+        timestamp: Date.now() - 40000, // 40 seconds old
+        lockId: 'live-lock-id',
+      });
+      fs.writeFileSync(testConfig.lockPath, liveLockPayload, 'utf8');
+
+      const manager = new TokenManager(testConfig);
+
+      // Attempting to acquire lock with short timeout must fail because live process lock is preserved
+      await expect(manager.acquireLock(200)).rejects.toThrow(/Timeout acquiring lock/);
+      expect(fs.existsSync(testConfig.lockPath)).toBe(true);
+
+      // Clean up lock file
+      fs.unlinkSync(testConfig.lockPath);
+    });
+
+    it('should NOT delete successor lock if an older owner releases after losing ownership', async () => {
+      const lockPath = testConfig.lockPath;
+      const oldLock = { fd: 999, path: lockPath, lockId: 'old-lock-id' };
+
+      // Successor acquired lock and wrote its own lockId
+      const successorPayload = JSON.stringify({
+        pid: process.pid,
+        timestamp: Date.now(),
+        lockId: 'successor-lock-id',
+      });
+      fs.writeFileSync(lockPath, successorPayload, 'utf8');
+
+      const manager = new TokenManager(testConfig);
+      // Old owner attempts release
+      manager.releaseLock(oldLock as any);
+
+      // Successor lock MUST remain intact!
+      expect(fs.existsSync(lockPath)).toBe(true);
+      const remainingContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+      expect(remainingContent.lockId).toBe('successor-lock-id');
+
+      // Clean up
+      fs.unlinkSync(lockPath);
     });
 
     it('should re-read valid token from disk under lock when refreshed by peer process', async () => {

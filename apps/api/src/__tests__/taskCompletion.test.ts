@@ -9,6 +9,7 @@ jest.mock('../middleware/auth', () => ({
       payload: {
         sub: 'auth0|test-user',
         email: 'test@example.com',
+        scope: 'read:tasks write:tasks',
       },
     };
     next();
@@ -30,6 +31,7 @@ jest.mock('../prisma', () => {
     findFirst: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   };
 
   const mockProgressFunctions = {
@@ -104,7 +106,7 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
 
       expect(res.body.isCompleted).toBe(true);
       // In-transaction update and progress creation must NOT be called on retry
-      expect(prisma.task.update).not.toHaveBeenCalled();
+      expect(prisma.task.updateMany).not.toHaveBeenCalled();
       expect(prisma.progress.create).not.toHaveBeenCalled();
     });
 
@@ -123,7 +125,7 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
       };
 
       (prisma.task.findFirst as jest.Mock).mockResolvedValue(pendingTask);
-      (prisma.task.update as jest.Mock).mockResolvedValue(completedTask);
+      (prisma.task.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
       (prisma.task.findUnique as jest.Mock).mockResolvedValue(completedTask);
       (prisma.progress.create as jest.Mock).mockResolvedValue({ id: 'prog-1' });
 
@@ -133,9 +135,9 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
         .expect(200);
 
       expect(res.body.isCompleted).toBe(true);
-      expect(prisma.task.update).toHaveBeenCalledWith(
+      expect(prisma.task.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'task-1' },
+          where: { id: 'task-1', userId: 1, isCompleted: false },
           data: expect.objectContaining({ isCompleted: true }),
         })
       );
@@ -145,6 +147,36 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
           value: 1,
         }),
       });
+    });
+
+    it('should avoid duplicate progress entries when concurrent request already updated count to 0', async () => {
+      const pendingTask = {
+        id: 'task-1',
+        title: 'Finish Feature Concurrent',
+        isCompleted: false,
+        userId: 1,
+        goalTasks: [{ goalId: 'goal-1', taskId: 'task-1' }],
+      };
+
+      const completedTask = {
+        ...pendingTask,
+        isCompleted: true,
+      };
+
+      (prisma.task.findFirst as jest.Mock).mockResolvedValue(pendingTask);
+      // Another concurrent transaction already flipped isCompleted, so updateMany returns count: 0
+      (prisma.task.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.task.findUnique as jest.Mock).mockResolvedValue(completedTask);
+
+      const res = await request(app)
+        .post('/api/tasks/task-1/set-completion')
+        .send({ isCompleted: true })
+        .expect(200);
+
+      expect(res.body.isCompleted).toBe(true);
+      expect(prisma.task.updateMany).toHaveBeenCalled();
+      // Must not create progress entry if update count was 0!
+      expect(prisma.progress.create).not.toHaveBeenCalled();
     });
   });
 
@@ -161,7 +193,7 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
       const completedTask = { ...pendingTask, isCompleted: true };
 
       (prisma.task.findFirst as jest.Mock).mockResolvedValue(pendingTask);
-      (prisma.task.update as jest.Mock).mockResolvedValue(completedTask);
+      (prisma.task.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
       (prisma.task.findUnique as jest.Mock).mockResolvedValue(completedTask);
 
       const res = await request(app)
@@ -169,7 +201,7 @@ describe('Task Completion API (Idempotent set-completion & legacy complete)', ()
         .expect(200);
 
       expect(res.body.isCompleted).toBe(true);
-      expect(prisma.task.update).toHaveBeenCalledWith(
+      expect(prisma.task.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ isCompleted: true }),
         })

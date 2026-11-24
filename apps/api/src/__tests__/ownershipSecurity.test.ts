@@ -3,11 +3,14 @@ import app from '../app';
 import { prisma } from '../prisma';
 import { ensureUser } from '../services/userService';
 
+import { authConfig } from '../config/auth';
+
 // Mock auth middleware to allow dynamic payload injection
 let mockAuthPayload: any = {
   sub: 'auth0|user-a',
   email: 'user-a@example.com',
   name: 'User A',
+  scope: 'read:goals write:goals read:tasks write:tasks read:calendar',
 };
 
 jest.mock('../middleware/auth', () => ({
@@ -87,6 +90,7 @@ describe('Ownership & Security Verification', () => {
       sub: 'auth0|user-a',
       email: 'user-a@example.com',
       name: 'User A',
+      scope: 'read:goals write:goals read:tasks write:tasks read:calendar',
     };
     (ensureUser as jest.Mock).mockResolvedValue(userA);
   });
@@ -95,7 +99,11 @@ describe('Ownership & Security Verification', () => {
     it('should halt and return 404 when goal does not belong to the caller, deleting nothing', async () => {
       // Simulate User B attempting to delete User A's goal
       (ensureUser as jest.Mock).mockResolvedValue(userB);
-      mockAuthPayload = { sub: 'auth0|user-b', email: 'user-b@example.com' };
+      mockAuthPayload = {
+        sub: 'auth0|user-b',
+        email: 'user-b@example.com',
+        scope: 'read:goals write:goals read:tasks write:tasks read:calendar',
+      };
 
       // Goal belongs to User A (userId: 1), so findFirst for User B returns null
       (prisma.goal.findFirst as jest.Mock).mockResolvedValue(null);
@@ -113,7 +121,10 @@ describe('Ownership & Security Verification', () => {
     it('should reject reparenting a goal to another user goal with 400', async () => {
       // User B trying to reparent their goal to User A's goal
       (ensureUser as jest.Mock).mockResolvedValue(userB);
-      mockAuthPayload = { sub: 'auth0|user-b' };
+      mockAuthPayload = {
+        sub: 'auth0|user-b',
+        scope: 'read:goals write:goals read:tasks write:tasks read:calendar',
+      };
 
       // Existing goal for User B
       (prisma.goal.findFirst as jest.Mock)
@@ -162,7 +173,10 @@ describe('Ownership & Security Verification', () => {
 
     it('should reject reparenting a task to another user task with 400', async () => {
       (ensureUser as jest.Mock).mockResolvedValue(userB);
-      mockAuthPayload = { sub: 'auth0|user-b' };
+      mockAuthPayload = {
+        sub: 'auth0|user-b',
+        scope: 'read:goals write:goals read:tasks write:tasks read:calendar',
+      };
 
       (prisma.task.findFirst as jest.Mock)
         .mockResolvedValueOnce({ id: 'task-b', userId: 2, title: 'Task B' }) // existingTask check
@@ -205,10 +219,12 @@ describe('Ownership & Security Verification', () => {
       await request(app).get('/api/goals').expect(200);
     });
 
-    it('should allow legacy web/mobile tokens without colon-scopes to pass through', async () => {
+    it('should allow legacy web/mobile tokens without colon-scopes to pass through for trusted clients', async () => {
+      authConfig.legacyClientIds = ['test-legacy-web-client'];
       // Legacy Web token
       mockAuthPayload = {
         sub: 'auth0|user-a',
+        azp: 'test-legacy-web-client',
         scope: 'openid profile email offline_access',
       };
       (prisma.goal.findMany as jest.Mock).mockResolvedValue([]);

@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { auth } from 'express-oauth2-jwt-bearer';
-import { authConfig } from '../config/auth';
+import { authConfig, isTrustedLegacyClient } from '../config/auth';
 
 // Define the expected JWT payload structure from Auth0
 interface AuthPayload {
@@ -45,11 +45,14 @@ export const requireScope = (requiredScopes: string[]) => {
     const payload = req.auth?.payload as AuthPayload | undefined;
     const rawScope = (payload?.scope as string) || '';
     const grantedScopes = new Set(rawScope.split(' ').filter(Boolean));
+    const clientId = (payload?.azp || payload?.client_id) as string | undefined;
 
-    // If the token does not contain any colon-delimited custom permissions (legacy tokens from web/mobile),
-    // allow access to prevent breaking production web and Android clients.
+    // Fail-closed backward compatibility:
+    // Only verified trusted legacy Web/Mobile client IDs are permitted to bypass custom scope checks
+    // if their tokens lack colon-delimited custom permissions.
+    // Dedicated MCP client tokens, unidentified callers, and untrusted clients MUST possess all required scopes.
     const hasCustomScopes = rawScope.includes(':');
-    if (!hasCustomScopes) {
+    if (!hasCustomScopes && isTrustedLegacyClient(clientId)) {
       return next();
     }
 

@@ -5,7 +5,7 @@ import { formatErrorResult, formatSuccessResult, sanitizeString } from './saniti
 
 export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 3: list_tasks
-  server.tool(
+  (server as any).tool(
     'list_tasks',
     'List tasks filtered by date, month, completion status, or unscheduled state',
     {
@@ -16,7 +16,7 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
       page: z.number().int().min(1).optional().default(1).describe('Page number for pagination'),
       limit: z.number().int().min(1).max(50).optional().default(50).describe('Max items to return (1-50)'),
     },
-    async ({ status, date, month, unscheduled, page, limit }) => {
+    async ({ status, date, month, unscheduled, page, limit }: any) => {
       try {
         const query: Record<string, string | number | boolean | undefined> = {
           page,
@@ -67,13 +67,13 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
   );
 
   // Tool: get_task
-  server.tool(
+  (server as any).tool(
     'get_task',
     'Get detailed information for a specific task including description, parent task, subtasks, and linked goals',
     {
       taskId: z.string().uuid('Invalid task ID format').describe('Task UUID'),
     },
-    async ({ taskId }) => {
+    async ({ taskId }: any) => {
       try {
         const task = await apiClient.get<any>(`/api/tasks/${taskId}`);
 

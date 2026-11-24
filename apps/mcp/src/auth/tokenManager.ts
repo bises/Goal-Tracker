@@ -1,21 +1,43 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { ProfileConfig } from '../config';
 import { TokenStore, StoredTokens } from './tokenStore';
 import { AuthRequiredError } from '../client/errors';
 
+export interface FileLock {
+  fd: number;
+  path: string;
+  lockId: string;
+}
+
 export class TokenManager {
   private config: ProfileConfig;
   private cachedTokens: StoredTokens | null = null;
+  private cachedMtimeMs: number | null = null;
 
   constructor(config: ProfileConfig) {
     this.config = config;
   }
 
   /**
-   * Acquire exclusive file lock using atomic 'wx' flag with stale-lock detection and exponential jitter.
+   * Helper to get mtimeMs of credentials file on disk.
    */
-  public async acquireLock(timeoutMs = 10000): Promise<{ fd: number; path: string }> {
+  private getCredentialsMtime(): number | null {
+    try {
+      if (fs.existsSync(this.config.credentialsPath)) {
+        return fs.statSync(this.config.credentialsPath).mtimeMs;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Acquire exclusive file lock using atomic 'wx' flag with unique lockId and dead-process detection.
+   */
+  public async acquireLock(timeoutMs = 10000): Promise<FileLock> {
     const lockPath = this.config.lockPath;
     const startTime = Date.now();
     TokenStore.ensureDirectory(path.dirname(lockPath));
@@ -23,12 +45,14 @@ export class TokenManager {
     while (Date.now() - startTime < timeoutMs) {
       try {
         const fd = fs.openSync(lockPath, 'wx');
+        const lockId = crypto.randomUUID();
         const lockPayload = JSON.stringify({
           pid: process.pid,
           timestamp: Date.now(),
+          lockId,
         });
         fs.writeFileSync(fd, lockPayload, 'utf8');
-        return { fd, path: lockPath };
+        return { fd, path: lockPath, lockId };
       } catch (err: any) {
         if (err.code === 'EEXIST') {
           // Lock already held. Inspect for stale lock
@@ -49,7 +73,9 @@ export class TokenManager {
   }
 
   /**
-   * Stale lock recovery: breaks lock if PID is dead or timestamp is older than 30s.
+   * Stale lock recovery: breaks lock only if owning process is confirmed dead
+   * or if lock file is corrupted with no PID after 5 minutes.
+   * Live processes preserve their lock exclusivity.
    */
   private checkAndRecoverStaleLock(lockPath: string): void {
     try {
@@ -62,7 +88,7 @@ export class TokenManager {
       let isDead = false;
       if (data.pid) {
         try {
-          process.kill(data.pid, 0); // 0 doesn't kill; checks if process exists
+          process.kill(data.pid, 0); // 0 checks if process exists
         } catch (e: any) {
           if (e.code === 'ESRCH') {
             isDead = true;
@@ -70,13 +96,19 @@ export class TokenManager {
         }
       }
 
-      if ((ageMs > 15000 && isDead) || ageMs > 30000) {
+      // Live processes preserve their lock exclusivity.
+      // Only recover if the owning process is confirmed dead or corrupted lock older than 5 minutes.
+      if (isDead || (!data.pid && ageMs > 300_000)) {
         console.error(
-          `[MCP:auth] Stale lock detected (pid: ${data.pid}, age: ${Math.round(
+          `[MCP:auth] Stale lock detected (pid: ${data.pid || 'none'}, dead: ${isDead}, age: ${Math.round(
             ageMs / 1000
           )}s). Recovering...`
         );
-        fs.unlinkSync(lockPath);
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // Ignore if unlinked concurrently
+        }
       }
     } catch {
       // Ignore JSON parse or race condition errors
@@ -84,9 +116,9 @@ export class TokenManager {
   }
 
   /**
-   * Release exclusive lock safely.
+   * Release exclusive lock safely, checking ownership to avoid releasing a successor's lock.
    */
-  public releaseLock(lock: { fd: number; path: string }): void {
+  public releaseLock(lock: FileLock): void {
     try {
       fs.closeSync(lock.fd);
     } catch {
@@ -95,7 +127,12 @@ export class TokenManager {
 
     try {
       if (fs.existsSync(lock.path)) {
-        fs.unlinkSync(lock.path);
+        const content = fs.readFileSync(lock.path, 'utf8');
+        const data = JSON.parse(content);
+        // Only unlink if the lock file is still owned by this acquisition
+        if (data.lockId === lock.lockId) {
+          fs.unlinkSync(lock.path);
+        }
       }
     } catch {
       // Ignore if unlinked
@@ -112,10 +149,23 @@ export class TokenManager {
   }
 
   /**
-   * Retrieve a valid access token. Handles in-memory cache, in-lock re-read, and Auth0 refresh rotation.
+   * Retrieve a valid access token. Handles in-memory cache, external logout/account change detection,
+   * in-lock re-read, and Auth0 refresh rotation.
    */
   public async getValidAccessToken(): Promise<string> {
-    // 1. In-memory check
+    // 1. Observe external logout or credential change
+    const currentMtime = this.getCredentialsMtime();
+    if (currentMtime === null) {
+      // Credentials file was deleted on disk (e.g. by CLI logout)
+      this.cachedTokens = null;
+      this.cachedMtimeMs = null;
+    } else if (this.cachedMtimeMs !== null && currentMtime !== this.cachedMtimeMs) {
+      // Credentials file was modified externally (e.g. by CLI login to another account or concurrent refresh)
+      this.cachedTokens = null;
+      this.cachedMtimeMs = null;
+    }
+
+    // Fast-path: in-memory fresh tokens matching current disk generation
     if (this.isTokenFresh(this.cachedTokens)) {
       return this.cachedTokens!.accessToken;
     }
@@ -125,23 +175,39 @@ export class TokenManager {
     try {
       // 3. In-lock re-read from disk (peer process may have refreshed while we waited)
       const diskTokens = TokenStore.readTokens(this.config.credentialsPath);
+      const diskMtime = this.getCredentialsMtime();
 
       if (this.isTokenFresh(diskTokens)) {
         this.cachedTokens = diskTokens;
+        this.cachedMtimeMs = diskMtime;
         return diskTokens!.accessToken;
       }
 
       // If no stored credentials exist or no refresh token
       if (!diskTokens || !diskTokens.refreshToken) {
         this.cachedTokens = null;
+        this.cachedMtimeMs = null;
         throw new AuthRequiredError(this.config.profile);
       }
 
       // 4. Perform Auth0 refresh token exchange
-      const newTokens = await this.refreshTokensWithAuth0(diskTokens.refreshToken);
-      TokenStore.writeTokens(this.config.credentialsPath, newTokens);
-      this.cachedTokens = newTokens;
-      return newTokens.accessToken;
+      try {
+        const newTokens = await this.refreshTokensWithAuth0(diskTokens.refreshToken);
+        TokenStore.writeTokens(this.config.credentialsPath, newTokens);
+        this.cachedTokens = newTokens;
+        this.cachedMtimeMs = this.getCredentialsMtime();
+        return newTokens.accessToken;
+      } catch (err: any) {
+        // Recovery for uncertain refresh result:
+        // Re-read disk in case another process succeeded while we timed out/failed
+        const recheckTokens = TokenStore.readTokens(this.config.credentialsPath);
+        if (this.isTokenFresh(recheckTokens)) {
+          this.cachedTokens = recheckTokens;
+          this.cachedMtimeMs = this.getCredentialsMtime();
+          return recheckTokens!.accessToken;
+        }
+        throw err;
+      }
     } finally {
       this.releaseLock(lock);
     }
@@ -165,6 +231,7 @@ export class TokenManager {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
         redirect: 'error',
+        signal: AbortSignal.timeout(15_000),
       });
     } catch (err: any) {
       throw new Error(`Network failure during Auth0 token refresh: ${err.message}`);
@@ -182,6 +249,7 @@ export class TokenManager {
         // Refresh token revoked, expired, or reuse detected. Clear local storage.
         TokenStore.clearTokens(this.config.credentialsPath);
         this.cachedTokens = null;
+        this.cachedMtimeMs = null;
         throw new AuthRequiredError(
           this.config.profile,
           `Auth0 refresh token revoked or expired (${errPayload.error_description || errPayload.error || 'invalid_grant'}). Please re-authenticate.`
@@ -221,6 +289,7 @@ export class TokenManager {
     try {
       TokenStore.writeTokens(this.config.credentialsPath, tokens);
       this.cachedTokens = tokens;
+      this.cachedMtimeMs = this.getCredentialsMtime();
     } finally {
       this.releaseLock(lock);
     }
@@ -234,6 +303,7 @@ export class TokenManager {
     try {
       TokenStore.clearTokens(this.config.credentialsPath);
       this.cachedTokens = null;
+      this.cachedMtimeMs = null;
     } finally {
       this.releaseLock(lock);
     }
@@ -243,8 +313,17 @@ export class TokenManager {
    * Get cached or stored tokens without refresh (for status inspection).
    */
   public getStoredTokens(): StoredTokens | null {
-    if (this.cachedTokens) return this.cachedTokens;
+    const currentMtime = this.getCredentialsMtime();
+    if (currentMtime === null) {
+      this.cachedTokens = null;
+      this.cachedMtimeMs = null;
+      return null;
+    }
+    if (this.cachedTokens && this.cachedMtimeMs === currentMtime) {
+      return this.cachedTokens;
+    }
     this.cachedTokens = TokenStore.readTokens(this.config.credentialsPath);
+    this.cachedMtimeMs = currentMtime;
     return this.cachedTokens;
   }
 }
