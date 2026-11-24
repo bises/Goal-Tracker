@@ -1,17 +1,41 @@
-node_modules
-apps/web/dist
-apps/web/dev-dist
-apps/api/dist
-packages/shared/dist
+# Dependencies
+node_modules/
+**/node_modules/
 
-# Environment files with secrets (use .env.example for templates)
+# Build artifacts (never commit)
+dist/
+**/dist/
+build/
+**/build/
+dev-dist/
+**/dev-dist/
+*.tsbuildinfo
+
+# Environment files & secrets (never commit)
 .env
 .env.*
+.env*.local
 !.env.example
 !.env.*.example
-apps/api/.env
-apps/web/.env
-apps/mcp/.env
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+!apps/*/.env.*.example
+
+# Certificates & private keys (never commit)
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+
+# Local authentication tokens & credentials (never commit)
+.auth/
+**/.auth/
+*.token
+*.token.json
+auth-*.json
 
 # pnpm store
 .pnpm-store
