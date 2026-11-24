@@ -320,6 +320,10 @@ When reviewing PRs, ensure:
 
 ## 🔒 Security Practices
 
+- **Never commit build artifacts:** `dist/`, `build/`, `dev-dist/`, `*.tsbuildinfo`
+- **Never commit secrets:** `.env`, `.env.*` (except `.env.example`), API keys, credentials
+- **Never commit certificates or keys:** `*.crt`, `*.key`, `*.pem`
+- **Never commit auth tokens:** Local credentials or token caches
 - **Never log sensitive data:** Tokens, passwords, API keys
 - **Validate Input:** Server-side validation always, client-side for UX
 - **Auth Guards:** Always verify user owns the data they're accessing

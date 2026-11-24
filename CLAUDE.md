@@ -163,6 +163,8 @@ The following MCP servers are configured in `.mcp.json` (Claude Code) and `.vsco
 ### Safety Rules
 
 - Never commit directly to main — always use feature branches
+- Never commit build artifacts (`dist/`, `build/`, `dev-dist/`, `*.tsbuildinfo`)
+- Never commit secrets, `.env` files, certificates (`*.crt`, `*.key`, `*.pem`), or auth tokens
 - Never modify existing migrations after they are pushed
 - Never log tokens, passwords, or API keys
 - Always validate user input server-side
