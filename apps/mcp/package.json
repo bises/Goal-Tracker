@@ -1,0 +1,33 @@
+{
+  "name": "@goal-tracker/mcp",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "bin": {
+    "goal-tracker-mcp": "./bin/goal-tracker-mcp.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "login": "node dist/index.js login",
+    "logout": "node dist/index.js logout",
+    "status": "node dist/index.js status",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@goal-tracker/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "dotenv": "^16.4.5",
+    "open": "^10.1.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

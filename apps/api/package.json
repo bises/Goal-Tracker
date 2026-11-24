@@ -9,7 +9,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "db:repair": "ts-node src/scripts/repairGoalProgress.ts"
+    "db:repair": "ts-node src/scripts/repairGoalProgress.ts",
+    "db:audit-ownership": "ts-node src/scripts/auditAndRepairOwnership.ts"
   },
   "dependencies": {
     "@goal-tracker/shared": "workspace:*",

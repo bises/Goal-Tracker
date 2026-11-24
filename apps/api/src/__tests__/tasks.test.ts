@@ -17,6 +17,7 @@ jest.mock('../middleware/auth', () => ({
     next();
   }),
   requireAuth: jest.fn((req, res, next) => next()),
+  requireScope: jest.fn(() => (req: any, res: any, next: any) => next()),
   getUserId: jest.fn((req) => req.auth?.payload?.sub || 'auth0|test-user-id'),
   getUserEmail: jest.fn((req) => req.auth?.payload?.email),
   getUserName: jest.fn((req) => req.auth?.payload?.name),

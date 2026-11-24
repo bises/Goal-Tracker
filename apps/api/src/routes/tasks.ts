@@ -1,7 +1,7 @@
 import { parseDateOnly } from '@goal-tracker/shared';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
-import { requireAuth, validateJWT } from '../middleware/auth';
+import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { recalculateGoalProgress } from '../services/goalProgressService';
 import { ensureUser } from '../services/userService';
@@ -10,6 +10,122 @@ const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(validateJWT, requireAuth);
+
+/**
+ * Verifies that a target parent task exists, belongs to the specified user,
+ * and does not create a cycle in the task hierarchy.
+ */
+export async function validateParentTask(
+  taskId: string | null,
+  parentTaskId: string,
+  userId: number,
+  tx: Prisma.TransactionClient | typeof prisma
+): Promise<void> {
+  if (taskId && parentTaskId === taskId) {
+    const error = new Error('Task cannot be its own parent');
+    (error as any).statusCode = 400;
+    throw error;
+  }
+
+  const parent = await tx.task.findFirst({
+    where: { id: parentTaskId, userId },
+    select: { id: true, parentTaskId: true },
+  });
+
+  if (!parent) {
+    const error = new Error('Parent task not found or access denied');
+    (error as any).statusCode = 400;
+    throw error;
+  }
+
+  if (taskId) {
+    let currentAncestorId: string | null = parent.parentTaskId;
+    const visited = new Set<string>([taskId, parent.id]);
+
+    while (currentAncestorId) {
+      if (currentAncestorId === taskId) {
+        const error = new Error('Cyclic task hierarchy detected: target parent is a descendant of this task');
+        (error as any).statusCode = 400;
+        throw error;
+      }
+      if (visited.has(currentAncestorId)) {
+        break;
+      }
+      visited.add(currentAncestorId);
+
+      const ancestor = await tx.task.findFirst({
+        where: { id: currentAncestorId, userId },
+        select: { parentTaskId: true },
+      });
+      currentAncestorId = ancestor?.parentTaskId || null;
+    }
+  }
+}
+
+/**
+ * Idempotently sets the completion state of a task.
+ * If the task is already in the requested state, it returns the current state without modifying progress.
+ */
+export async function executeSetTaskCompletion(
+  taskId: string,
+  userId: number,
+  isCompleted: boolean
+) {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      userId,
+    },
+    include: {
+      goalTasks: true,
+    },
+  });
+
+  if (!task) {
+    const error = new Error('Task not found or access denied');
+    (error as any).statusCode = 404;
+    throw error;
+  }
+
+  // Idempotency check: if state is already what is requested, return without modifying progress
+  if (task.isCompleted === isCompleted) {
+    return prisma.task.findUnique({
+      where: { id: taskId },
+      include: taskWithGoals,
+    });
+  }
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Update task completion state
+    await tx.task.update({
+      where: { id: taskId },
+      data: {
+        isCompleted,
+        completedAt: isCompleted ? new Date() : null,
+      },
+    });
+
+    // Atomically recalculate progress for linked goals (also updates parents)
+    for (const gt of task.goalTasks) {
+      await recalculateGoalProgress(gt.goalId, tx);
+
+      // Log a progress entry for traceability
+      await tx.progress.create({
+        data: {
+          goalId: gt.goalId,
+          value: isCompleted ? 1 : -1,
+          note: `Task "${task.title}" ${isCompleted ? 'completed' : 'reopened'}`,
+          date: new Date(),
+        },
+      });
+    }
+  });
+
+  return prisma.task.findUnique({
+    where: { id: taskId },
+    include: taskWithGoals,
+  });
+}
 
 // Helper function to include goals with tasks
 const taskWithGoals = {
@@ -39,7 +155,7 @@ const taskWithGoals = {
 };
 
 // GET /api/tasks - Get all tasks with optional filtering and pagination
-router.get('/', async (req, res) => {
+router.get('/', requireScope(['read:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -224,7 +340,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/tasks/:id - Get task by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireScope(['read:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -283,7 +399,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/tasks - Create task
-router.post('/', async (req, res) => {
+router.post('/', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -316,18 +432,15 @@ router.post('/', async (req, res) => {
           },
         });
         if (goalCount !== goalIds.length) {
-          throw new Error('One or more goals not found or access denied');
+          const error = new Error('One or more goals not found or access denied');
+          (error as any).statusCode = 400;
+          throw error;
         }
       }
 
-      // Verify parent task belongs to user if provided
+      // Verify parent task belongs to user and is cycle-free if provided
       if (parentTaskId) {
-        const parentTask = await tx.task.findFirst({
-          where: { id: parentTaskId, userId: user.id },
-        });
-        if (!parentTask) {
-          throw new Error('Parent task not found or access denied');
-        }
+        await validateParentTask(null, parentTaskId, user.id, tx);
       }
 
       // Create the task
@@ -415,14 +528,17 @@ router.post('/', async (req, res) => {
     });
 
     res.status(201).json(task);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Error creating task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to create task' });
   }
 });
 
 // PUT /api/tasks/:id - Update task (no longer handles goal linking)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -448,6 +564,11 @@ router.put('/:id', async (req, res) => {
       estimatedDurationMinutes,
       estimatedCompletionDate,
     } = req.body;
+
+    // Validate parent task ownership and cycle freedom if provided
+    if (parentTaskId !== undefined && parentTaskId !== null && parentTaskId !== '') {
+      await validateParentTask(req.params.id, parentTaskId, user.id, prisma);
+    }
 
     const updateData: any = {};
 
@@ -498,14 +619,17 @@ router.put('/:id', async (req, res) => {
     });
 
     res.json(task);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Error updating task:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
 
 // DELETE /api/tasks/:id - Delete task
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { goalIds = [] } = req.body;
@@ -549,8 +673,29 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/tasks/:id/complete - Toggle completion
-router.post('/:id/complete', async (req, res) => {
+// POST /api/tasks/:id/set-completion - Idempotent completion state setter
+router.post('/:id/set-completion', requireScope(['write:tasks']), async (req, res) => {
+  try {
+    const user = await ensureUser(req);
+    const { isCompleted } = req.body;
+
+    if (typeof isCompleted !== 'boolean') {
+      return res.status(400).json({ error: 'Field isCompleted (boolean) is required' });
+    }
+
+    const updatedTask = await executeSetTaskCompletion(req.params.id, user.id, isCompleted);
+    res.json(updatedTask);
+  } catch (error: any) {
+    if (error?.statusCode === 404) {
+      return res.status(404).json({ error: error.message });
+    }
+    console.error('Error setting task completion:', error instanceof Error ? error.message : 'Unknown error');
+    res.status(500).json({ error: 'Failed to set task completion' });
+  }
+});
+
+// POST /api/tasks/:id/complete - Toggle completion (legacy compatible)
+router.post('/:id/complete', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -559,57 +704,26 @@ router.post('/:id/complete', async (req, res) => {
         id: req.params.id,
         userId: user.id,
       },
-      include: {
-        goalTasks: true,
-      },
+      select: { isCompleted: true },
     });
 
     if (!task) {
       return res.status(404).json({ error: 'Task not found or access denied' });
     }
 
-    const toggledCompleted = !task.isCompleted;
-
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Update task completion state
-      await tx.task.update({
-        where: { id: req.params.id },
-        data: {
-          isCompleted: toggledCompleted,
-          completedAt: toggledCompleted ? new Date() : null,
-        },
-      });
-
-      // Atomically recalculate progress for linked goals (also updates parents)
-      for (const gt of task.goalTasks) {
-        await recalculateGoalProgress(gt.goalId, tx);
-
-        // Log a progress entry for traceability
-        await tx.progress.create({
-          data: {
-            goalId: gt.goalId,
-            value: toggledCompleted ? 1 : -1,
-            note: `Task "${task.title}" ${toggledCompleted ? 'completed' : 'reopened'}`,
-            date: new Date(),
-          },
-        });
-      }
-    });
-
-    const updatedTask = await prisma.task.findUnique({
-      where: { id: req.params.id },
-      include: taskWithGoals,
-    });
-
+    const updatedTask = await executeSetTaskCompletion(req.params.id, user.id, !task.isCompleted);
     res.json(updatedTask);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error('Error toggling task completion:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to toggle task completion' });
   }
 });
 
 // GET /api/tasks/scheduled/:date - Get tasks for date
-router.get('/scheduled/:date', async (req, res) => {
+router.get('/scheduled/:date', requireScope(['read:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const date = new Date(req.params.date);
@@ -638,7 +752,7 @@ router.get('/scheduled/:date', async (req, res) => {
 });
 
 // GET /api/tasks/unscheduled - Get unscheduled tasks
-router.get('/unscheduled/list', async (req, res) => {
+router.get('/unscheduled/list', requireScope(['read:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -662,7 +776,7 @@ router.get('/unscheduled/list', async (req, res) => {
 });
 
 // POST /api/tasks/:id/link-goal - Link task to a goal
-router.post('/:id/link-goal', async (req, res) => {
+router.post('/:id/link-goal', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { goalId } = req.body;
@@ -721,7 +835,7 @@ router.post('/:id/link-goal', async (req, res) => {
 });
 
 // POST /api/tasks/:id/unlink-goal - Unlink task from a goal
-router.post('/:id/unlink-goal', async (req, res) => {
+router.post('/:id/unlink-goal', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { goalId } = req.body;
@@ -776,7 +890,7 @@ router.post('/:id/unlink-goal', async (req, res) => {
 });
 
 // POST /api/tasks/:id/schedule - Schedule or unschedule a task
-router.post('/:id/schedule', async (req, res) => {
+router.post('/:id/schedule', requireScope(['write:tasks']), async (req, res) => {
   try {
     const user = await ensureUser(req);
     const { scheduledDate } = req.body;

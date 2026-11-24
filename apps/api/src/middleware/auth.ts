@@ -36,6 +36,36 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 };
 
 /**
+ * Middleware to ensure request token contains required OAuth scopes.
+ * Preserves backward compatibility for legacy web SPA and mobile clients
+ * that do not yet request granular scopes.
+ */
+export const requireScope = (requiredScopes: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const payload = req.auth?.payload as AuthPayload | undefined;
+    const rawScope = (payload?.scope as string) || '';
+    const grantedScopes = new Set(rawScope.split(' ').filter(Boolean));
+
+    // If the token does not contain any colon-delimited custom permissions (legacy tokens from web/mobile),
+    // allow access to prevent breaking production web and Android clients.
+    const hasCustomScopes = rawScope.includes(':');
+    if (!hasCustomScopes) {
+      return next();
+    }
+
+    const missingScopes = requiredScopes.filter((s) => !grantedScopes.has(s));
+    if (missingScopes.length > 0) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `Missing required scope(s): ${missingScopes.join(', ')}`,
+      });
+    }
+
+    next();
+  };
+};
+
+/**
  * Helper to get user ID (sub claim) from authenticated request
  */
 export const getUserId = (req: Request): string => {

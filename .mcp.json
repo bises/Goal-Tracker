@@ -23,6 +23,16 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "goal-tracker": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["apps/mcp/dist/index.js", "stdio", "--profile", "production"]
+    },
+    "goal-tracker-dev": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["apps/mcp/dist/index.js", "stdio", "--profile", "development"]
     }
   }
 }

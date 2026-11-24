@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
-import { requireAuth, validateJWT } from '../middleware/auth';
+import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
 import { recalculateGoalProgress } from '../services/goalProgressService';
@@ -10,6 +10,57 @@ const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(validateJWT, requireAuth);
+
+/**
+ * Verifies that a target parent goal exists, belongs to the specified user,
+ * and does not create a cycle in the goal hierarchy.
+ */
+export async function validateParentGoal(
+  goalId: string | null,
+  parentId: string,
+  userId: number,
+  tx: Prisma.TransactionClient | typeof prisma
+): Promise<void> {
+  if (goalId && parentId === goalId) {
+    const error = new Error('Goal cannot be its own parent');
+    (error as any).statusCode = 400;
+    throw error;
+  }
+
+  const parent = await tx.goal.findFirst({
+    where: { id: parentId, userId },
+    select: { id: true, parentId: true },
+  });
+
+  if (!parent) {
+    const error = new Error('Parent goal not found or access denied');
+    (error as any).statusCode = 400;
+    throw error;
+  }
+
+  if (goalId) {
+    let currentAncestorId: string | null = parent.parentId;
+    const visited = new Set<string>([goalId, parent.id]);
+
+    while (currentAncestorId) {
+      if (currentAncestorId === goalId) {
+        const error = new Error('Cyclic goal hierarchy detected: target parent is a descendant of this goal');
+        (error as any).statusCode = 400;
+        throw error;
+      }
+      if (visited.has(currentAncestorId)) {
+        break;
+      }
+      visited.add(currentAncestorId);
+
+      const ancestor = await tx.goal.findFirst({
+        where: { id: currentAncestorId, userId },
+        select: { parentId: true },
+      });
+      currentAncestorId = ancestor?.parentId || null;
+    }
+  }
+}
 
 // Lazy-initialize the completion service to avoid circular dependency issues
 let completionService: CompletionService;
@@ -80,7 +131,7 @@ const computeGoalView = (goal: any) => {
 };
 
 // Get all goals
-router.get('/', async (req, res) => {
+router.get('/', requireScope(['read:goals']), async (req, res) => {
   try {
     // Ensure user exists in database (creates if new user)
     const user = await ensureUser(req);
@@ -135,7 +186,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get a single goal by ID with full details
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireScope(['read:goals']), async (req, res) => {
   const { id } = req.params;
   try {
     const user = await ensureUser(req);
@@ -195,7 +246,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create a new goal
-router.post('/', async (req, res) => {
+router.post('/', requireScope(['write:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -214,14 +265,9 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // If parentId is provided, verify parent belongs to user
+      // If parentId is provided, verify parent belongs to user and is cycle-free
       if (parentId) {
-        const parent = await tx.goal.findFirst({
-          where: { id: parentId, userId: user.id },
-        });
-        if (!parent) {
-          throw new Error('Parent goal not found or access denied');
-        }
+        await validateParentGoal(null, parentId, user.id, tx);
       }
 
       // Create the goal first
@@ -251,14 +297,17 @@ router.post('/', async (req, res) => {
     });
 
     res.json(created);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to create goal' });
   }
 });
 
 // Update a goal
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireScope(['write:goals']), async (req, res) => {
   const { id } = req.params;
   try {
     const user = await ensureUser(req);
@@ -283,6 +332,11 @@ router.put('/:id', async (req, res) => {
       scope,
     } = req.body;
 
+    // Validate parent if provided and not null (unparenting with null is permitted)
+    if (parentId !== undefined && parentId !== null) {
+      await validateParentGoal(id, parentId, user.id, prisma);
+    }
+
     const goal = await prisma.goal.update({
       where: { id },
       data: {
@@ -299,14 +353,17 @@ router.put('/:id', async (req, res) => {
     });
 
     res.json(goal);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to update goal' });
   }
 });
 
 // Update progress
-router.post('/:id/progress', async (req, res) => {
+router.post('/:id/progress', requireScope(['write:goals']), async (req, res) => {
   const { id } = req.params;
   const { value, note, date, customData } = req.body;
 
@@ -351,36 +408,45 @@ router.post('/:id/progress', async (req, res) => {
 });
 
 // Delete goal
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireScope(['write:goals']), async (req, res) => {
   const { id } = req.params;
   try {
     const user = await ensureUser(req);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Look up the goal to capture parent before deletion
+      // Look up the goal to verify ownership and capture parent before deletion
       const goal = await tx.goal.findFirst({
         where: { id, userId: user.id },
-        select: { parentId: true },
+        select: { id: true, parentId: true },
       });
 
+      if (!goal) {
+        const error = new Error('Goal not found or access denied');
+        (error as any).statusCode = 404;
+        throw error;
+      }
+
       // Delete related progress entries then the goal itself
-      await tx.progress.deleteMany({ where: { goalId: id } });
-      await tx.goal.delete({ where: { id } });
+      await tx.progress.deleteMany({ where: { goalId: goal.id } });
+      await tx.goal.delete({ where: { id: goal.id } });
 
       // If this was a child goal with a parent, atomically recalculate parent's progress
-      if (goal?.parentId) {
+      if (goal.parentId) {
         await recalculateGoalProgress(goal.parentId, tx);
       }
     });
     res.json({ message: 'Goal deleted' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error(error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to delete goal' });
   }
 });
 
 // Get hierarchical goal tree (top-level goals with nested children)
-router.get('/tree', async (req, res) => {
+router.get('/tree', requireScope(['read:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -452,7 +518,7 @@ router.get('/tree', async (req, res) => {
 });
 
 // Get goals by scope
-router.get('/scope/:scope', async (req, res) => {
+router.get('/scope/:scope', requireScope(['read:goals']), async (req, res) => {
   const { scope } = req.params;
   try {
     const user = await ensureUser(req);
@@ -512,7 +578,7 @@ router.get('/scope/:scope', async (req, res) => {
 });
 
 // Bulk create child tasks
-router.post('/:id/bulk-tasks', async (req, res) => {
+router.post('/:id/bulk-tasks', requireScope(['write:goals']), async (req, res) => {
   const { id } = req.params;
   const { tasks } = req.body; // Array of { title, scheduledDate?, size? }
 
@@ -574,7 +640,7 @@ router.post('/:id/bulk-tasks', async (req, res) => {
 });
 
 // POST /api/goals/:id/complete - Mark goal as completed and update parent
-router.post('/:id/complete', async (req, res) => {
+router.post('/:id/complete', requireScope(['write:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -600,7 +666,7 @@ router.post('/:id/complete', async (req, res) => {
 });
 
 // POST /api/goals/:id/uncomplete - Mark goal as incomplete and update parent (decrement)
-router.post('/:id/uncomplete', async (req, res) => {
+router.post('/:id/uncomplete', requireScope(['write:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -626,7 +692,7 @@ router.post('/:id/uncomplete', async (req, res) => {
 });
 
 // GET /api/goals/:id/tasks - Fetch tasks and children for a specific goal
-router.get('/:id/tasks', async (req, res) => {
+router.get('/:id/tasks', requireScope(['read:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
@@ -682,7 +748,7 @@ router.get('/:id/tasks', async (req, res) => {
 });
 
 // GET /api/goals/:id/activities - Fetch progress/activities for a specific goal
-router.get('/:id/activities', async (req, res) => {
+router.get('/:id/activities', requireScope(['read:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
