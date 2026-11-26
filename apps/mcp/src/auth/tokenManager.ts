@@ -6,9 +6,9 @@ import { TokenStore, StoredTokens } from './tokenStore';
 import { AuthRequiredError } from '../client/errors';
 
 export interface FileLock {
-  fd: number;
   path: string;
   lockId: string;
+  ownerPath: string;
 }
 
 export class TokenManager {
@@ -35,7 +35,7 @@ export class TokenManager {
   }
 
   /**
-   * Acquire exclusive file lock using atomic 'wx' flag with unique lockId and dead-process detection.
+   * Claim a lock directory, verify its owner record, and recover abandoned owners.
    */
   public async acquireLock(timeoutMs = 10000): Promise<FileLock> {
     const lockPath = this.config.lockPath;
@@ -43,18 +43,51 @@ export class TokenManager {
     TokenStore.ensureDirectory(path.dirname(lockPath));
 
     while (Date.now() - startTime < timeoutMs) {
+      const lockId = crypto.randomUUID();
+      const ownerName = `owner-${lockId}.json`;
+      const ownerPath = path.join(lockPath, ownerName);
+      let createdDirectory = false;
       try {
-        const fd = fs.openSync(lockPath, 'wx');
-        const lockId = crypto.randomUUID();
+        fs.mkdirSync(lockPath, { mode: 0o700 });
+        createdDirectory = true;
+        const directory = fs.statSync(lockPath);
         const lockPayload = JSON.stringify({
           pid: process.pid,
           timestamp: Date.now(),
           lockId,
         });
-        fs.writeFileSync(fd, lockPayload, 'utf8');
-        return { fd, path: lockPath, lockId };
+        fs.writeFileSync(ownerPath, lockPayload, { flag: 'wx', mode: 0o600 });
+        const current = fs.statSync(lockPath);
+        const entries = fs.readdirSync(lockPath);
+        // An interrupted initializer may resume after its abandoned directory was replaced.
+        if (
+          current.dev !== directory.dev ||
+          current.ino !== directory.ino ||
+          entries.length !== 1 ||
+          entries[0] !== ownerName
+        ) {
+          throw Object.assign(new Error('Lock ownership changed during initialization'), {
+            code: 'EEXIST',
+          });
+        }
+        return { path: lockPath, lockId, ownerPath };
       } catch (err: any) {
-        if (err.code === 'EEXIST') {
+        if (createdDirectory) {
+          try {
+            fs.unlinkSync(ownerPath);
+          } catch {
+            // Already removed or replaced.
+          }
+          try {
+            fs.rmdirSync(lockPath);
+          } catch {
+            // Preserve any successor's nonempty directory.
+          }
+        }
+        if (
+          ['EEXIST', 'ENOTEMPTY', 'EPERM', 'EISDIR', 'ENOTDIR'].includes(err.code) &&
+          fs.existsSync(lockPath)
+        ) {
           // Lock already held. Inspect for stale lock
           this.checkAndRecoverStaleLock(lockPath);
 
@@ -74,21 +107,42 @@ export class TokenManager {
 
   /**
    * Stale lock recovery: breaks lock only if owning process is confirmed dead
-   * or if lock file is corrupted with no PID after 5 minutes.
+   * or if a lock without a readable owner has been unchanged for 5 minutes.
    * Live processes preserve their lock exclusivity.
    */
   private checkAndRecoverStaleLock(lockPath: string): void {
     try {
-      if (!fs.existsSync(lockPath)) return;
-
-      const content = fs.readFileSync(lockPath, 'utf8');
-      const data = JSON.parse(content);
-      const ageMs = Date.now() - (data.timestamp || 0);
+      const lockStat = fs.statSync(lockPath);
+      const isDirectory = lockStat.isDirectory();
+      let ownerPath = lockPath;
+      if (isDirectory) {
+        const entries = fs.readdirSync(lockPath);
+        if (entries.length === 0 && Date.now() - lockStat.mtimeMs > 300_000) {
+          fs.rmdirSync(lockPath);
+          return;
+        }
+        if (entries.length !== 1 || !/^owner-[\w-]+\.json$/.test(entries[0])) {
+          return;
+        }
+        ownerPath = path.join(lockPath, entries[0]);
+      }
+      const snapshot = fs.statSync(ownerPath);
+      const content = fs.readFileSync(ownerPath, 'utf8');
+      let ownerPid: number | undefined;
+      try {
+        const data = JSON.parse(content);
+        if (Number.isInteger(data?.pid) && data.pid > 0) {
+          ownerPid = data.pid;
+        }
+      } catch {
+        // Older clients can leave an empty or partial record if interrupted during creation.
+      }
+      const ageMs = Date.now() - snapshot.mtimeMs;
 
       let isDead = false;
-      if (data.pid) {
+      if (ownerPid !== undefined) {
         try {
-          process.kill(data.pid, 0); // 0 checks if process exists
+          process.kill(ownerPid, 0); // 0 checks if process exists
         } catch (e: any) {
           if (e.code === 'ESRCH') {
             isDead = true;
@@ -97,21 +151,36 @@ export class TokenManager {
       }
 
       // Live processes preserve their lock exclusivity.
-      // Only recover if the owning process is confirmed dead or corrupted lock older than 5 minutes.
-      if (isDead || (!data.pid && ageMs > 300_000)) {
+      // Only recover a confirmed dead owner or an abandoned incomplete record.
+      if (isDead || (ownerPid === undefined && ageMs > 300_000)) {
+        const current = fs.statSync(ownerPath);
+        if (
+          current.dev !== snapshot.dev ||
+          current.ino !== snapshot.ino ||
+          current.mtimeMs !== snapshot.mtimeMs ||
+          current.ctimeMs !== snapshot.ctimeMs ||
+          fs.readFileSync(ownerPath, 'utf8') !== content
+        ) {
+          return;
+        }
         console.error(
-          `[MCP:auth] Stale lock detected (pid: ${data.pid || 'none'}, dead: ${isDead}, age: ${Math.round(
+          `[MCP:auth] Stale lock detected (pid: ${ownerPid || 'none'}, dead: ${isDead}, age: ${Math.round(
             ageMs / 1000
           )}s). Recovering...`
         );
         try {
-          fs.unlinkSync(lockPath);
+          // Remove only the observed owner's unique record. A successor has a different name.
+          fs.unlinkSync(ownerPath);
+          if (isDirectory) {
+            // Never remove a successor's nonempty directory.
+            fs.rmdirSync(lockPath);
+          }
         } catch {
           // Ignore if unlinked concurrently
         }
       }
     } catch {
-      // Ignore JSON parse or race condition errors
+      // Another process may have already released or replaced this lock.
     }
   }
 
@@ -120,18 +189,13 @@ export class TokenManager {
    */
   public releaseLock(lock: FileLock): void {
     try {
-      fs.closeSync(lock.fd);
-    } catch {
-      // Ignore if already closed
-    }
-
-    try {
-      if (fs.existsSync(lock.path)) {
-        const content = fs.readFileSync(lock.path, 'utf8');
+      if (lock.ownerPath && fs.existsSync(lock.ownerPath)) {
+        const content = fs.readFileSync(lock.ownerPath, 'utf8');
         const data = JSON.parse(content);
         // Only unlink if the lock file is still owned by this acquisition
         if (data.lockId === lock.lockId) {
-          fs.unlinkSync(lock.path);
+          fs.unlinkSync(lock.ownerPath);
+          fs.rmdirSync(lock.path);
         }
       }
     } catch {
@@ -143,7 +207,7 @@ export class TokenManager {
    * Check if a token record is valid (not expired, with 60-second safety margin).
    */
   public isTokenFresh(tokens: StoredTokens | null): boolean {
-    if (!tokens || !tokens.accessToken || !tokens.expiresAt) return false;
+    if (!tokens || !tokens.accessToken || !tokens.expiresAt || tokens.refreshPending) return false;
     // 60-second safety window
     return Date.now() < tokens.expiresAt - 60_000;
   }
@@ -190,23 +254,29 @@ export class TokenManager {
         throw new AuthRequiredError(this.config.profile);
       }
 
+      if (diskTokens.refreshPending) {
+        // A previous process may have exchanged this token before it was interrupted.
+        TokenStore.clearTokens(this.config.credentialsPath);
+        this.cachedTokens = null;
+        this.cachedMtimeMs = null;
+        throw new AuthRequiredError(this.config.profile);
+      }
+
       // 4. Perform Auth0 refresh token exchange
+      // Persist before dispatch so a process crash cannot leave a replayable token behind.
+      TokenStore.writeTokens(this.config.credentialsPath, { ...diskTokens, refreshPending: true });
       try {
         const newTokens = await this.refreshTokensWithAuth0(diskTokens.refreshToken);
         TokenStore.writeTokens(this.config.credentialsPath, newTokens);
         this.cachedTokens = newTokens;
         this.cachedMtimeMs = this.getCredentialsMtime();
         return newTokens.accessToken;
-      } catch (err: any) {
-        // Recovery for uncertain refresh result:
-        // Re-read disk in case another process succeeded while we timed out/failed
-        const recheckTokens = TokenStore.readTokens(this.config.credentialsPath);
-        if (this.isTokenFresh(recheckTokens)) {
-          this.cachedTokens = recheckTokens;
-          this.cachedMtimeMs = this.getCredentialsMtime();
-          return recheckTokens!.accessToken;
-        }
-        throw err;
+      } catch {
+        // Auth0 may have consumed the token even when its response never arrived.
+        TokenStore.clearTokens(this.config.credentialsPath);
+        this.cachedTokens = null;
+        this.cachedMtimeMs = null;
+        throw new AuthRequiredError(this.config.profile);
       }
     } finally {
       this.releaseLock(lock);

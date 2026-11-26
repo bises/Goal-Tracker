@@ -7,6 +7,7 @@ import { ProfileConfig } from '../config';
 import { AuthRequiredError } from '../client/errors';
 
 describe('TokenManager & TokenStore', () => {
+  const originalFetch = global.fetch;
   let testDir: string;
   let testConfig: ProfileConfig;
 
@@ -28,6 +29,8 @@ describe('TokenManager & TokenStore', () => {
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
     try {
       if (fs.existsSync(testDir)) {
         fs.rmSync(testDir, { recursive: true, force: true });
@@ -159,27 +162,136 @@ describe('TokenManager & TokenStore', () => {
 
     it('should NOT delete successor lock if an older owner releases after losing ownership', async () => {
       const lockPath = testConfig.lockPath;
-      const oldLock = { fd: 999, path: lockPath, lockId: 'old-lock-id' };
-
-      // Successor acquired lock and wrote its own lockId
-      const successorPayload = JSON.stringify({
-        pid: process.pid,
-        timestamp: Date.now(),
-        lockId: 'successor-lock-id',
-      });
-      fs.writeFileSync(lockPath, successorPayload, 'utf8');
-
       const manager = new TokenManager(testConfig);
+      const oldLock = await manager.acquireLock();
+      fs.renameSync(lockPath, `${lockPath}.abandoned`);
+      const successorLock = await manager.acquireLock();
       // Old owner attempts release
-      manager.releaseLock(oldLock as any);
+      manager.releaseLock(oldLock);
 
       // Successor lock MUST remain intact!
       expect(fs.existsSync(lockPath)).toBe(true);
-      const remainingContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-      expect(remainingContent.lockId).toBe('successor-lock-id');
+      const remainingContent = JSON.parse(fs.readFileSync(successorLock.ownerPath, 'utf8'));
+      expect(remainingContent.lockId).toBe(successorLock.lockId);
 
       // Clean up
-      fs.unlinkSync(lockPath);
+      manager.releaseLock(successorLock);
+    });
+
+    it.each(['', '{"pid":', 'null', '{}'])(
+      'should recover an abandoned incomplete lock record %j using its file age',
+      async (content) => {
+        fs.writeFileSync(testConfig.lockPath, content);
+        const abandonedAt = new Date(Date.now() - 600_000);
+        fs.utimesSync(testConfig.lockPath, abandonedAt, abandonedAt);
+
+        const manager = new TokenManager(testConfig);
+        const lock = await manager.acquireLock(1000);
+        expect(JSON.parse(fs.readFileSync(lock.ownerPath, 'utf8'))).toEqual(
+          expect.objectContaining({ pid: process.pid, lockId: lock.lockId })
+        );
+        manager.releaseLock(lock);
+        expect(fs.existsSync(testConfig.lockPath)).toBe(false);
+      }
+    );
+
+    it('should preserve a recent incomplete lock record', async () => {
+      fs.writeFileSync(testConfig.lockPath, '');
+      const manager = new TokenManager(testConfig);
+
+      await expect(manager.acquireLock(200)).rejects.toThrow(/Timeout acquiring lock/);
+      expect(fs.readFileSync(testConfig.lockPath, 'utf8')).toBe('');
+    });
+
+    it('should recover a directory left empty by an interrupted release', async () => {
+      fs.mkdirSync(testConfig.lockPath);
+      const abandonedAt = new Date(Date.now() - 600_000);
+      fs.utimesSync(testConfig.lockPath, abandonedAt, abandonedAt);
+      const manager = new TokenManager(testConfig);
+
+      const lock = await manager.acquireLock(1000);
+      expect(fs.existsSync(lock.ownerPath)).toBe(true);
+      manager.releaseLock(lock);
+      expect(fs.existsSync(testConfig.lockPath)).toBe(false);
+    });
+
+    it('should leave no lock behind when creating its owner record fails', async () => {
+      jest.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => {
+        throw new Error('Synthetic lock write failure');
+      });
+      const manager = new TokenManager(testConfig);
+
+      await expect(manager.acquireLock()).rejects.toThrow('Synthetic lock write failure');
+      expect(fs.readdirSync(testDir)).toEqual([]);
+
+      const lock = await manager.acquireLock();
+      manager.releaseLock(lock);
+    });
+
+    it('should preserve a successor that replaces an abandoned lock during recovery', async () => {
+      fs.writeFileSync(testConfig.lockPath, '{}');
+      const abandonedAt = new Date(Date.now() - 600_000);
+      fs.utimesSync(testConfig.lockPath, abandonedAt, abandonedAt);
+      const realStat = fs.statSync;
+      let lockReads = 0;
+      jest.spyOn(fs, 'statSync').mockImplementation(((filename: fs.PathLike, options?: any) => {
+        if (filename === testConfig.lockPath && ++lockReads === 2) {
+          fs.writeFileSync(testConfig.lockPath, JSON.stringify({
+            pid: process.pid,
+            lockId: 'successor-lock-id',
+            timestamp: Date.now(),
+          }));
+        }
+        return realStat(filename, options);
+      }) as typeof fs.statSync);
+      const manager = new TokenManager(testConfig);
+
+      await expect(manager.acquireLock(300)).rejects.toThrow(/Timeout acquiring lock/);
+      expect(JSON.parse(fs.readFileSync(testConfig.lockPath, 'utf8')).lockId).toBe('successor-lock-id');
+    });
+
+    it('should never remove a successor directory when reclaiming a dead owner', async () => {
+      fs.mkdirSync(testConfig.lockPath);
+      const oldOwnerPath = path.join(testConfig.lockPath, 'owner-dead.json');
+      fs.writeFileSync(oldOwnerPath, JSON.stringify({ pid: 99999999, lockId: 'dead' }));
+      const realUnlink = fs.unlinkSync;
+      let replaced = false;
+      jest.spyOn(fs, 'unlinkSync').mockImplementation((filename) => {
+        if (filename === oldOwnerPath && !replaced) {
+          replaced = true;
+          fs.renameSync(testConfig.lockPath, `${testConfig.lockPath}.abandoned`);
+          fs.mkdirSync(testConfig.lockPath);
+          fs.writeFileSync(path.join(testConfig.lockPath, 'owner-successor.json'), JSON.stringify({
+            pid: process.pid,
+            lockId: 'successor',
+          }));
+        }
+        realUnlink(filename);
+      });
+
+      await expect(new TokenManager(testConfig).acquireLock(300)).rejects.toThrow(/Timeout acquiring lock/);
+      const successor = JSON.parse(fs.readFileSync(path.join(testConfig.lockPath, 'owner-successor.json'), 'utf8'));
+      expect(successor.lockId).toBe('successor');
+    });
+
+    it('should reject an initializer whose directory was replaced before its owner record was written', async () => {
+      const realWrite = fs.writeFileSync;
+      let replaced = false;
+      jest.spyOn(fs, 'writeFileSync').mockImplementation(((filename: fs.PathOrFileDescriptor, data: any, options?: any) => {
+        if (!replaced) {
+          replaced = true;
+          fs.renameSync(testConfig.lockPath, `${testConfig.lockPath}.abandoned`);
+          fs.mkdirSync(testConfig.lockPath);
+          realWrite(path.join(testConfig.lockPath, 'owner-successor.json'), JSON.stringify({
+            pid: process.pid,
+            lockId: 'successor',
+          }));
+        }
+        realWrite(filename, data, options);
+      }) as typeof fs.writeFileSync);
+
+      await expect(new TokenManager(testConfig).acquireLock(300)).rejects.toThrow(/Timeout acquiring lock/);
+      expect(fs.readdirSync(testConfig.lockPath)).toEqual(['owner-successor.json']);
     });
 
     it('should re-read valid token from disk under lock when refreshed by peer process', async () => {
@@ -252,6 +364,100 @@ describe('TokenManager & TokenStore', () => {
       const onDisk = TokenStore.readTokens(testConfig.credentialsPath);
       expect(onDisk?.accessToken).toBe('brand-new-rotated-access-token');
       expect(onDisk?.refreshToken).toBe('brand-new-rotated-refresh-token');
+      expect(onDisk?.refreshPending).toBeUndefined();
+    });
+
+    it('should persist the pending refresh before sending credentials to Auth0', async () => {
+      TokenStore.writeTokens(testConfig.credentialsPath, {
+        accessToken: 'expired-access',
+        refreshToken: 'synthetic-refresh',
+        expiresAt: Date.now() - 1000,
+        scope: 'read:goals',
+        tokenType: 'Bearer',
+        updatedAt: Date.now(),
+      });
+      global.fetch = jest.fn().mockImplementation(async () => {
+        expect(TokenStore.readTokens(testConfig.credentialsPath)?.refreshPending).toBe(true);
+        return {
+          ok: true,
+          json: async () => ({
+            access_token: 'fresh-access',
+            refresh_token: 'rotated-refresh',
+            expires_in: 3600,
+          }),
+        };
+      });
+
+      expect(await new TokenManager(testConfig).getValidAccessToken()).toBe('fresh-access');
+      expect(TokenStore.readTokens(testConfig.credentialsPath)?.refreshPending).toBeUndefined();
+    });
+
+    it.each(['timeout', 'invalid response', 'server error', 'token persistence failure'])(
+      'should prevent replay after an uncertain refresh with %s',
+      async (failure) => {
+        TokenStore.writeTokens(testConfig.credentialsPath, {
+          accessToken: 'expired-access',
+          refreshToken: 'synthetic-refresh',
+          expiresAt: Date.now() - 1000,
+          scope: 'read:goals',
+          tokenType: 'Bearer',
+          updatedAt: Date.now(),
+        });
+        const mockFetch = jest.fn().mockImplementation(async () => {
+          if (failure === 'timeout') {
+            throw new DOMException('Synthetic lost response', 'TimeoutError');
+          }
+          if (failure === 'server error') {
+            return { ok: false, status: 502, json: async () => ({}) };
+          }
+          return {
+            ok: true,
+            json: async () => {
+              if (failure === 'invalid response') {
+                throw new SyntaxError('Synthetic truncated response');
+              }
+              jest.spyOn(TokenStore, 'writeTokens').mockImplementationOnce(() => {
+                throw new Error('Synthetic disk failure');
+              });
+              return {
+                access_token: 'fresh-access',
+                refresh_token: 'rotated-refresh',
+                expires_in: 3600,
+              };
+            },
+          };
+        });
+        global.fetch = mockFetch;
+        const manager = new TokenManager(testConfig);
+
+        await expect(manager.getValidAccessToken()).rejects.toThrow(AuthRequiredError);
+        expect(TokenStore.readTokens(testConfig.credentialsPath)).toBeNull();
+        await expect(new TokenManager(testConfig).getValidAccessToken()).rejects.toThrow(AuthRequiredError);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('should require login after a process crashed with a pending refresh', async () => {
+      TokenStore.writeTokens(testConfig.credentialsPath, {
+        accessToken: 'still-valid-access',
+        refreshToken: 'possibly-consumed-refresh',
+        expiresAt: Date.now() + 3600_000,
+        scope: 'read:goals',
+        tokenType: 'Bearer',
+        updatedAt: Date.now(),
+        refreshPending: true,
+      });
+      fs.writeFileSync(testConfig.lockPath, JSON.stringify({
+        pid: 99999999,
+        timestamp: Date.now(),
+        lockId: 'interrupted-process',
+      }));
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch;
+
+      await expect(new TokenManager(testConfig).getValidAccessToken()).rejects.toThrow(AuthRequiredError);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(TokenStore.readTokens(testConfig.credentialsPath)).toBeNull();
     });
 
     it('should clear disk tokens and throw AuthRequiredError when Auth0 returns invalid_grant', async () => {
