@@ -10,6 +10,7 @@ export interface StoredTokens {
   scope: string;
   tokenType: string;
   updatedAt: number;
+  refreshPending?: boolean;
 }
 
 export class TokenStore {

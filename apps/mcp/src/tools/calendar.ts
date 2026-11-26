@@ -5,7 +5,7 @@ import { formatErrorResult, formatSuccessResult, sanitizeString } from './saniti
 
 export function registerCalendarTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 4: get_calendar_agenda
-  server.tool(
+  (server as any).tool(
     'get_calendar_agenda',
     'Fetch daily scheduled tasks and commitments for a calendar date range',
     {
@@ -14,7 +14,7 @@ export function registerCalendarTools(server: McpServer, apiClient: GoalTrackerA
       includeUnscheduled: z.boolean().optional().default(false).describe('Include unassigned tasks'),
       parentGoalId: z.string().uuid().optional().describe('Filter by specific parent goal ID'),
     },
-    async ({ startDate, endDate, includeUnscheduled, parentGoalId }) => {
+    async ({ startDate, endDate, includeUnscheduled, parentGoalId }: any) => {
       try {
         const query: Record<string, string | boolean | undefined> = {
           startDate,

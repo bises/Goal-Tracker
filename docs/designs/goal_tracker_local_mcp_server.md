@@ -391,12 +391,12 @@ sequenceDiagram
 ```
 
 #### Step-by-Step Mechanism
-1.  **In-Memory Pre-Check**: If the in-memory access token is valid (current time `< expiresAt - 60_000ms`), return immediately.
-2.  **Lock Acquisition**: Acquire `auth-<profile>.lock` using atomic `fs.open(lockPath, 'wx')`. If locked, poll every 100ms with jitter up to 10 seconds.
+1.  **In-Memory Pre-Check**: Check the credential file's existence and modification time before using a cached token. A pending refresh requires reauthentication.
+2.  **Lock Acquisition**: Claim `auth-<profile>.lock` with atomic `fs.mkdirSync`, then write a uniquely named PID and UUID owner record inside it. Verify directory identity and sole ownership before returning the lock. This prevents an initializer resuming after recovery from acting as a second owner. If locked, poll with jitter up to 10 seconds.
 3.  **In-Lock Re-Read**: Read `auth-<profile>.json` directly from disk under the lock. If another process refreshed the token while this process waited, the on-disk access token will be valid. If valid, update in-memory cache, release lock, and return.
-4.  **Auth0 Refresh Exchange**: If still expired, POST to `https://${auth0Domain}/oauth/token` with `grant_type=refresh_token`.
+4.  **Auth0 Refresh Exchange**: If still expired, atomically persist `refreshPending: true` before posting to `https://${auth0Domain}/oauth/token`. Bound the request to 15 seconds. An interrupted or unsuccessful refresh requires login because Auth0 may have consumed the previous token.
 5.  **Atomic Persistence**: Write new tokens to `auth-<profile>.json.tmp.<pid>` and execute `fs.renameSync` over `auth-<profile>.json`.
-6.  **Lock Release**: Delete `auth-<profile>.lock` in a `finally` block.
+6.  **Lock Release**: In a `finally` block, remove only this acquisition's UUID owner record and remove the shared directory only if empty.
 
 ### 4.2 Storage Protections & Atomic Writes
 *   **Directory Permissions**: `~/.goal-tracker/` created with `0700` (`rwx------`).
@@ -405,12 +405,9 @@ sequenceDiagram
 *   **Atomic Replacement**: Writes always target an ephemeral PID-tagged temporary file before atomic rename, preventing zero-byte file reads.
 
 ### 4.3 Stale Lock Recovery
-The lock file contains JSON: `{ "pid": 1234, "timestamp": 1731800000000 }`.
-If lock acquisition fails:
-1.  Read the lock file.
-2.  If `Date.now() - lock.timestamp > 15000` (15-second timeout):
-    *   Check if `pid` is active using `process.kill(pid, 0)`.
-    *   If process is dead or elapsed time exceeds 30 seconds, unlink the stale lock, log a diagnostic warning to `stderr`, and proceed to acquire.
+The lock directory contains a uniquely named JSON owner record with `pid`, `timestamp`, and `lockId`. A crash during initialization can leave an empty directory or incomplete record. Filesystem age permits recovery after five minutes, and acquisition verifies ownership before using the protected credential.
+
+Check owner liveness with `process.kill(pid, 0)`. Preserve locks owned by live processes regardless of age. Recover a confirmed dead owner by removing its unique record and then removing the directory only if empty. For empty, malformed, or ownerless records left by older clients, use modification time and recover after five minutes. Recheck file identity, timestamps, and contents before removal. Legacy file locks remain supported during recovery. Removing a legacy file cannot unlink a successor's directory, and removing an old UUID record cannot delete a successor's different record.
 
 ### 4.4 Logout Synchronization & Process Observation
 *   `goal-tracker-mcp logout --profile <profile>`:
@@ -420,8 +417,8 @@ If lock acquisition fails:
 *   **Running Process Observation**: When an active stdio process attempts a token read and finds `auth-<profile>.json` missing, it purges its in-memory cache and throws `AuthRequiredError`. Subsequent tool calls fail fast without network attempts.
 
 ### 4.5 Refresh Failures, Network Timeouts & Revocation
-*   **Crash/Timeout After Auth0 Rotates Token**: If Auth0 rotates the token but the process crashes before saving to disk, the old refresh token is transmitted on the next attempt. Auth0 triggers *Reuse Detection* and returns HTTP 400 `invalid_grant`.
-*   **Actionable Error**: When Auth0 returns `invalid_grant`, the client unlinks `auth-<profile>.json` and throws `AuthRequiredError`.
+*   **Crash/Timeout After Auth0 Rotates Token**: The persisted pending marker survives process termination. A new process rejects a pending credential before any exchange. A failed refresh clears stored credentials while holding the lock. Successful persistence replaces the pending record with the new token set.
+*   **Actionable Error**: A pending, failed, or revoked refresh clears the local credential and returns `AuthRequiredError` with the CLI login instruction. This deliberately requires another login after an uncertain network result to prevent reuse of a potentially consumed token.
 *   **Access Token Lifetime vs. Refresh Revocation**: Access tokens are stateless JWTs. A revoked refresh token prevents *future* token issuances, but existing unexpired access tokens remain valid until their `exp` timestamp. The MCP client guarantees that once an explicit logout occurs, cached access tokens are purged from disk and memory immediately.
 *   **Redacted Error Output**: When unauthenticated, tool calls return:
     ```json

@@ -23,6 +23,28 @@ export const authConfig = {
 
   // Expected audience (your API identifier)
   audience: process.env.AUTH0_AUDIENCE || DEFAULT_AUTH0_AUDIENCE,
+
+  // Explicitly trusted legacy client IDs permitted to bypass custom scope checks
+  // if their tokens lack colon-delimited custom permissions.
+  legacyClientIds: [
+    process.env.AUTH0_WEB_CLIENT_ID,
+    process.env.VITE_AUTH0_CLIENT_ID,
+    process.env.AUTH0_MOBILE_CLIENT_ID,
+    ...(process.env.AUTH0_LEGACY_CLIENT_IDS || '').split(','),
+  ]
+    .map((id) => id?.trim())
+    .filter((id): id is string => typeof id === 'string' && id.length > 0),
+};
+
+/**
+ * Checks whether a given client ID is an explicitly trusted legacy Web/Mobile client.
+ * Fails closed if clientId is absent or unconfigured.
+ */
+export const isTrustedLegacyClient = (clientId?: string): boolean => {
+  if (!clientId) {
+    return false;
+  }
+  return authConfig.legacyClientIds.includes(clientId);
 };
 
 export const validateAuthConfig = () => {

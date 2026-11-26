@@ -11,6 +11,10 @@ services:
       USE_HTTPS: ${USE_HTTPS:-false}
       SSL_CERT_PATH: ${SSL_CERT_PATH:-/certs/cert.crt}
       SSL_KEY_PATH: ${SSL_KEY_PATH:-/certs/cert.key}
+      # Configure trusted legacy clients in the server's Compose .env before deployment.
+      AUTH0_WEB_CLIENT_ID: ${AUTH0_WEB_CLIENT_ID:-${VITE_AUTH0_CLIENT_ID:-}}
+      AUTH0_MOBILE_CLIENT_ID: ${AUTH0_MOBILE_CLIENT_ID:-}
+      AUTH0_LEGACY_CLIENT_IDS: ${AUTH0_LEGACY_CLIENT_IDS:-}
     volumes:
       - /opt/certs:/certs:ro
     networks:

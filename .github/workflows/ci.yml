@@ -18,6 +18,7 @@ jobs:
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
       shared: ${{ steps.filter.outputs.shared }}
+      mcp: ${{ steps.filter.outputs.mcp }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -34,6 +35,10 @@ jobs:
               - 'pnpm-lock.yaml'
             shared:
               - 'packages/shared/**'
+            mcp:
+              - 'apps/mcp/**'
+              - 'packages/shared/**'
+              - 'pnpm-lock.yaml'
 
   # ---------------------------------------------------
   # Shared package — build + validate
@@ -147,3 +152,35 @@ jobs:
 
       - name: Build Web
         run: pnpm --filter web build
+
+  # ---------------------------------------------------
+  # MCP — lint, typecheck, test, build
+  # ---------------------------------------------------
+  mcp:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @goal-tracker/shared build
+
+      - name: TypeScript check
+        run: cd apps/mcp && npx tsc --noEmit
+
+      - name: Run MCP tests
+        run: pnpm --filter @goal-tracker/mcp test
+
+      - name: Build MCP package
+        run: pnpm --filter @goal-tracker/mcp build

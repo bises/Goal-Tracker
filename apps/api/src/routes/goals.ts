@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { GoalScope, Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
@@ -137,7 +137,33 @@ router.get('/', requireScope(['read:goals']), async (req, res) => {
     const user = await ensureUser(req);
 
     // Parse query parameters
-    const includeCompleted = req.query.completed === 'true';
+    const statusQuery = req.query.status as string | undefined;
+    const scopeQuery = req.query.scope as string | undefined;
+    const completedQuery = req.query.completed;
+    const includeCompletedQuery = req.query.includeCompleted === 'true';
+
+    let isMarkedCompleteFilter: boolean | undefined = false; // default active only
+
+    if (statusQuery === 'completed') {
+      isMarkedCompleteFilter = true;
+    } else if (statusQuery === 'active') {
+      isMarkedCompleteFilter = false;
+    } else if (statusQuery === 'all') {
+      isMarkedCompleteFilter = undefined;
+    } else if (includeCompletedQuery) {
+      isMarkedCompleteFilter = undefined;
+    } else if (completedQuery === 'true') {
+      isMarkedCompleteFilter = true;
+    } else if (completedQuery === 'false') {
+      isMarkedCompleteFilter = false;
+    }
+
+    const validScopes = Object.values(GoalScope);
+    const scopeFilter =
+      scopeQuery && validScopes.includes(scopeQuery.toUpperCase() as GoalScope)
+        ? (scopeQuery.toUpperCase() as GoalScope)
+        : undefined;
+
     const startDate = req.query.startDate
       ? new Date(req.query.startDate as string)
       : new Date(new Date().getFullYear(), 0, 1);
@@ -150,7 +176,8 @@ router.get('/', requireScope(['read:goals']), async (req, res) => {
       relationLoadStrategy: 'join',
       where: {
         userId: user.id,
-        isMarkedComplete: includeCompleted ? undefined : false,
+        isMarkedComplete: isMarkedCompleteFilter,
+        ...(scopeFilter ? { scope: scopeFilter } : {}),
         createdAt: {
           gte: startDate,
           lte: endDate,

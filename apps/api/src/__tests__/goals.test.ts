@@ -124,9 +124,60 @@ describe('GET /api/goals', () => {
 
     const response = await request(app).get('/api/goals?completed=true').expect(200);
 
-    // Check that findMany was called (completed filter affects the where clause)
-    expect(prisma.goal.findMany).toHaveBeenCalled();
+    expect(prisma.goal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isMarkedComplete: true }),
+      })
+    );
     expect(response.body).toHaveLength(1);
+  });
+
+  it('should filter goals by status=completed', async () => {
+    (prisma.goal.findMany as jest.Mock).mockResolvedValue([mockGoal]);
+
+    await request(app).get('/api/goals?status=completed').expect(200);
+
+    expect(prisma.goal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isMarkedComplete: true }),
+      })
+    );
+  });
+
+  it('should filter goals by status=active', async () => {
+    (prisma.goal.findMany as jest.Mock).mockResolvedValue([mockGoal]);
+
+    await request(app).get('/api/goals?status=active').expect(200);
+
+    expect(prisma.goal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isMarkedComplete: false }),
+      })
+    );
+  });
+
+  it('should return all goals when status=all', async () => {
+    (prisma.goal.findMany as jest.Mock).mockResolvedValue([mockGoal]);
+
+    await request(app).get('/api/goals?status=all').expect(200);
+
+    expect(prisma.goal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isMarkedComplete: undefined }),
+      })
+    );
+  });
+
+  it('should filter goals by scope', async () => {
+    (prisma.goal.findMany as jest.Mock).mockResolvedValue([mockGoal]);
+
+    await request(app).get('/api/goals?scope=WEEKLY').expect(200);
+
+    expect(prisma.goal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ scope: 'WEEKLY' }),
+      })
+    );
   });
 });
 

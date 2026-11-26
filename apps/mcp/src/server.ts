@@ -21,7 +21,7 @@ function protectStdout(): void {
 }
 
 export function createMcpServer(config: ProfileConfig): {
-  server: McpServer;
+  server: any;
   tokenManager: TokenManager;
   apiClient: GoalTrackerApiClient;
 } {

@@ -5,7 +5,7 @@ import { formatErrorResult, formatSuccessResult, sanitizeString } from './saniti
 
 export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 1: list_goals
-  server.tool(
+  (server as any).tool(
     'list_goals',
     'List active goals with hierarchical structure, scope, and progress metrics',
     {
@@ -14,10 +14,10 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('Start date range'),
       endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('End date range'),
     },
-    async ({ scope, status, startDate, endDate }) => {
+    async ({ scope, status, startDate, endDate }: any) => {
       try {
         const query: Record<string, string | undefined> = {};
-        if (status === 'completed') query.completed = 'true';
+        if (status) query.status = status;
         if (scope) query.scope = scope;
         if (startDate) query.startDate = startDate;
         if (endDate) query.endDate = endDate;
@@ -27,6 +27,8 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
 
         if (status === 'active') {
           goals = goals.filter((g: any) => !g.isMarkedComplete);
+        } else if (status === 'completed') {
+          goals = goals.filter((g: any) => Boolean(g.isMarkedComplete));
         }
 
         if (goals.length === 0) {
@@ -60,13 +62,13 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
   );
 
   // Tool 2: get_goal
-  server.tool(
+  (server as any).tool(
     'get_goal',
     'Get detailed goal information including child goals, linked tasks, and progress details',
     {
       goalId: z.string().uuid('Invalid goal ID format').describe('Goal UUID'),
     },
-    async ({ goalId }) => {
+    async ({ goalId }: any) => {
       try {
         const goal = await apiClient.get<any>(`/api/goals/${goalId}`);
 
