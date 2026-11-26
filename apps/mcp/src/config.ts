@@ -26,6 +26,7 @@ export interface ProfileConfig {
 }
 
 export const V1_READ_SCOPES = 'openid profile email offline_access read:goals read:tasks read:calendar';
+export const V2_SCOPES = 'openid profile email offline_access read:goals read:tasks read:calendar write:goals write:tasks';
 
 export function getProfileConfig(profileArg?: string): ProfileConfig {
   const profileName = (
@@ -52,7 +53,7 @@ export function getProfileConfig(profileArg?: string): ProfileConfig {
       auth0Domain: process.env.AUTH0_DOMAIN || 'bises.auth0.com',
       auth0ClientId: process.env.AUTH0_DEV_CLIENT_ID || 'DEDICATED_DEV_CLIENT_ID',
       auth0Audience: process.env.AUTH0_DEV_AUDIENCE || 'https://goal-tracker-api-dev',
-      auth0Scopes: V1_READ_SCOPES,
+      auth0Scopes: process.env.AUTH0_SCOPES || V2_SCOPES,
       baseDir,
       credentialsPath,
       lockPath,
@@ -75,7 +76,7 @@ export function getProfileConfig(profileArg?: string): ProfileConfig {
     auth0Domain: process.env.AUTH0_DOMAIN || 'bises.auth0.com',
     auth0ClientId: process.env.AUTH0_CLIENT_ID || 'DEDICATED_PROD_CLIENT_ID',
     auth0Audience: process.env.AUTH0_AUDIENCE || 'https://goal-tracker-api',
-    auth0Scopes: V1_READ_SCOPES,
+    auth0Scopes: process.env.AUTH0_SCOPES || V2_SCOPES,
     baseDir,
     credentialsPath,
     lockPath,

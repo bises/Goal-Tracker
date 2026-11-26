@@ -83,4 +83,49 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
     expect(text).toContain('Completed Goal');
     expect(text).toContain('2 found');
   });
+
+  it('create_goal should call POST /api/goals', async () => {
+    const createGoal = tools.get('create_goal');
+    expect(createGoal).toBeDefined();
+
+    mockApiClient.post.mockResolvedValueOnce({
+      id: 'g-new',
+      title: 'New App Project',
+      scope: 'YEARLY',
+      targetValue: 3,
+    });
+
+    const res = await createGoal.handler({
+      title: 'New App Project',
+      scope: 'YEARLY',
+      targetValue: 3,
+    });
+
+    expect(mockApiClient.post).toHaveBeenCalledWith('/api/goals', {
+      title: 'New App Project',
+      scope: 'YEARLY',
+      type: 'TOTAL_TARGET',
+      targetValue: 3,
+    });
+    expect(res.content[0].text).toContain('New App Project');
+  });
+
+  it('complete_goal should call POST /api/goals/:id/complete', async () => {
+    const completeGoal = tools.get('complete_goal');
+    expect(completeGoal).toBeDefined();
+
+    mockApiClient.post.mockResolvedValueOnce({
+      success: true,
+      updatedGoal: { id: 'g1', title: 'Audio Books' },
+    });
+
+    const res = await completeGoal.handler({
+      goalId: 'g1',
+      isCompleted: true,
+    });
+
+    expect(mockApiClient.post).toHaveBeenCalledWith('/api/goals/g1/complete', {});
+    expect(res.content[0].text).toContain('Audio Books');
+    expect(res.content[0].text).toContain('marked completed');
+  });
 });

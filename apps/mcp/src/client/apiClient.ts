@@ -31,6 +31,10 @@ export class GoalTrackerApiClient {
     return this.request<T>(endpoint, { method: 'PUT', body });
   }
 
+  public async delete<T>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE', body });
+  }
+
   public async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const accessToken = await this.tokenManager.getValidAccessToken();
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
