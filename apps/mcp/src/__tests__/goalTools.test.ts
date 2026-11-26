@@ -7,6 +7,7 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
   let tools: Map<string, any>;
 
   beforeEach(() => {
+    process.env.GOAL_TRACKER_ALLOW_WRITES = 'true';
     tools = new Map();
     const fakeServer = {
       tool: jest.fn((name, description, schema, handler) => {
@@ -127,5 +128,19 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
     expect(mockApiClient.post).toHaveBeenCalledWith('/api/goals/g1/complete', {});
     expect(res.content[0].text).toContain('Audio Books');
     expect(res.content[0].text).toContain('marked completed');
+  });
+
+  it('create_goal should reject write when GOAL_TRACKER_ALLOW_WRITES is false or unset', async () => {
+    delete process.env.GOAL_TRACKER_ALLOW_WRITES;
+    const createGoal = tools.get('create_goal');
+    expect(createGoal).toBeDefined();
+
+    const res = await createGoal.handler({
+      title: 'Blocked Goal',
+    });
+
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('Write operations disabled in headless mode');
+    expect(mockApiClient.post).not.toHaveBeenCalled();
   });
 });

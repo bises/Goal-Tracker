@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { GoalTrackerApiClient } from '../client/apiClient';
-import { formatErrorResult, formatSuccessResult, sanitizeString } from './sanitize';
+import { formatErrorResult, formatSuccessResult, sanitizeString, checkWritesAllowed } from './sanitize';
 
 export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 3: list_tasks
@@ -27,17 +27,44 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
           if (!goal) {
             return formatSuccessResult(`Goal '${goalId}' not found.`);
           }
-          const rawTasks = (goal.goalTasks || []).map((gt: any) => ({
+          let allTasks = (goal.goalTasks || []).map((gt: any) => ({
             ...gt.task,
             goalTasks: [{ goal: { id: goal.id, title: goal.title } }],
           }));
 
-          tasks = rawTasks;
           if (status === 'completed') {
-            tasks = tasks.filter((t: any) => t.isCompleted);
+            allTasks = allTasks.filter((t: any) => t.isCompleted);
           } else if (status === 'pending') {
-            tasks = tasks.filter((t: any) => !t.isCompleted);
+            allTasks = allTasks.filter((t: any) => !t.isCompleted);
           }
+
+          if (date) {
+            allTasks = allTasks.filter(
+              (t: any) => t.scheduledDate && t.scheduledDate.substring(0, 10) === date
+            );
+          }
+
+          if (month) {
+            allTasks = allTasks.filter(
+              (t: any) => t.scheduledDate && t.scheduledDate.substring(0, 7) === month
+            );
+          }
+
+          if (unscheduled !== undefined) {
+            allTasks = allTasks.filter((t: any) =>
+              unscheduled ? !t.scheduledDate : Boolean(t.scheduledDate)
+            );
+          }
+
+          const total = allTasks.length;
+          const startIndex = (page - 1) * limit;
+          tasks = allTasks.slice(startIndex, startIndex + limit);
+          pagination = {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit) || 1,
+          };
         } else {
           const query: Record<string, string | number | boolean | undefined> = {
             page,
@@ -155,12 +182,15 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
       description: z.string().max(4000).optional().describe('Task description or notes'),
       scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('Scheduled date (YYYY-MM-DD)'),
       scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:mm').optional().describe('Scheduled time (HH:mm)'),
-      priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().default('MEDIUM').describe('Task priority'),
-      category: z.string().max(50).optional().describe('Task category'),
+      priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional().default('MEDIUM').describe('Task priority'),
+      category: z.enum(['WORK', 'PERSONAL', 'HEALTH', 'LEARNING', 'FINANCE', 'SOCIAL', 'HOUSEHOLD', 'OTHER']).optional().describe('Task category'),
       parentTaskId: z.string().uuid('Invalid parent task ID format').optional().describe('Parent task UUID for subtasks'),
       goalIds: z.array(z.string().uuid('Invalid goal ID format')).optional().describe('Array of Goal UUIDs to link to'),
     },
     async (args: any) => {
+      const writeGuard = checkWritesAllowed(apiClient.getProfile());
+      if (writeGuard) return writeGuard;
+
       try {
         const body: Record<string, any> = {
           title: sanitizeString(args.title),
@@ -193,11 +223,14 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
       description: z.string().max(4000).optional().describe('New task description'),
       scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').nullable().optional().describe('New scheduled date (YYYY-MM-DD or null to unschedule)'),
       scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:mm').nullable().optional().describe('New scheduled time (HH:mm)'),
-      priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().describe('New priority'),
-      category: z.string().max(50).nullable().optional().describe('New category'),
+      priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional().describe('New priority'),
+      category: z.enum(['WORK', 'PERSONAL', 'HEALTH', 'LEARNING', 'FINANCE', 'SOCIAL', 'HOUSEHOLD', 'OTHER']).nullable().optional().describe('New category'),
       isCompleted: z.boolean().optional().describe('New completion status'),
     },
     async ({ taskId, ...fields }: any) => {
+      const writeGuard = checkWritesAllowed(apiClient.getProfile());
+      if (writeGuard) return writeGuard;
+
       try {
         const body: Record<string, any> = {};
         if (fields.title !== undefined) body.title = sanitizeString(fields.title);
@@ -225,12 +258,13 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
     {
       taskId: z.string().uuid('Invalid task ID format').describe('Task UUID'),
       isCompleted: z.boolean().describe('True to complete task, false to reopen'),
-      completedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Must be YYYY-MM-DD or ISO timestamp').optional().describe('Optional historical completion date (YYYY-MM-DD)'),
     },
-    async ({ taskId, isCompleted, completedAt }: any) => {
+    async ({ taskId, isCompleted }: any) => {
+      const writeGuard = checkWritesAllowed(apiClient.getProfile());
+      if (writeGuard) return writeGuard;
+
       try {
         const body: Record<string, any> = { isCompleted };
-        if (completedAt) body.completedAt = completedAt;
 
         let updated: any;
         try {
@@ -260,9 +294,11 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
       taskIds: z.array(z.string().uuid('Invalid task ID format')).optional().describe('Array of Task UUIDs to update'),
       goalId: z.string().uuid('Invalid goal ID format').optional().describe('Goal UUID whose tasks should be updated'),
       isCompleted: z.boolean().describe('True to mark complete, false to reopen'),
-      completedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Must be YYYY-MM-DD or ISO timestamp').optional().describe('Optional historical completion date (YYYY-MM-DD)'),
     },
-    async ({ taskIds, goalId, isCompleted, completedAt }: any) => {
+    async ({ taskIds, goalId, isCompleted }: any) => {
+      const writeGuard = checkWritesAllowed(apiClient.getProfile());
+      if (writeGuard) return writeGuard;
+
       try {
         if ((!taskIds || taskIds.length === 0) && !goalId) {
           throw new Error('Must provide either taskIds array or goalId.');
@@ -274,7 +310,6 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
             taskIds,
             goalId,
             isCompleted,
-            completedAt,
           });
           if (res && res.updatedCount !== undefined) {
             return formatSuccessResult(
@@ -306,25 +341,41 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
           );
         }
 
-        let updatedCount = 0;
-        const body: Record<string, any> = { isCompleted };
-        if (completedAt) body.completedAt = completedAt;
+        const succeededIds: string[] = [];
+        const failedTasks: { id: string; error: string }[] = [];
 
         for (const tid of targetIds) {
           try {
-            await apiClient.post<any>(`/api/tasks/${tid}/set-completion`, body);
-          } catch (postErr: any) {
-            if (postErr?.status === 404 || postErr?.statusCode === 404) {
-              await apiClient.put<any>(`/api/tasks/${tid}`, { isCompleted });
-            } else {
-              throw postErr;
+            try {
+              await apiClient.post<any>(`/api/tasks/${tid}/set-completion`, { isCompleted });
+            } catch (postErr: any) {
+              if (postErr?.status === 404 || postErr?.statusCode === 404) {
+                await apiClient.put<any>(`/api/tasks/${tid}`, { isCompleted });
+              } else {
+                throw postErr;
+              }
             }
+            succeededIds.push(tid);
+          } catch (itemErr: any) {
+            failedTasks.push({
+              id: tid,
+              error: itemErr?.message || itemErr?.error || String(itemErr),
+            });
           }
-          updatedCount++;
+        }
+
+        if (failedTasks.length > 0) {
+          const summary = [
+            `Partial batch completion failure: ${succeededIds.length} succeeded, ${failedTasks.length} failed.`,
+            `Succeeded task IDs: ${succeededIds.length > 0 ? succeededIds.map((id) => `\`${id}\``).join(', ') : 'None'}`,
+            'Failed tasks:',
+            ...failedTasks.map((f) => `- \`${f.id}\`: ${f.error}`),
+          ].join('\n');
+          return formatErrorResult(new Error(summary), apiClient.getProfile());
         }
 
         return formatSuccessResult(
-          `Successfully ${isCompleted ? 'completed' : 'reopened'} ${updatedCount} task(s)${goalTitle}.`
+          `Successfully ${isCompleted ? 'completed' : 'reopened'} ${succeededIds.length} task(s)${goalTitle}.`
         );
       } catch (err: any) {
         return formatErrorResult(err, apiClient.getProfile());
@@ -341,6 +392,9 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
       confirm: z.boolean().describe('Must be explicitly true to confirm permanent deletion'),
     },
     async ({ taskId, confirm }: any) => {
+      const writeGuard = checkWritesAllowed(apiClient.getProfile());
+      if (writeGuard) return writeGuard;
+
       try {
         if (!confirm) {
           return formatErrorResult(

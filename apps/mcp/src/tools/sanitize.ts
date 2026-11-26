@@ -44,6 +44,20 @@ export function sanitizeData<T>(data: T): T {
 }
 
 /**
+ * Ensures write operations are explicitly opted into via GOAL_TRACKER_ALLOW_WRITES=true.
+ * Protects headless agents from performing unintended database mutations.
+ */
+export function checkWritesAllowed(profile: string): { isError: true; content: [{ type: 'text'; text: string }] } | null {
+  if (process.env.GOAL_TRACKER_ALLOW_WRITES !== 'true') {
+    return formatErrorResult(
+      new Error('Write operations disabled in headless mode. Set GOAL_TRACKER_ALLOW_WRITES=true to enable.'),
+      profile
+    );
+  }
+  return null;
+}
+
+/**
  * Format tool error responses according to the MCP specification.
  */
 export function formatErrorResult(err: any, profile: string) {
