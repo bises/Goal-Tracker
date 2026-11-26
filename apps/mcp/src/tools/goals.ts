@@ -117,4 +117,100 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
       }
     }
   );
+
+  // Tool 3: create_goal
+  (server as any).tool(
+    'create_goal',
+    'Create a new goal with scope, target value, and optional parent goal hierarchy',
+    {
+      title: z.string().min(1, 'Title cannot be empty').max(255).describe('Goal title'),
+      description: z.string().max(4000).optional().describe('Goal description or acceptance criteria'),
+      scope: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'STANDALONE']).optional().default('STANDALONE').describe('Goal scope'),
+      type: z.enum(['BOOLEAN', 'TOTAL_TARGET', 'FREQUENCY', 'COMPLETION_TARGET', 'HABIT']).optional().default('TOTAL_TARGET').describe('Goal measurement type'),
+      targetValue: z.number().positive().optional().describe('Target numeric value (default 1)'),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('Start date (YYYY-MM-DD)'),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('Target completion date (YYYY-MM-DD)'),
+      parentId: z.string().uuid('Invalid parent goal ID format').optional().describe('Parent goal UUID for hierarchy'),
+    },
+    async (args: any) => {
+      try {
+        const body: Record<string, any> = {
+          title: sanitizeString(args.title),
+          scope: args.scope || 'STANDALONE',
+          type: args.type || 'TOTAL_TARGET',
+        };
+        if (args.description !== undefined) body.description = sanitizeString(args.description);
+        if (args.targetValue !== undefined) body.targetValue = args.targetValue;
+        if (args.startDate !== undefined) body.startDate = args.startDate;
+        if (args.endDate !== undefined) body.endDate = args.endDate;
+        if (args.parentId !== undefined) body.parentId = args.parentId;
+
+        const created = await apiClient.post<any>('/api/goals', body);
+        return formatSuccessResult(
+          `Successfully created goal "${sanitizeString(created.title)}" (\`${created.id}\`). Scope: ${created.scope}, Target: ${created.targetValue ?? 1}.`
+        );
+      } catch (err: any) {
+        return formatErrorResult(err, apiClient.getProfile());
+      }
+    }
+  );
+
+  // Tool 4: update_goal
+  (server as any).tool(
+    'update_goal',
+    'Update goal metadata, title, description, target value, dates, or parent goal',
+    {
+      goalId: z.string().uuid('Invalid goal ID format').describe('Goal UUID to update'),
+      title: z.string().min(1).max(255).optional().describe('New goal title'),
+      description: z.string().max(4000).optional().describe('New goal description'),
+      targetValue: z.number().positive().optional().describe('New target numeric value'),
+      scope: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'STANDALONE']).optional().describe('New goal scope'),
+      parentId: z.string().uuid('Invalid parent goal ID format').nullable().optional().describe('New parent goal UUID (or null to unparent)'),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('New target completion date (YYYY-MM-DD)'),
+    },
+    async ({ goalId, ...fields }: any) => {
+      try {
+        const body: Record<string, any> = {};
+        if (fields.title !== undefined) body.title = sanitizeString(fields.title);
+        if (fields.description !== undefined) body.description = sanitizeString(fields.description);
+        if (fields.targetValue !== undefined) body.targetValue = fields.targetValue;
+        if (fields.scope !== undefined) body.scope = fields.scope;
+        if (fields.parentId !== undefined) body.parentId = fields.parentId;
+        if (fields.endDate !== undefined) body.endDate = fields.endDate;
+
+        const updated = await apiClient.put<any>(`/api/goals/${goalId}`, body);
+        return formatSuccessResult(
+          `Successfully updated goal "${sanitizeString(updated.title)}" (\`${updated.id}\`). Scope: ${updated.scope}, Progress: ${updated.currentValue ?? 0}/${updated.targetValue ?? 0}.`
+        );
+      } catch (err: any) {
+        return formatErrorResult(err, apiClient.getProfile());
+      }
+    }
+  );
+
+  // Tool 5: complete_goal
+  (server as any).tool(
+    'complete_goal',
+    'Mark a goal as completed or re-open it, updating parent goal progress atomically',
+    {
+      goalId: z.string().uuid('Invalid goal ID format').describe('Goal UUID'),
+      isCompleted: z.boolean().optional().default(true).describe('True to mark complete, false to re-open (default true)'),
+      completedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Must be YYYY-MM-DD or ISO timestamp').optional().describe('Optional historical completion date (YYYY-MM-DD)'),
+    },
+    async ({ goalId, isCompleted = true, completedAt }: any) => {
+      try {
+        const endpoint = isCompleted ? `/api/goals/${goalId}/complete` : `/api/goals/${goalId}/uncomplete`;
+        const body: Record<string, any> = {};
+        if (completedAt) body.completedAt = completedAt;
+
+        const result = await apiClient.post<any>(endpoint, body);
+        const goalTitle = result?.updatedGoal?.title ? `"${sanitizeString(result.updatedGoal.title)}"` : `\`${goalId}\``;
+        return formatSuccessResult(
+          `Goal ${goalTitle} successfully ${isCompleted ? 'marked completed' : 're-opened'}.`
+        );
+      } catch (err: any) {
+        return formatErrorResult(err, apiClient.getProfile());
+      }
+    }
+  );
 }
