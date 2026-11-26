@@ -38,21 +38,15 @@ export function registerTaskTools(server: McpServer, apiClient: GoalTrackerApiCl
             allTasks = allTasks.filter((t: any) => !t.isCompleted);
           }
 
-          if (date) {
+          if (unscheduled === true) {
+            allTasks = allTasks.filter((t: any) => !t.scheduledDate);
+          } else if (date) {
             allTasks = allTasks.filter(
               (t: any) => t.scheduledDate && t.scheduledDate.substring(0, 10) === date
             );
-          }
-
-          if (month) {
+          } else if (month) {
             allTasks = allTasks.filter(
               (t: any) => t.scheduledDate && t.scheduledDate.substring(0, 7) === month
-            );
-          }
-
-          if (unscheduled !== undefined) {
-            allTasks = allTasks.filter((t: any) =>
-              unscheduled ? !t.scheduledDate : Boolean(t.scheduledDate)
             );
           }
 

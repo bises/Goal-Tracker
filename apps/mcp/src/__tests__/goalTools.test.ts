@@ -1,10 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerGoalTools } from '../tools/goals';
 import { GoalTrackerApiClient } from '../client/apiClient';
+import { z } from 'zod';
 
 describe('Goal Tools (list_goals status & scope filtering)', () => {
   let mockApiClient: jest.Mocked<GoalTrackerApiClient>;
   let tools: Map<string, any>;
+  const originalWriteSetting = process.env.GOAL_TRACKER_ALLOW_WRITES;
+
+  afterEach(() => {
+    if (originalWriteSetting === undefined) delete process.env.GOAL_TRACKER_ALLOW_WRITES;
+    else process.env.GOAL_TRACKER_ALLOW_WRITES = originalWriteSetting;
+  });
 
   beforeEach(() => {
     process.env.GOAL_TRACKER_ALLOW_WRITES = 'true';
@@ -142,5 +149,28 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toContain('Write operations disabled in headless mode');
     expect(mockApiClient.post).not.toHaveBeenCalled();
+  });
+
+  it.each(['create_goal', 'update_goal', 'complete_goal'])(
+    '%s blocks disabled writes before dispatch', async (name) => {
+      for (const setting of [undefined, 'false', 'TRUE']) {
+        if (setting === undefined) delete process.env.GOAL_TRACKER_ALLOW_WRITES;
+        else process.env.GOAL_TRACKER_ALLOW_WRITES = setting;
+        const result = await tools.get(name).handler({ goalId: 'b75cc3f2-53b1-4e1f-96a1-b5396c5be944', title: 'Synthetic' });
+        expect(result.isError).toBe(true);
+        expect(mockApiClient.post).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('goal schemas accept supported domain values and reject unsupported scopes and types', () => {
+    const createSchema = z.object(tools.get('create_goal').schema);
+    expect(createSchema.safeParse({ title: 'Synthetic', scope: 'WEEKLY', type: 'TOTAL_TARGET' }).success).toBe(true);
+    expect(createSchema.safeParse({ title: 'Synthetic', scope: 'DAILY' }).success).toBe(false);
+    for (const type of ['BOOLEAN', 'COMPLETION_TARGET', 'HABIT']) {
+      expect(createSchema.safeParse({ title: 'Synthetic', type }).success).toBe(false);
+    }
+    const updateSchema = z.object(tools.get('update_goal').schema);
+    expect(updateSchema.safeParse({ goalId: 'b75cc3f2-53b1-4e1f-96a1-b5396c5be944', scope: 'DAILY' }).success).toBe(false);
   });
 });
