@@ -13,7 +13,7 @@ Goal Tracker Local MCP Server is a Node.js daemon package (`apps/mcp`) inside th
 
 The architecture is built on five core operational pillars:
 1. **API-First Ownership & Cascade Integrity**: Hardens existing Express endpoints before MCP rollout, eliminating a cross-user deletion vulnerability in `DELETE /api/goals/:id`, validating ownership and cycle freedom on all hierarchy updates, and aligning with Prisma's hard-delete cascade model.
-2. **Phased Action Scoping (Read-Only v1)**: Restricts initial deployment strictly to read-only tools enforced by Auth0 API scopes (`read:goals`, `read:tasks`, `read:calendar`). Mutation tools are staged for v2 with human-in-the-loop approval gates. Goal and task deletion is permanently excluded from autonomous agent capabilities.
+2. **Phased Action Scoping (Read-Only v1)**: Restricts initial deployment to read-only tools enforced by Auth0 API scopes (`read:goals`, `read:tasks`, `read:calendar`). The v2 tools require explicit `GOAL_TRACKER_ALLOW_WRITES=true` opt-in and matching API write scopes. Agent-host permissions govern human review of tool calls.
 3. **Environment-Bound Credential Profiles**: Establishes isolated profiles (`development` vs. `production`) with dedicated API origins, distinct Auth0 audiences to prevent cross-environment token replay, certificate-validated HTTPS over Tailscale, and automated rejection of HTTP redirects.
 4. **Coordinated Credential Synchronization**: Implements cross-process file locking (`auth-<profile>.lock`) with in-lock freshness checks, atomic replacement, and automated recovery from stale locks, crashes, and simultaneous token rotations. Headless agent processes never spawn browser sessions.
 5. **Exact REST Contract Alignment**: Bridges MCP tools directly to actual Express routes (`PUT /api/goals/:id`, `PUT /api/tasks/:id`, `GET /api/calendar/tasks`, array `goalIds`), introducing an idempotent completion endpoint (`POST /api/tasks/:id/set-completion`) to make network retries safe.
@@ -44,7 +44,7 @@ Goal Tracker currently provides a React web client (`apps/web`), an Express REST
 
 ## Non-Goals
 
-*   **Agent Deletion Tools (Permanent Non-Goal)**: Neither v1 nor v2 will expose `delete_goal` or `delete_task` to AI agents. Deletions must be performed directly by the human user through the web or mobile UI.
+*   **Goal Deletion**: The MCP server does not expose `delete_goal`. The v2 `delete_task` tool requires write opt-in and `confirm: true`, and uses the API's owner-scoped hard deletion with subtask cascades.
 *   **Agent Mutations in v1**: Write tools (`create_task`, `update_task`, `set_task_completion`, `create_goal`, `update_goal`) are deferred to Rollout Stage 3.
 *   **Direct Database Mutations via Prisma**: The MCP package will not bundle Prisma client or connect directly to PostgreSQL.
 *   **Mobile App Proxying**: Mobile clients continue connecting directly to the Express REST API.
@@ -277,11 +277,13 @@ flowchart LR
 *   Auth0 Native Client configuration grants strictly `read:goals read:tasks read:calendar`.
 *   Mutating tools do not exist in the codebase in this phase.
 
-#### Stage 3: MCP Server v2 (Controlled Writes with Approval Gates)
-*   Introduce mutation tools: `create_task`, `update_task`, `set_task_completion`, `create_goal`, `update_goal`, `link_task_to_goal`, `unlink_task_from_goal`.
-*   Deletion tools remain permanently excluded.
-*   **Host Approval Enforcement**: Mutating tools declare MCP annotations requesting user approval. In agent environments that support tool approval (Claude Code, Antigravity), users are prompted before changes are committed.
-*   **Headless Safety Invariant**: In unmonitored headless agent runners (e.g. CI runners or automated scripts), the MCP server enforces an environment variable `GOAL_TRACKER_ALLOW_WRITES=true`. If unset or false, write calls return a structured error: `"Write operations disabled in headless mode. Set GOAL_TRACKER_ALLOW_WRITES=true to enable."`
+#### Stage 3: MCP Server v2 (Controlled Writes)
+*   Mutation tools are `create_goal`, `update_goal`, `complete_goal`, `create_task`, `update_task`, `set_task_completion`, `batch_set_task_completion`, and `delete_task`.
+*   **Write Opt-In**: Every mutation checks `GOAL_TRACKER_ALLOW_WRITES=true` before making an API request. Unset, false, or other values produce a structured error. Read tools remain available. The example environment configuration defaults writes to false.
+*   **Host Permissions**: Configure the agent host's tool approval rules for the desired human review. The `confirm` deletion parameter is supplied by the model. Interactive approval depends on the host's policy.
+*   **API Contract**: Goal scopes/types and task priorities/categories use the API's supported enum values. Goal creation supports `endDate`. Goal `startDate` and historical `completedAt` inputs are excluded from mutation schemas because the API does not persist them.
+*   **Goal Task Queries**: Filtering by `goalId` preserves pagination and the task API's date-filter precedence. `unscheduled=true` takes precedence over date, which takes precedence over month. `unscheduled=false` adds no restriction.
+*   **Batch Outcomes**: The existing API lacks an atomic batch completion route. The fallback performs individual idempotent completion calls and returns succeeded and failed IDs if any item fails. Earlier successes remain committed. A legacy PUT fallback supports API images without the set-completion route.
 
 ### 2.3 Prompt Injection Defense & Data Sanitization
 1.  **Untrusted Data Boundary**: Goal titles, task descriptions, notes, and customData labels are treated as untrusted user content.
