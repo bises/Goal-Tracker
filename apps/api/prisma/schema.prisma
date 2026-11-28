@@ -26,6 +26,7 @@ model Goal {
   title            String
   description      String?
   type             GoalType       @default(TOTAL_TARGET)
+  progressMode     GoalProgressMode @default(AUTOMATIC)
   targetValue      Float?
   currentValue     Float          @default(0)
   stepSize         Float          @default(1)
@@ -47,6 +48,7 @@ model Goal {
   progress         Progress[]
 
   @@index([userId])
+  @@index([parentId, isMarkedComplete])
 }
 
 model Task {
@@ -96,6 +98,11 @@ model Progress {
   note       String?
   customData String?
   goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+}
+
+enum GoalProgressMode {
+  AUTOMATIC
+  COMPLETED_SUBGOALS
 }
 
 enum GoalType {

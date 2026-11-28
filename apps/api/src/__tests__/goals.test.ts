@@ -29,6 +29,7 @@ jest.mock('../prisma', () => {
   const mockGoalFunctions = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -56,6 +57,7 @@ jest.mock('../prisma', () => {
     prisma: {
       $transaction: jest.fn((callback) =>
         callback({
+          $queryRaw: jest.fn(),
           goal: mockGoalFunctions,
           task: mockTaskFunctions,
           goalTask: mockGoalTaskFunctions,
@@ -270,5 +272,102 @@ describe('DELETE /api/goals/:id', () => {
 
     await request(app).delete('/api/goals/999').expect(404);
     expect(prisma.goal.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('fixed completed-subgoal targets', () => {
+  const fixedGoal = {
+    ...mockGoal,
+    progressMode: 'COMPLETED_SUBGOALS',
+    targetValue: 12,
+    currentValue: 8,
+    isMarkedComplete: false,
+  };
+
+  it.each([undefined, 0, -1, 1.5, '12', null])('rejects an invalid target of %p', async (targetValue) => {
+    await request(app)
+      .post('/api/goals')
+      .send({ title: 'Read 12 books', progressMode: 'COMPLETED_SUBGOALS', targetValue })
+      .expect(400);
+    expect(prisma.goal.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a fixed target before any books have been chosen', async () => {
+    (prisma.goal.create as jest.Mock).mockResolvedValue({ ...fixedGoal, currentValue: 0 });
+    await request(app)
+      .post('/api/goals')
+      .send({ title: 'Read 12 books', scope: 'YEARLY', progressMode: 'COMPLETED_SUBGOALS', targetValue: 12 })
+      .expect(200);
+    expect(prisma.goal.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ progressMode: 'COMPLETED_SUBGOALS', targetValue: 12 }),
+    });
+  });
+
+  it('provides the Android list with fixed-target progress and preserves ordinary list entries', async () => {
+    (prisma.goal.findMany as jest.Mock).mockResolvedValue([fixedGoal, { ...mockGoal, id: 'ordinary' }]);
+
+    const response = await request(app).get('/api/goals').expect(200);
+
+    expect(response.body[0].progressSummary.percentComplete).toBeCloseTo(800 / 12);
+    expect(response.body[0].progressSummary.manualTotals).toEqual({ currentValue: 8, targetValue: 12 });
+    expect(response.body[0].progressSummary.taskTotals).toBeUndefined();
+    expect(response.body[1].progressSummary).toBeUndefined();
+  });
+
+  it('returns yearly progress based on books even when all linked chapter tasks are complete', async () => {
+    (prisma.goal.findFirst as jest.Mock).mockResolvedValue({
+      ...fixedGoal,
+      children: [{ isMarkedComplete: true, goalTasks: [{ task: { id: 'chapter-1', isCompleted: true } }] }],
+    });
+
+    const response = await request(app).get('/api/goals/1').expect(200);
+    expect(response.body.progressSummary.percentComplete).toBeCloseTo(800 / 12);
+    expect(response.body.progressSummary.manualTotals).toEqual({ currentValue: 8, targetValue: 12 });
+  });
+
+  it('switches an existing goal to 12 books and returns its recalculated progress', async () => {
+    (prisma.goal.findFirst as jest.Mock).mockResolvedValue({ ...mockGoal, progressMode: 'AUTOMATIC' });
+    (prisma.goal.findUnique as jest.Mock).mockResolvedValue({ ...fixedGoal, isMarkedComplete: true });
+    (prisma.goal.count as jest.Mock).mockResolvedValue(8);
+    (prisma.goal.update as jest.Mock).mockResolvedValue(fixedGoal);
+    (prisma.goal.findUniqueOrThrow as jest.Mock).mockResolvedValue(fixedGoal);
+
+    const response = await request(app)
+      .put('/api/goals/1')
+      .send({ progressMode: 'COMPLETED_SUBGOALS', targetValue: 12 })
+      .expect(200);
+
+    expect(prisma.goal.update).toHaveBeenLastCalledWith({
+      where: { id: '1' },
+      data: { currentValue: 8, isMarkedComplete: false },
+    });
+    expect(response.body).toMatchObject({ targetValue: 12, currentValue: 8, isMarkedComplete: false });
+  });
+
+  it('rejects manually marking the yearly goal complete at 8 of 12', async () => {
+    (prisma.goal.findFirst as jest.Mock).mockResolvedValue(fixedGoal);
+    (prisma.goal.findUnique as jest.Mock).mockResolvedValue(fixedGoal);
+
+    const response = await request(app).post('/api/goals/1/complete').expect(409);
+    expect(response.body.error).toMatch(/complete more subgoals/i);
+    expect(prisma.goal.update).not.toHaveBeenCalled();
+  });
+
+  it('allows marking the yearly goal complete once it reaches 12 of 12', async () => {
+    const reachedGoal = { ...fixedGoal, currentValue: 12 };
+    (prisma.goal.findFirst as jest.Mock).mockResolvedValue(reachedGoal);
+    (prisma.goal.findUnique as jest.Mock).mockResolvedValue(reachedGoal);
+    (prisma.goal.update as jest.Mock).mockResolvedValue({ ...reachedGoal, isMarkedComplete: true });
+
+    await request(app).post('/api/goals/1/complete').expect(200);
+    expect(prisma.goal.update).toHaveBeenCalledWith({ where: { id: '1' }, data: { isMarkedComplete: true } });
+  });
+
+  it('rejects manual progress increments', async () => {
+    (prisma.goal.findFirst as jest.Mock).mockResolvedValue(fixedGoal);
+    (prisma.goal.findUniqueOrThrow as jest.Mock).mockResolvedValue(fixedGoal);
+
+    await request(app).post('/api/goals/1/progress').send({ value: 1 }).expect(409);
+    expect(prisma.progress.create).not.toHaveBeenCalled();
   });
 });

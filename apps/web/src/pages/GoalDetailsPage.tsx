@@ -212,8 +212,15 @@ export const GoalDetailsPage = () => {
   const percent =
     summary?.percentComplete ??
     (goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0);
-  const isGoalComplete = summary?.percentComplete === 100;
-  const isTaskBased = summary && summary.taskTotals.totalCount > 0;
+  const isGoalComplete = goal.isMarkedComplete;
+  const countsSubgoals = goal.progressMode === 'COMPLETED_SUBGOALS';
+  const taskTotals = summary?.taskTotals;
+  const isTaskBased = !countsSubgoals && taskTotals && taskTotals.totalCount > 0;
+  const canMarkComplete =
+    percent >= 100 ||
+    (!countsSubgoals &&
+      goal.parent?.progressMode === 'COMPLETED_SUBGOALS' &&
+      taskTotals?.totalCount === 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pt-6 pb-4">
@@ -471,7 +478,7 @@ export const GoalDetailsPage = () => {
                   >
                     <span className="font-medium">Tasks Completed</span>
                     <span className="font-semibold">
-                      {summary.taskTotals.completedCount}/{summary.taskTotals.totalCount}
+                      {taskTotals.completedCount}/{taskTotals.totalCount}
                     </span>
                   </div>
                   <div
@@ -482,7 +489,7 @@ export const GoalDetailsPage = () => {
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         background: 'var(--gradient-primary)',
-                        width: `${summary.taskTotals.totalCount > 0 ? (summary.taskTotals.completedCount / summary.taskTotals.totalCount) * 100 : 0}%`,
+                        width: `${(taskTotals.completedCount / taskTotals.totalCount) * 100}%`,
                       }}
                     />
                   </div>
@@ -495,7 +502,7 @@ export const GoalDetailsPage = () => {
                   className="text-4xl font-bold font-display"
                   style={{ color: 'var(--deep-charcoal)' }}
                 >
-                  {summary.percentComplete.toFixed(0)}%
+                  {percent.toFixed(0)}%
                 </div>
                 <span className="text-sm" style={{ color: 'var(--warm-gray)' }}>
                   overall completion
@@ -509,7 +516,9 @@ export const GoalDetailsPage = () => {
                   className="flex justify-between text-xs mb-2"
                   style={{ color: 'var(--warm-gray)' }}
                 >
-                  <span className="font-medium">Current Value</span>
+                  <span className="font-medium">
+                    {countsSubgoals ? 'Completed subgoals' : 'Current Value'}
+                  </span>
                   <span className="font-semibold">
                     {goal.currentValue} {goal.targetValue ? `/ ${goal.targetValue}` : ''}
                   </span>
@@ -593,7 +602,7 @@ export const GoalDetailsPage = () => {
               <Link size={16} className="inline mr-1.5" />
               Link Tasks
             </button>
-            {!isGoalComplete && percent >= 100 && (
+            {!isGoalComplete && canMarkComplete && (
               <button
                 onClick={handleCompleteGoal}
                 disabled={isCompleting}
@@ -752,6 +761,7 @@ export const GoalDetailsPage = () => {
                         description: child.description,
                         scope: child.scope as Goal['scope'],
                         type: 'TOTAL_TARGET',
+                        progressMode: child.progressMode,
                         targetValue: child.targetValue,
                         currentValue: child.currentValue,
                         startDate: child.createdAt,

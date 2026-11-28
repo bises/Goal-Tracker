@@ -1,11 +1,12 @@
 import { Goal, Prisma, PrismaClient } from '@prisma/client';
-import { recalculateGoalProgress } from './goalProgressService';
+import { lockGoalProgress, recalculateGoalProgress } from './goalProgressService';
 
 /**
  * Result type for completion service operations
  */
 export interface CompletionResult {
   success: boolean;
+  statusCode?: number;
   message: string;
   updatedGoal?: Partial<Goal>;
 }
@@ -21,7 +22,7 @@ export class CompletionService {
    */
   async completeGoal(goalId: string): Promise<CompletionResult> {
     return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Fetch the goal with parent info
+      await lockGoalProgress(goalId, tx);
       const goal = await tx.goal.findUnique({
         where: { id: goalId },
         select: {
@@ -29,6 +30,9 @@ export class CompletionService {
           title: true,
           parentId: true,
           isMarkedComplete: true,
+          progressMode: true,
+          currentValue: true,
+          targetValue: true,
         },
       });
 
@@ -36,6 +40,14 @@ export class CompletionService {
         return {
           success: false,
           message: 'Goal not found',
+        };
+      }
+
+      if (goal.progressMode === 'COMPLETED_SUBGOALS' && goal.currentValue < (goal.targetValue ?? Infinity)) {
+        return {
+          success: false,
+          statusCode: 409,
+          message: 'Complete more subgoals to reach the target',
         };
       }
 
@@ -85,7 +97,7 @@ export class CompletionService {
    */
   async uncompleteGoal(goalId: string): Promise<CompletionResult> {
     return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Fetch the goal with parent info
+      await lockGoalProgress(goalId, tx);
       const goal = await tx.goal.findUnique({
         where: { id: goalId },
         select: {
