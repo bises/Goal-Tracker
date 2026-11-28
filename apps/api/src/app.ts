@@ -4,6 +4,7 @@ import authRoutes from './routes/auth';
 import calendarRoutes from './routes/calendar';
 import goalRoutes from './routes/goals';
 import taskRoutes from './routes/tasks';
+import { errorHandler } from './middleware/errorHandler';
 
 // Get version from environment variable or default to 1.0.0
 const version = process.env.APP_VERSION?.trim() || '1.0.0';
@@ -25,5 +26,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use(errorHandler);
 
 export default app;
