@@ -2,9 +2,21 @@ import { parseDateOnly } from '@goal-tracker/shared';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { prisma } from '../prisma';
 import { recalculateGoalProgress } from '../services/goalProgressService';
 import { ensureUser } from '../services/userService';
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  setTaskCompletionSchema,
+  linkGoalSchema,
+  unlinkGoalSchema,
+  scheduleTaskSchema,
+  taskIdParamSchema,
+  scheduledDateParamSchema,
+  listTasksQuerySchema,
+} from '../validation/tasksSchemas';
 
 const router = Router();
 
@@ -167,7 +179,7 @@ const taskWithGoals = {
 };
 
 // GET /api/tasks - Get all tasks with optional filtering and pagination
-router.get('/', requireScope(['read:tasks']), async (req, res) => {
+router.get('/', requireScope(['read:tasks']), validateQuery(listTasksQuerySchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -346,13 +358,12 @@ router.get('/', requireScope(['read:tasks']), async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching tasks:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to fetch tasks' });
+    next(error);
   }
 });
 
 // GET /api/tasks/:id - Get task by ID
-router.get('/:id', requireScope(['read:tasks']), async (req, res) => {
+router.get('/:id', requireScope(['read:tasks']), validateParams(taskIdParamSchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -400,18 +411,19 @@ router.get('/:id', requireScope(['read:tasks']), async (req, res) => {
     });
 
     if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+      const error = new Error('Task not found');
+      (error as any).statusCode = 404;
+      throw error;
     }
 
     res.json(task);
   } catch (error) {
-    console.error('Error fetching task:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to fetch task' });
+    next(error);
   }
 });
 
 // POST /api/tasks - Create task
-router.post('/', requireScope(['write:tasks']), async (req, res) => {
+router.post('/', requireScope(['write:tasks']), validateBody(createTaskSchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -429,10 +441,6 @@ router.post('/', requireScope(['write:tasks']), async (req, res) => {
       estimatedDurationMinutes,
       estimatedCompletionDate,
     } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
 
     const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Verify all goals belong to the user
@@ -541,16 +549,12 @@ router.post('/', requireScope(['write:tasks']), async (req, res) => {
 
     res.status(201).json(task);
   } catch (error: any) {
-    if (error?.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
-    }
-    console.error('Error creating task:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to create task' });
+    next(error);
   }
 });
 
 // PUT /api/tasks/:id - Update task (no longer handles goal linking)
-router.put('/:id', requireScope(['write:tasks']), async (req, res) => {
+router.put('/:id', requireScope(['write:tasks']), validateParams(taskIdParamSchema), validateBody(updateTaskSchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -559,7 +563,9 @@ router.put('/:id', requireScope(['write:tasks']), async (req, res) => {
       where: { id: req.params.id, userId: user.id },
     });
     if (!existingTask) {
-      return res.status(404).json({ error: 'Task not found or access denied' });
+      const error = new Error('Task not found or access denied');
+      (error as any).statusCode = 404;
+      throw error;
     }
 
     const {
@@ -632,16 +638,12 @@ router.put('/:id', requireScope(['write:tasks']), async (req, res) => {
 
     res.json(task);
   } catch (error: any) {
-    if (error?.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
-    }
-    console.error('Error updating task:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to update task' });
+    next(error);
   }
 });
 
 // DELETE /api/tasks/:id - Delete task
-router.delete('/:id', requireScope(['write:tasks']), async (req, res) => {
+router.delete('/:id', requireScope(['write:tasks']), validateParams(taskIdParamSchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
     const { goalIds = [] } = req.body;
@@ -656,7 +658,9 @@ router.delete('/:id', requireScope(['write:tasks']), async (req, res) => {
     });
 
     if (!existingTask) {
-      return res.status(404).json({ error: 'Task not found or access denied' });
+      const error = new Error('Task not found or access denied');
+      (error as any).statusCode = 404;
+      throw error;
     }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -680,34 +684,31 @@ router.delete('/:id', requireScope(['write:tasks']), async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting task:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to delete task' });
+    next(error);
   }
 });
 
 // POST /api/tasks/:id/set-completion - Idempotent completion state setter
-router.post('/:id/set-completion', requireScope(['write:tasks']), async (req, res) => {
-  try {
-    const user = await ensureUser(req);
-    const { isCompleted } = req.body;
+router.post(
+  '/:id/set-completion',
+  requireScope(['write:tasks']),
+  validateParams(taskIdParamSchema),
+  validateBody(setTaskCompletionSchema),
+  async (req, res, next) => {
+    try {
+      const user = await ensureUser(req);
+      const { isCompleted } = req.body;
 
-    if (typeof isCompleted !== 'boolean') {
-      return res.status(400).json({ error: 'Field isCompleted (boolean) is required' });
+      const updatedTask = await executeSetTaskCompletion(req.params.id, user.id, isCompleted);
+      res.json(updatedTask);
+    } catch (error: any) {
+      next(error);
     }
-
-    const updatedTask = await executeSetTaskCompletion(req.params.id, user.id, isCompleted);
-    res.json(updatedTask);
-  } catch (error: any) {
-    if (error?.statusCode === 404) {
-      return res.status(404).json({ error: error.message });
-    }
-    console.error('Error setting task completion:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to set task completion' });
   }
-});
+);
 
 // POST /api/tasks/:id/complete - Toggle completion (legacy compatible)
-router.post('/:id/complete', requireScope(['write:tasks']), async (req, res) => {
+router.post('/:id/complete', requireScope(['write:tasks']), validateParams(taskIdParamSchema), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -720,51 +721,53 @@ router.post('/:id/complete', requireScope(['write:tasks']), async (req, res) => 
     });
 
     if (!task) {
-      return res.status(404).json({ error: 'Task not found or access denied' });
+      const error = new Error('Task not found or access denied');
+      (error as any).statusCode = 404;
+      throw error;
     }
 
     const updatedTask = await executeSetTaskCompletion(req.params.id, user.id, !task.isCompleted);
     res.json(updatedTask);
   } catch (error: any) {
-    if (error?.statusCode === 404) {
-      return res.status(404).json({ error: error.message });
-    }
-    console.error('Error toggling task completion:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to toggle task completion' });
+    next(error);
   }
 });
 
 // GET /api/tasks/scheduled/:date - Get tasks for date
-router.get('/scheduled/:date', requireScope(['read:tasks']), async (req, res) => {
-  try {
-    const user = await ensureUser(req);
-    const date = new Date(req.params.date);
-    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+router.get(
+  '/scheduled/:date',
+  requireScope(['read:tasks']),
+  validateParams(scheduledDateParamSchema),
+  async (req, res, next) => {
+    try {
+      const user = await ensureUser(req);
+      const date = new Date(req.params.date);
+      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
 
-    const tasks = await prisma.task.findMany({
-      where: {
-        userId: user.id,
-        scheduledDate: {
-          gte: startOfDay,
-          lte: endOfDay,
+      const tasks = await prisma.task.findMany({
+        where: {
+          userId: user.id,
+          scheduledDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
         },
-      },
-      include: taskWithGoals,
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+        include: taskWithGoals,
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
 
-    res.json(tasks);
-  } catch (error) {
-    console.error('Error fetching scheduled tasks:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to fetch scheduled tasks' });
+      res.json(tasks);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // GET /api/tasks/unscheduled - Get unscheduled tasks
-router.get('/unscheduled/list', requireScope(['read:tasks']), async (req, res) => {
+router.get('/unscheduled/list', requireScope(['read:tasks']), async (req, res, next) => {
   try {
     const user = await ensureUser(req);
 
@@ -782,162 +785,182 @@ router.get('/unscheduled/list', requireScope(['read:tasks']), async (req, res) =
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching unscheduled tasks:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to fetch unscheduled tasks' });
+    next(error);
   }
 });
 
 // POST /api/tasks/:id/link-goal - Link task to a goal
-router.post('/:id/link-goal', requireScope(['write:tasks']), async (req, res) => {
-  try {
-    const user = await ensureUser(req);
-    const { goalId } = req.body;
+router.post(
+  '/:id/link-goal',
+  requireScope(['write:tasks']),
+  validateParams(taskIdParamSchema),
+  validateBody(linkGoalSchema),
+  async (req, res, next) => {
+    try {
+      const user = await ensureUser(req);
+      const { goalId } = req.body;
 
-    if (!goalId) {
-      return res.status(400).json({ error: 'goalId is required' });
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        // Verify task belongs to user
+        const task = await tx.task.findFirst({
+          where: { id: req.params.id, userId: user.id },
+        });
+        if (!task) {
+          const error = new Error('Task not found or access denied');
+          (error as any).statusCode = 404;
+          throw error;
+        }
+
+        // Verify goal belongs to user
+        const goal = await tx.goal.findFirst({
+          where: { id: goalId, userId: user.id },
+          select: { targetValue: true },
+        });
+        if (!goal) {
+          const error = new Error('Goal not found or access denied');
+          (error as any).statusCode = 404;
+          throw error;
+        }
+
+        // Check if link already exists
+        const existing = await tx.goalTask.findFirst({
+          where: { taskId: req.params.id, goalId },
+        });
+
+        if (existing) {
+          const error = new Error('Task is already linked to this goal');
+          (error as any).statusCode = 400;
+          throw error;
+        }
+
+        // Create the link
+        await tx.goalTask.create({
+          data: { goalId, taskId: req.params.id },
+        });
+
+        // Recalculate goal progress atomically
+        await recalculateGoalProgress(goalId, tx);
+      });
+
+      // Return updated task
+      const task = await prisma.task.findUnique({
+        where: { id: req.params.id },
+        include: taskWithGoals,
+      });
+
+      res.json(task);
+    } catch (error: any) {
+      next(error);
     }
-
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Verify task belongs to user
-      const task = await tx.task.findFirst({
-        where: { id: req.params.id, userId: user.id },
-      });
-      if (!task) {
-        throw new Error('Task not found or access denied');
-      }
-
-      // Verify goal belongs to user
-      const goal = await tx.goal.findFirst({
-        where: { id: goalId, userId: user.id },
-        select: { targetValue: true },
-      });
-      if (!goal) {
-        throw new Error('Goal not found or access denied');
-      }
-
-      // Check if link already exists
-      const existing = await tx.goalTask.findFirst({
-        where: { taskId: req.params.id, goalId },
-      });
-
-      if (existing) {
-        throw new Error('Task is already linked to this goal');
-      }
-
-      // Create the link
-      await tx.goalTask.create({
-        data: { goalId, taskId: req.params.id },
-      });
-
-      // Recalculate goal progress atomically
-      await recalculateGoalProgress(goalId, tx);
-    });
-
-    // Return updated task
-    const task = await prisma.task.findUnique({
-      where: { id: req.params.id },
-      include: taskWithGoals,
-    });
-
-    res.json(task);
-  } catch (error: any) {
-    console.error('Error linking task to goal:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: error.message || 'Failed to link task to goal' });
   }
-});
+);
 
 // POST /api/tasks/:id/unlink-goal - Unlink task from a goal
-router.post('/:id/unlink-goal', requireScope(['write:tasks']), async (req, res) => {
-  try {
-    const user = await ensureUser(req);
-    const { goalId } = req.body;
+router.post(
+  '/:id/unlink-goal',
+  requireScope(['write:tasks']),
+  validateParams(taskIdParamSchema),
+  validateBody(unlinkGoalSchema),
+  async (req, res, next) => {
+    try {
+      const user = await ensureUser(req);
+      const { goalId } = req.body;
 
-    if (!goalId) {
-      return res.status(400).json({ error: 'goalId is required' });
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        // Verify task belongs to user
+        const task = await tx.task.findFirst({
+          where: { id: req.params.id, userId: user.id },
+          select: { isCompleted: true, size: true },
+        });
+        if (!task) {
+          const error = new Error('Task not found or access denied');
+          (error as any).statusCode = 404;
+          throw error;
+        }
+
+        // Verify goal belongs to user and fetch its properties
+        const goal = await tx.goal.findFirst({
+          where: { id: goalId, userId: user.id },
+          select: { targetValue: true, currentValue: true },
+        });
+        if (!goal) {
+          const error = new Error('Goal not found or access denied');
+          (error as any).statusCode = 404;
+          throw error;
+        }
+
+        // Delete the link
+        const deleted = await tx.goalTask.deleteMany({
+          where: { taskId: req.params.id, goalId },
+        });
+
+        if (deleted.count === 0) {
+          const error = new Error('Task is not linked to this goal');
+          (error as any).statusCode = 400;
+          throw error;
+        }
+
+        // Recalculate goal progress atomically
+        await recalculateGoalProgress(goalId, tx);
+      });
+
+      // Return updated task
+      const task = await prisma.task.findUnique({
+        where: { id: req.params.id },
+        include: taskWithGoals,
+      });
+
+      res.json(task);
+    } catch (error: any) {
+      next(error);
     }
-
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Verify task belongs to user
-      const task = await tx.task.findFirst({
-        where: { id: req.params.id, userId: user.id },
-        select: { isCompleted: true, size: true },
-      });
-      if (!task) {
-        throw new Error('Task not found or access denied');
-      }
-
-      // Verify goal belongs to user and fetch its properties
-      const goal = await tx.goal.findFirst({
-        where: { id: goalId, userId: user.id },
-        select: { targetValue: true, currentValue: true },
-      });
-      if (!goal) {
-        throw new Error('Goal not found or access denied');
-      }
-
-      // Delete the link
-      const deleted = await tx.goalTask.deleteMany({
-        where: { taskId: req.params.id, goalId },
-      });
-
-      if (deleted.count === 0) {
-        throw new Error('Task is not linked to this goal');
-      }
-
-      // Recalculate goal progress atomically
-      await recalculateGoalProgress(goalId, tx);
-    });
-
-    // Return updated task
-    const task = await prisma.task.findUnique({
-      where: { id: req.params.id },
-      include: taskWithGoals,
-    });
-
-    res.json(task);
-  } catch (error: any) {
-    console.error('Error unlinking task from goal:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: error.message || 'Failed to unlink task from goal' });
   }
-});
+);
 
 // POST /api/tasks/:id/schedule - Schedule or unschedule a task
-router.post('/:id/schedule', requireScope(['write:tasks']), async (req, res) => {
-  try {
-    const user = await ensureUser(req);
-    const { scheduledDate } = req.body;
+router.post(
+  '/:id/schedule',
+  requireScope(['write:tasks']),
+  validateParams(taskIdParamSchema),
+  validateBody(scheduleTaskSchema),
+  async (req, res, next) => {
+    try {
+      const user = await ensureUser(req);
+      const { scheduledDate } = req.body;
 
-    // Verify task belongs to user
-    const existingTask = await prisma.task.findFirst({
-      where: { id: req.params.id, userId: user.id },
-    });
-    if (!existingTask) {
-      return res.status(404).json({ error: 'Task not found or access denied' });
+      // Verify task belongs to user
+      const existingTask = await prisma.task.findFirst({
+        where: { id: req.params.id, userId: user.id },
+      });
+      if (!existingTask) {
+        const error = new Error('Task not found or access denied');
+        (error as any).statusCode = 404;
+        throw error;
+      }
+
+      // Parse YYYY-MM-DD string as local date (not UTC)
+      let parsedDate = null;
+      if (scheduledDate) {
+        const [year, month, day] = scheduledDate.split('-').map(Number);
+        parsedDate = new Date(year, month - 1, day);
+      }
+
+      const task = await prisma.task.update({
+        where: { id: req.params.id },
+        data: {
+          scheduledDate: parsedDate,
+        },
+        include: taskWithGoals,
+      });
+
+      res.json({
+        success: true,
+        task,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    // Parse YYYY-MM-DD string as local date (not UTC)
-    let parsedDate = null;
-    if (scheduledDate) {
-      const [year, month, day] = scheduledDate.split('-').map(Number);
-      parsedDate = new Date(year, month - 1, day);
-    }
-
-    const task = await prisma.task.update({
-      where: { id: req.params.id },
-      data: {
-        scheduledDate: parsedDate,
-      },
-      include: taskWithGoals,
-    });
-
-    res.json({
-      success: true,
-      task,
-    });
-  } catch (error) {
-    console.error('Error scheduling task:', error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({ error: 'Failed to schedule task' });
   }
-});
+);
 
 export default router;
