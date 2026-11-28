@@ -4,7 +4,7 @@ import { Drawer } from 'vaul';
 import { api } from '../api';
 import { useGoalContext } from '../contexts/GoalContext';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
-import { Goal, GoalScope } from '../types';
+import { Goal, GoalProgressMode, GoalScope } from '../types';
 import { Button } from './ui/button';
 import { CalendarDialog } from './ui/calendar-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -41,6 +41,8 @@ export const GoalEditSheet = ({
   const [description, setDescription] = useState('');
   const [type, setType] = useState<'TOTAL_TARGET' | 'FREQUENCY'>('TOTAL_TARGET');
   const [targetValue, setTargetValue] = useState('');
+  const [progressMode, setProgressMode] = useState<GoalProgressMode>('AUTOMATIC');
+  const countsSubgoals = progressMode === 'COMPLETED_SUBGOALS';
   const [scope, setScope] = useState<GoalScope>('STANDALONE');
   const [endDate, setEndDate] = useState('');
   const [customDataLabel, setCustomDataLabel] = useState('');
@@ -57,6 +59,7 @@ export const GoalEditSheet = ({
       setDescription(goal.description || '');
       setType(goal.type || 'TOTAL_TARGET');
       setTargetValue(goal.targetValue?.toString() || '');
+      setProgressMode(goal.progressMode ?? 'AUTOMATIC');
       setScope(goal.scope || 'STANDALONE');
       setEndDate(goal.endDate ? goal.endDate.split('T')[0] : '');
       setCustomDataLabel(goal.customDataLabel || '');
@@ -105,6 +108,7 @@ export const GoalEditSheet = ({
     setDescription('');
     setType('TOTAL_TARGET');
     setTargetValue('');
+    setProgressMode('AUTOMATIC');
     setScope('STANDALONE');
     setEndDate('');
     setCustomDataLabel('');
@@ -127,6 +131,7 @@ export const GoalEditSheet = ({
         title: title.trim(),
         description: description.trim() || undefined,
         type,
+        progressMode,
         targetValue: targetValue ? parseFloat(targetValue) : undefined,
         scope,
         endDate: endDate ? new Date(endDate + 'T00:00:00').toISOString() : undefined,
@@ -266,20 +271,40 @@ export const GoalEditSheet = ({
                 </Select>
               </div>
 
+              <div>
+                <label htmlFor="goal-progress-mode" className="mb-2 block text-sm font-semibold">
+                  Track progress by
+                </label>
+                <Select
+                  value={progressMode}
+                  onValueChange={(value: GoalProgressMode) => setProgressMode(value)}
+                >
+                  <SelectTrigger id="goal-progress-mode" className="h-12 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTOMATIC">Automatic</SelectItem>
+                    <SelectItem value="COMPLETED_SUBGOALS">Completed subgoals</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Target Value */}
               <div>
                 <label
                   className="block text-sm font-semibold mb-2"
                   style={{ color: 'var(--deep-charcoal)' }}
                 >
-                  Target Value
+                  {countsSubgoals ? 'Subgoal target' : 'Target Value'}
                 </label>
                 <input
                   type="number"
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
                   placeholder="e.g. 12"
-                  min="0"
+                  min={countsSubgoals ? 1 : 0}
+                  max={countsSubgoals ? 2147483647 : undefined}
+                  required={countsSubgoals}
                   className="w-full px-4 py-3 rounded-xl border text-base"
                   style={{
                     borderColor: 'var(--card-border)',
@@ -288,7 +313,9 @@ export const GoalEditSheet = ({
                   }}
                 />
                 <p className="text-xs mt-1.5" style={{ color: 'var(--warm-gray)' }}>
-                  Leave blank for open-ended tracking
+                  {countsSubgoals
+                    ? 'Add subgoals as you go. Each completed subgoal counts once toward this target.'
+                    : 'Leave blank for open-ended tracking'}
                 </p>
               </div>
 

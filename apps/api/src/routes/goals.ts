@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { requireAuth, requireScope, validateJWT } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { CompletionService } from '../services/completionService';
-import { recalculateGoalProgress } from '../services/goalProgressService';
+import { lockGoalProgress, recalculateGoalProgress } from '../services/goalProgressService';
 import { ensureUser } from '../services/userService';
 
 const router = Router();
@@ -71,6 +71,31 @@ const getCompletionService = () => {
   return completionService;
 };
 
+function validateProgressMode(progressMode: unknown, targetValue: unknown): void {
+  if (
+    progressMode !== undefined &&
+    progressMode !== 'AUTOMATIC' &&
+    progressMode !== 'COMPLETED_SUBGOALS'
+  ) {
+    throw Object.assign(new Error('Invalid goal progress mode'), { statusCode: 400 });
+  }
+  if (
+    progressMode === 'COMPLETED_SUBGOALS' &&
+    (typeof targetValue !== 'number' ||
+      !Number.isInteger(targetValue) ||
+      targetValue < 1 ||
+      targetValue > 2147483647)
+  ) {
+    throw Object.assign(new Error('Completed-subgoal goals require a positive whole-number target'), {
+      statusCode: 400,
+    });
+  }
+}
+
+function getSubgoalProgressPercent(goal: { currentValue: number; targetValue: number | null }): number {
+  return goal.targetValue ? Math.min((goal.currentValue / goal.targetValue) * 100, 100) : 0;
+}
+
 const computeGoalView = (goal: any) => {
   const goalTasks = goal.goalTasks || [];
   const children = goal.children || [];
@@ -108,8 +133,12 @@ const computeGoalView = (goal: any) => {
     completedSize = completedCount;
   }
 
-  // Task progress is the primary calculation (all goals use tasks)
-  const percentComplete = totalSize > 0 ? (completedSize / totalSize) * 100 : 0;
+  const percentComplete =
+    goal.progressMode === 'COMPLETED_SUBGOALS'
+      ? getSubgoalProgressPercent(goal)
+      : totalSize > 0
+        ? (completedSize / totalSize) * 100
+        : 0;
 
   return {
     ...goal,
@@ -188,6 +217,7 @@ router.get('/', requireScope(['read:goals']), async (req, res) => {
         title: true,
         scope: true,
         type: true,
+        progressMode: true,
         currentValue: true,
         targetValue: true,
         parentId: true,
@@ -205,7 +235,20 @@ router.get('/', requireScope(['read:goals']), async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(goals);
+    // The Android list reads progressSummary without making a goal detail request.
+    res.json(
+      goals.map((goal) =>
+        goal.progressMode === 'COMPLETED_SUBGOALS'
+          ? {
+              ...goal,
+              progressSummary: {
+                percentComplete: getSubgoalProgressPercent(goal),
+                manualTotals: { currentValue: goal.currentValue, targetValue: goal.targetValue },
+              },
+            }
+          : goal
+      )
+    );
   } catch (error) {
     console.error('Failed to fetch goals:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch goals' });
@@ -229,6 +272,7 @@ router.get('/:id', requireScope(['read:goals']), async (req, res) => {
             id: true,
             title: true,
             scope: true,
+            progressMode: true,
           },
         },
         children: {
@@ -238,6 +282,7 @@ router.get('/:id', requireScope(['read:goals']), async (req, res) => {
             description: true,
             scope: true,
             type: true,
+            progressMode: true,
             targetValue: true,
             currentValue: true,
             parentId: true,
@@ -281,6 +326,7 @@ router.post('/', requireScope(['write:goals']), async (req, res) => {
       title,
       description,
       type,
+      progressMode,
       targetValue,
       frequencyTarget,
       frequencyType,
@@ -290,6 +336,8 @@ router.post('/', requireScope(['write:goals']), async (req, res) => {
       parentId,
       scope,
     } = req.body;
+
+    validateProgressMode(progressMode, targetValue);
 
     const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // If parentId is provided, verify parent belongs to user and is cycle-free
@@ -303,6 +351,7 @@ router.post('/', requireScope(['write:goals']), async (req, res) => {
           title,
           description,
           type: type || 'TOTAL_TARGET',
+          progressMode,
           targetValue,
           frequencyTarget,
           frequencyType,
@@ -339,17 +388,10 @@ router.put('/:id', requireScope(['write:goals']), async (req, res) => {
   try {
     const user = await ensureUser(req);
 
-    // Verify goal belongs to user
-    const existingGoal = await prisma.goal.findFirst({
-      where: { id, userId: user.id },
-    });
-    if (!existingGoal) {
-      return res.status(404).json({ error: 'Goal not found or access denied' });
-    }
-
     const {
       title,
       description,
+      progressMode,
       targetValue,
       frequencyTarget,
       frequencyType,
@@ -359,26 +401,65 @@ router.put('/:id', requireScope(['write:goals']), async (req, res) => {
       scope,
     } = req.body;
 
-    // Validate parent if provided and not null (unparenting with null is permitted)
-    if (parentId !== undefined && parentId !== null) {
-      await validateParentGoal(id, parentId, user.id, prisma);
-    }
+    const goal = await prisma.$transaction(async (tx) => {
+      let existingGoal = await tx.goal.findFirst({ where: { id, userId: user.id } });
+      if (!existingGoal) {
+        throw Object.assign(new Error('Goal not found or access denied'), { statusCode: 404 });
+      }
 
-    const goal = await prisma.goal.update({
-      where: { id },
-      data: {
-        title,
-        description,
-        targetValue,
-        frequencyTarget,
-        frequencyType,
-        endDate: endDate ? new Date(endDate) : undefined,
-        customDataLabel,
-        parentId,
-        scope,
-      },
+      if (parentId !== undefined && parentId !== null) {
+        await validateParentGoal(id, parentId, user.id, tx);
+      }
+
+      if (progressMode !== undefined || targetValue !== undefined || parentId !== undefined) {
+        await lockGoalProgress(id, tx);
+        existingGoal = await tx.goal.findFirst({ where: { id, userId: user.id } });
+        if (!existingGoal) {
+          throw Object.assign(new Error('Goal not found or access denied'), { statusCode: 404 });
+        }
+      }
+
+      const nextMode = progressMode === undefined ? existingGoal.progressMode : progressMode;
+      const modeChanged = nextMode !== existingGoal.progressMode;
+      const nextTarget =
+        targetValue === undefined && !modeChanged ? existingGoal.targetValue : targetValue;
+      validateProgressMode(nextMode, nextTarget);
+
+      const updated = await tx.goal.update({
+        where: { id },
+        data: {
+          title,
+          description,
+          progressMode,
+          targetValue,
+          frequencyTarget,
+          frequencyType,
+          endDate: endDate ? new Date(endDate) : undefined,
+          customDataLabel,
+          parentId,
+          scope,
+          ...(progressMode === 'AUTOMATIC' && existingGoal.progressMode === 'COMPLETED_SUBGOALS'
+            ? { currentValue: 0 }
+            : {}),
+        },
+      });
+
+      const recalculateSelf =
+        modeChanged || (nextMode === 'COMPLETED_SUBGOALS' && targetValue !== undefined);
+      if (recalculateSelf) {
+        await recalculateGoalProgress(id, tx);
+      }
+      if (updated.parentId !== existingGoal.parentId) {
+        const parentIds = [existingGoal.parentId, recalculateSelf ? null : updated.parentId];
+        for (const parentId of parentIds.sort()) {
+          if (parentId) {
+            await recalculateGoalProgress(parentId, tx);
+          }
+        }
+      }
+
+      return recalculateSelf ? tx.goal.findUniqueOrThrow({ where: { id } }) : updated;
     });
-
     res.json(goal);
   } catch (error: any) {
     if (error?.statusCode) {
@@ -406,6 +487,15 @@ router.post('/:id/progress', requireScope(['write:goals']), async (req, res) => 
     }
 
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await lockGoalProgress(id, tx);
+      const goalSettings = await tx.goal.findUniqueOrThrow({
+        where: { id },
+        select: { progressMode: true },
+      });
+      if (goalSettings.progressMode === 'COMPLETED_SUBGOALS') {
+        throw Object.assign(new Error('Progress comes from completed subgoals'), { statusCode: 409 });
+      }
+
       // Create progress entry
       const progress = await tx.progress.create({
         data: {
@@ -429,7 +519,10 @@ router.post('/:id/progress', requireScope(['write:goals']), async (req, res) => 
     });
 
     res.json(result);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Failed to update progress' });
   }
 });
@@ -682,7 +775,7 @@ router.post('/:id/complete', requireScope(['write:goals']), async (req, res) => 
     const result = await getCompletionService().completeGoal(req.params.id);
 
     if (!result.success) {
-      return res.status(404).json({ error: result.message });
+      return res.status(result.statusCode ?? 404).json({ error: result.message });
     }
 
     res.json(result);
@@ -751,6 +844,7 @@ router.get('/:id/tasks', requireScope(['read:goals']), async (req, res) => {
             description: true,
             scope: true,
             type: true,
+            progressMode: true,
             targetValue: true,
             currentValue: true,
             parentId: true,

@@ -6,6 +6,7 @@
 export type {
   FrequencyType,
   Goal,
+  GoalProgressMode,
   GoalScope,
   GoalTask,
   GoalTasksResponse,

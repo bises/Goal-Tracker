@@ -5,9 +5,11 @@ describe('recalculateGoalProgress', () => {
 
   beforeEach(() => {
     mockTx = {
+      $queryRaw: jest.fn(),
       goal: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
       },
     };
   });
@@ -141,4 +143,31 @@ describe('recalculateGoalProgress', () => {
       },
     });
   });
+
+  it.each([0, 1, 8, 12, 13])(
+    'keeps a target of 12 when %i subgoals are complete',
+    async (completed) => {
+      const goal = {
+        id: 'reading',
+        userId: 1,
+        parentId: null,
+        targetValue: 12,
+        progressMode: 'COMPLETED_SUBGOALS',
+        isMarkedComplete: true,
+        children: [{ goalTasks: [{ task: { id: 'chapter', isCompleted: true } }] }],
+      };
+      mockTx.goal.findUnique.mockResolvedValue(goal);
+      mockTx.goal.count.mockResolvedValue(completed);
+
+      await recalculateGoalProgress(goal.id, mockTx);
+
+      expect(mockTx.goal.count).toHaveBeenCalledWith({
+        where: { parentId: goal.id, isMarkedComplete: true, userId: goal.userId },
+      });
+      expect(mockTx.goal.update).toHaveBeenCalledWith({
+        where: { id: goal.id },
+        data: { currentValue: completed, ...(completed < 12 ? { isMarkedComplete: false } : {}) },
+      });
+    }
+  );
 });

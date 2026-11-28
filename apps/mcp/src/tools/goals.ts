@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { GoalTrackerApiClient } from '../client/apiClient';
 import { formatErrorResult, formatSuccessResult, sanitizeString, checkWritesAllowed } from './sanitize';
 
+const progressMode = z
+  .enum(['AUTOMATIC', 'COMPLETED_SUBGOALS'])
+  .optional()
+  .describe('Use COMPLETED_SUBGOALS to count finished child goals against a fixed whole-number target');
+
 export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiClient): void {
   // Tool 1: list_goals
   (server as any).tool(
@@ -81,6 +86,7 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
           `- **ID**: \`${goal.id}\``,
           `- **Scope**: ${goal.scope || 'STANDALONE'}`,
           `- **Type**: ${goal.type || 'TASK_COUNT'}`,
+          ...(goal.progressMode === 'COMPLETED_SUBGOALS' ? ['- **Tracks**: Completed subgoals'] : []),
           `- **Status**: ${goal.isMarkedComplete ? 'Completed' : 'Active'}`,
           `- **Progress**: ${goal.currentValue ?? 0} / ${goal.targetValue ?? 0}`,
         ];
@@ -127,7 +133,8 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
       description: z.string().max(4000).optional().describe('Goal description or acceptance criteria'),
       scope: z.enum(['YEARLY', 'MONTHLY', 'WEEKLY', 'STANDALONE']).optional().default('STANDALONE').describe('Goal scope'),
       type: z.enum(['TOTAL_TARGET', 'FREQUENCY']).optional().default('TOTAL_TARGET').describe('Goal measurement type'),
-      targetValue: z.number().positive().optional().describe('Target numeric value (default 1)'),
+      progressMode,
+      targetValue: z.number().positive().optional().describe('Target numeric value. Required for COMPLETED_SUBGOALS.'),
       endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('Target completion date (YYYY-MM-DD)'),
       parentId: z.string().uuid('Invalid parent goal ID format').optional().describe('Parent goal UUID for hierarchy'),
     },
@@ -142,6 +149,7 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
           type: args.type || 'TOTAL_TARGET',
         };
         if (args.description !== undefined) body.description = sanitizeString(args.description);
+        if (args.progressMode !== undefined) body.progressMode = args.progressMode;
         if (args.targetValue !== undefined) body.targetValue = args.targetValue;
         if (args.endDate !== undefined) body.endDate = args.endDate;
         if (args.parentId !== undefined) body.parentId = args.parentId;
@@ -164,7 +172,8 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
       goalId: z.string().uuid('Invalid goal ID format').describe('Goal UUID to update'),
       title: z.string().min(1).max(255).optional().describe('New goal title'),
       description: z.string().max(4000).optional().describe('New goal description'),
-      targetValue: z.number().positive().optional().describe('New target numeric value'),
+      progressMode,
+      targetValue: z.number().positive().optional().describe('New target numeric value. Required when switching to COMPLETED_SUBGOALS.'),
       scope: z.enum(['YEARLY', 'MONTHLY', 'WEEKLY', 'STANDALONE']).optional().describe('New goal scope'),
       parentId: z.string().uuid('Invalid parent goal ID format').nullable().optional().describe('New parent goal UUID (or null to unparent)'),
       endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().describe('New target completion date (YYYY-MM-DD)'),
@@ -177,6 +186,7 @@ export function registerGoalTools(server: McpServer, apiClient: GoalTrackerApiCl
         const body: Record<string, any> = {};
         if (fields.title !== undefined) body.title = sanitizeString(fields.title);
         if (fields.description !== undefined) body.description = sanitizeString(fields.description);
+        if (fields.progressMode !== undefined) body.progressMode = fields.progressMode;
         if (fields.targetValue !== undefined) body.targetValue = fields.targetValue;
         if (fields.scope !== undefined) body.scope = fields.scope;
         if (fields.parentId !== undefined) body.parentId = fields.parentId;

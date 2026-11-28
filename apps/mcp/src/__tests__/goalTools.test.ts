@@ -25,6 +25,7 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
     mockApiClient = {
       get: jest.fn(),
       post: jest.fn(),
+      put: jest.fn(),
       getProfile: jest.fn().mockReturnValue('development'),
     } as unknown as jest.Mocked<GoalTrackerApiClient>;
 
@@ -90,6 +91,27 @@ describe('Goal Tools (list_goals status & scope filtering)', () => {
     expect(text).toContain('Active Goal');
     expect(text).toContain('Completed Goal');
     expect(text).toContain('2 found');
+  });
+
+  it('forwards a fixed completed-subgoal target when updating a goal', async () => {
+    const goalId = '00000000-0000-4000-8000-000000000001';
+    mockApiClient.put.mockResolvedValueOnce({
+      id: goalId,
+      title: 'Read books',
+      scope: 'YEARLY',
+      currentValue: 8,
+      targetValue: 12,
+    });
+    const tool = tools.get('update_goal');
+    const args = z.object(tool.schema).parse({ goalId, progressMode: 'COMPLETED_SUBGOALS', targetValue: 12 });
+
+    const response = await tool.handler(args);
+
+    expect(mockApiClient.put).toHaveBeenCalledWith(`/api/goals/${goalId}`, {
+      progressMode: 'COMPLETED_SUBGOALS',
+      targetValue: 12,
+    });
+    expect(response.content[0].text).toContain('8/12');
   });
 
   it('create_goal should call POST /api/goals', async () => {

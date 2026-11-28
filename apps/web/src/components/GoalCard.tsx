@@ -78,9 +78,10 @@ export const GoalCard = ({ goal, onUpdate, variant = 'default' }: GoalCardProps)
     onUpdate();
   };
 
-  const displayCurrent = goal.targetValue
-    ? Math.min(goal.currentValue, goal.targetValue)
-    : goal.currentValue;
+  const displayCurrent =
+    goal.targetValue && goal.progressMode !== 'COMPLETED_SUBGOALS'
+      ? Math.min(goal.currentValue, goal.targetValue)
+      : goal.currentValue;
 
   const percent = goal.targetValue ? Math.min((displayCurrent / goal.targetValue) * 100, 100) : 0;
 
